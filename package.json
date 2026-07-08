@@ -17,5 +17,5 @@
     "@capacitor/cli": "^6.0.0"
   },
   "author": "SquashDB Team",
-  "license": "MIT"
+  "license": "Apache-2.0"
 }
