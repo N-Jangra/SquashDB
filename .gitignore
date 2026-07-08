@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Local Android/build toolchain (SDK, downloaded tools)
+build_env/
+
+# Python
+__pycache__/
+*.pyc
+
+# Android build output (also covered by android/.gitignore, kept here for safety)
+android/.gradle/
+android/app/build/
+android/**/build/
+android/local.properties
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/res/xml/config.xml
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+# Env/secrets
+.env
+.env.local
