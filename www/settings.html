@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Settings</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<body><div id="app-container">
+<main><section id="tab-settings" class="tab-content active">
+<div class="settings-page-header">
+  <h2>Settings</h2>
+</div>
+<div class="settings-section">
+  <h4 class="settings-section-title">Appearance</h4>
+  <div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" id="dashboard-row-actions-picker" data-pref="dashboardRowActions">
+      <div class="settings-row-icon"><i data-lucide="mouse-pointer-click"></i></div>
+      <div class="settings-row-body">
+        <label>Dashboard Row Actions</label>
+        <span>Choose how to edit or delete items.</span>
+      </div>
+      <div class="settings-row-value"><span id="dashboard-row-actions-picker-value">3-dot menu</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" id="main-color-picker" data-pref="mainColor">
+      <div class="settings-row-icon"><i data-lucide="droplets"></i></div>
+      <div class="settings-row-body">
+        <label>Main Color</label>
+        <span>Change the accent color.</span>
+      </div>
+      <div class="settings-row-value"><span id="main-color-picker-value">Normal</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" id="rating-format-picker" data-pref="ratingFormat">
+      <div class="settings-row-icon"><i data-lucide="star"></i></div>
+      <div class="settings-row-body">
+        <label>Rating Format</label>
+        <span>Choose how ratings are displayed.</span>
+      </div>
+      <div class="settings-row-value"><span id="rating-format-picker-value">5 stars</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" id="ui-theme-picker" data-pref="uiTheme">
+      <div class="settings-row-icon"><i data-lucide="palette"></i></div>
+      <div class="settings-row-body">
+        <label>Theme</label>
+        <span>Switch between dark and light modes.</span>
+      </div>
+      <div class="settings-row-value"><span id="ui-theme-picker-value">Dark</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+  </div>
+</div>
+<div class="settings-page-header">
+  <h4 class="settings-section-title">App</h4>
+</div>
+<div class="settings-section">
+  <div class="settings-list">
+    <a class="settings-row settings-row-link" href="manage-app-icon.html">
+      <div class="settings-row-icon"><i data-lucide="app-window"></i></div>
+      <div class="settings-row-body">
+        <label>App Icon</label>
+        <span>Change the app icon shown on your home screen.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="manage-app-name.html">
+      <div class="settings-row-icon"><i data-lucide="text-cursor-input"></i></div>
+      <div class="settings-row-body">
+        <label>App Name</label>
+        <span>Change the app name shown on your home screen.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="manage-nav-icons.html">
+      <div class="settings-row-icon"><i data-lucide="layout-panel-top"></i></div>
+      <div class="settings-row-body">
+        <label>Bottom Menu Icons</label>
+        <span>Customize the navigation bar icons.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+  </div>
+</div>
+<div class="settings-page-header">
+  <h4 class="settings-section-title">General</h4>
+</div>
+<div class="settings-section">
+  <div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" id="metadata-mode-picker" data-pref="metadataMode">
+      <div class="settings-row-icon"><i data-lucide="cloud-cog"></i></div>
+      <div class="settings-row-body">
+        <label>Metadata Mode</label>
+        <span>Offline keeps manual entry. Online can look up metadata and thumbnails.</span>
+      </div>
+      <div class="settings-row-value"><span id="metadata-mode-picker-value">Offline</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" id="metadata-thumbnails-picker" data-pref="metadataThumbnails">
+      <div class="settings-row-icon"><i data-lucide="image"></i></div>
+      <div class="settings-row-body">
+        <label>Metadata Thumbnails</label>
+        <span>Turn thumbnail fetching and display on or off.</span>
+      </div>
+      <div class="settings-row-value"><span id="metadata-thumbnails-picker-value">On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <a class="settings-row settings-row-link" href="manage-tracking.html">
+      <div class="settings-row-icon"><i data-lucide="list-checks"></i></div>
+      <div class="settings-row-body">
+        <label>Tracking Choices</label>
+        <span>Choose which lists show up and create new ones.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="manage-category-order.html">
+      <div class="settings-row-icon"><i data-lucide="arrow-down-up"></i></div>
+      <div class="settings-row-body">
+        <label>Category Order</label>
+        <span>Drag to reorder your enabled lists.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="manage-backups.html">
+      <div class="settings-row-icon"><i data-lucide="database-backup"></i></div>
+      <div class="settings-row-body">
+        <label>Backups &amp; Restore</label>
+        <span>Export your data or restore from a backup file.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+  </div>
+</div>
+</section></main>
+<nav class="bottom-nav"><a class="nav-item" data-tab="tab-dashboard" href="dashboard.html" aria-label="Dashboard"><i data-lucide="layout-grid"></i></a><a class="nav-item" data-tab="tab-timeline" href="timeline.html" aria-label="Timeline"><i data-lucide="calendar"></i></a><a class="nav-item" data-tab="tab-stats" href="statistics.html" aria-label="Statistics"><i data-lucide="pie-chart"></i></a><a class="nav-item active" data-tab="tab-settings" href="settings.html" aria-label="Settings"><i data-lucide="settings"></i></a></nav>
+<div id="picker-modal" class="modal-overlay">
+  <div class="modal-content picker-sheet">
+    <div class="modal-header">
+      <h3 id="picker-modal-title" class="modal-title">Options</h3>
+      <button class="modal-close" id="picker-modal-close">&times;</button>
+    </div>
+    <div id="picker-options-list" class="picker-options-list"></div>
+  </div>
+</div>
+</div><script src="metadata.js"></script><script src="app.js"></script></body></html>
