@@ -24,6 +24,9 @@ android/app/src/main/res/xml/config.xml
 .idea/
 .DS_Store
 
+# Built APKs
+*.apk
+
 # Logs
 *.log
 
