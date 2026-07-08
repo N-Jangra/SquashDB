@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SquashDB - Dashboard</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="index.css">
+  <script src="lucide.min.js"></script>
+</head>
+<body>
+  <div id="app-container">
+    <div id="search-container" class="search-container">
+      <i data-lucide="search"></i>
+      <input type="text" id="global-search" class="search-input" placeholder="Search Downloads...">
+    </div>
+    <div class="chips-container" id="category-chips"></div>
+
+    <main>
+      <section id="tab-dashboard" class="tab-content active">
+        <div id="notes-container" class="notes-container"></div>
+        <div id="dashboard-empty" class="empty-state" style="display:none;">
+          <i data-lucide="bookmark-x"></i>
+          <h3>No Items Found</h3>
+          <p>Tap the floating "+" button to add games, movies, series, or books to your list.</p>
+        </div>
+      </section>
+    </main>
+
+    <button id="add-fab" class="fab" title="Add Tracking Entry"><i data-lucide="plus"></i></button>
+
+    <nav class="bottom-nav">
+      <a class="nav-item active" data-tab="tab-dashboard" href="dashboard.html" aria-label="Dashboard"><i data-lucide="layout-grid"></i></a>
+      <a class="nav-item" data-tab="tab-timeline" href="timeline.html" aria-label="Timeline"><i data-lucide="calendar"></i></a>
+      <a class="nav-item" data-tab="tab-stats" href="statistics.html" aria-label="Statistics"><i data-lucide="pie-chart"></i></a>
+      <a class="nav-item" data-tab="tab-settings" href="settings.html" aria-label="Settings"><i data-lucide="settings"></i></a>
+    </nav>
+
+    <div id="item-modal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title" class="modal-title">Add Tracking Entry</h3>
+          <button class="modal-close" id="modal-close-btn">&times;</button>
+        </div>
+        <form id="tracker-form">
+          <input type="hidden" id="entry-id">
+          <div class="form-group">
+            <label for="entry-title">Title / Name</label>
+            <input type="text" id="entry-title" class="form-control" placeholder="e.g., Elden Ring, Naruto, Dune" required>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <input type="hidden" id="entry-category">
+            <div class="category-pill" id="entry-category-label"></div>
+          </div>
+          <div id="dynamic-fields" class="dynamic-fields"></div>
+          <div class="form-group">
+            <label for="entry-notes">Notes / Thoughts</label>
+            <textarea id="entry-notes" class="form-control" rows="3" placeholder="Add optional details, links, or comments..."></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="modal-save-btn">Save Entry</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="picker-modal" class="modal-overlay">
+      <div class="modal-content picker-sheet">
+        <div class="modal-header">
+          <h3 id="picker-modal-title" class="modal-title">Options</h3>
+          <button class="modal-close" id="picker-modal-close">&times;</button>
+        </div>
+        <div id="picker-options-list" class="picker-options-list"></div>
+      </div>
+    </div>
+  </div>
+  <script src="metadata.js"></script><script src="app.js"></script>
+</body>
+</html>

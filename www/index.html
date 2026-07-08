@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#6366f1">
+  <title>SquashDB</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #030712;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --primary: #6366f1;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(99, 102, 241, 0.22), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.16), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    .boot {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .boot-inner {
+      width: min(100%, 320px);
+      text-align: center;
+      animation: floatIn 420ms ease-out both;
+    }
+
+    .logo {
+      width: 62px;
+      height: 62px;
+      margin: 0 auto 14px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      animation: logoPulse 1.8s ease-in-out infinite;
+    }
+
+    .logo img {
+      width: 78%;
+      height: 78%;
+      display: block;
+      object-fit: contain;
+      object-position: center;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 23px;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .dots {
+      margin: 20px auto 0;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .dots span {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--primary);
+      opacity: 0.5;
+      animation: pulse 1s infinite ease-in-out;
+    }
+
+    .dots span:nth-child(2) { animation-delay: 0.15s; }
+    .dots span:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translateY(0); opacity: 0.45; }
+      50% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    @keyframes logoPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .boot-inner, .dots span, .logo, .logo img { animation: none; }
+    }
+  </style>
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      window.location.replace("dashboard.html");
+    });
+  </script>
+</head>
+<body>
+  <main class="boot" aria-label="Loading SquashDB">
+    <section class="boot-inner">
+      <div class="logo" aria-hidden="true">
+        <img src="squashdb-logo.svg" alt="" aria-hidden="true">
+      </div>
+      <h1>SquashDB</h1>
+      <p>Loading your dashboard</p>
+      <div class="dots" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Timeline</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<body><div id="app-container">
+<div class="chips-container" id="category-chips"></div>
+<main><section id="tab-timeline" class="tab-content active"><div class="timeline-filters"><button class="date-filter-btn active" data-filter="all">All Time</button><button class="date-filter-btn" data-filter="week">This Week</button><button class="date-filter-btn" data-filter="month">This Month</button><button class="timeline-filter-icon-btn" id="timeline-advanced-filter-btn" title="More Filters"><i data-lucide="sliders-horizontal"></i></button></div><div id="timeline-container" class="timeline"></div><div id="timeline-empty" class="empty-state" style="display:none;"><i data-lucide="calendar-x"></i><h3>No Completion History</h3><p>Check off trackers from your dashboard to record your completions here.</p></div></section></main>
+<nav class="bottom-nav"><a class="nav-item" data-tab="tab-dashboard" href="dashboard.html" aria-label="Dashboard"><i data-lucide="layout-grid"></i></a><a class="nav-item active" data-tab="tab-timeline" href="timeline.html" aria-label="Timeline"><i data-lucide="calendar"></i></a><a class="nav-item" data-tab="tab-stats" href="statistics.html" aria-label="Statistics"><i data-lucide="pie-chart"></i></a><a class="nav-item" data-tab="tab-settings" href="settings.html" aria-label="Settings"><i data-lucide="settings"></i></a></nav>
+
+<div id="timeline-filter-modal" class="modal-overlay">
+  <div class="modal-content picker-sheet">
+    <div class="modal-header">
+      <h3 class="modal-title">Filter Timeline</h3>
+      <button class="modal-close" id="timeline-filter-close">&times;</button>
+    </div>
+    <div class="timeline-filter-body">
+      <div class="form-group">
+        <label for="timeline-filter-search">Search by Name</label>
+        <input type="text" id="timeline-filter-search" class="form-control" placeholder="Search title...">
+      </div>
+      <div class="form-group">
+        <label for="timeline-filter-month">Specific Month</label>
+        <select id="timeline-filter-month" class="form-control">
+          <option value="">Any Month</option>
+          <option value="0">January</option>
+          <option value="1">February</option>
+          <option value="2">March</option>
+          <option value="3">April</option>
+          <option value="4">May</option>
+          <option value="5">June</option>
+          <option value="6">July</option>
+          <option value="7">August</option>
+          <option value="8">September</option>
+          <option value="9">October</option>
+          <option value="10">November</option>
+          <option value="11">December</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="timeline-filter-year">Specific Year</label>
+        <select id="timeline-filter-year" class="form-control">
+          <option value="">Any Year</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="timeline-filter-clear">Clear</button>
+        <button type="button" class="btn btn-primary" id="timeline-filter-apply">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div><script src="metadata.js"></script><script src="app.js"></script></body></html>
