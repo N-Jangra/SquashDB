@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">SquashDB Timeline Pulse Icon</title>
+  <desc id="desc">A rounded app icon with a timeline pulse, database bookmark, completion nodes, and analytics bars.</desc>
+  <defs>
+    <linearGradient id="pulse-bg" x1="70" y1="70" x2="948" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#071226"/>
+      <stop offset="0.48" stop-color="#103b53"/>
+      <stop offset="1" stop-color="#1bd878"/>
+    </linearGradient>
+    <radialGradient id="pulse-glow" cx="50%" cy="22%" r="74%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.30"/>
+      <stop offset="0.42" stop-color="#a9ffd3" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pulse-card" x1="305" y1="220" x2="744" y2="771" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f4fff4"/>
+      <stop offset="0.38" stop-color="#7dffc0"/>
+      <stop offset="1" stop-color="#1499d8"/>
+    </linearGradient>
+    <linearGradient id="pulse-line" x1="241" y1="303" x2="795" y2="738" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#8affc1"/>
+      <stop offset="1" stop-color="#60d1ff"/>
+    </linearGradient>
+    <filter id="pulse-shadow" x="-24%" y="-24%" width="148%" height="148%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="24" flood-color="#021020" flood-opacity="0.54"/>
+    </filter>
+    <filter id="pulse-blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#pulse-bg)"/>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#pulse-glow)"/>
+  <g opacity="0.11" fill="none" stroke="#ffffff" stroke-linecap="round">
+    <path d="M166 214 H858" stroke-width="8"/>
+    <path d="M131 372 H893" stroke-width="7"/>
+    <path d="M107 530 H917" stroke-width="7"/>
+    <path d="M137 688 H887" stroke-width="7"/>
+    <path d="M185 846 H839" stroke-width="8"/>
+  </g>
+  <ellipse cx="512" cy="772" rx="288" ry="70" fill="#02101b" opacity="0.32" filter="url(#pulse-blur)"/>
+
+  <g filter="url(#pulse-shadow)">
+    <rect x="275" y="193" width="474" height="624" rx="124" fill="#06172d" opacity="0.74"/>
+    <rect x="315" y="230" width="394" height="548" rx="96" fill="url(#pulse-card)"/>
+    <path d="M315 388 C410 336 554 360 709 304 V230 H411 C358 230 315 273 315 326 Z" fill="#ffffff" opacity="0.24"/>
+    <path d="M385 326 H576" stroke="#071a31" stroke-opacity="0.55" stroke-width="24" stroke-linecap="round"/>
+    <path d="M385 379 H626" stroke="#071a31" stroke-opacity="0.34" stroke-width="19" stroke-linecap="round"/>
+    <path d="M385 432 H549" stroke="#071a31" stroke-opacity="0.28" stroke-width="19" stroke-linecap="round"/>
+    <path d="M405 704 V588 C405 570 420 555 438 555 H586 C604 555 619 570 619 588 V704 L512 650 Z" fill="#071a31" opacity="0.74"/>
+    <path d="M456 599 H568" stroke="#eafff2" stroke-width="18" stroke-linecap="round" opacity="0.9"/>
+    <path d="M456 641 H535" stroke="#91ffd1" stroke-width="16" stroke-linecap="round" opacity="0.95"/>
+  </g>
+
+  <g filter="url(#pulse-shadow)">
+    <path d="M215 514 C281 435 323 453 374 514 C419 568 470 649 530 577 C592 502 620 358 704 432 C746 469 755 539 809 513" fill="none" stroke="#031528" stroke-opacity="0.38" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M215 514 C281 435 323 453 374 514 C419 568 470 649 530 577 C592 502 620 358 704 432 C746 469 755 539 809 513" fill="none" stroke="url(#pulse-line)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+    <g>
+      <circle cx="215" cy="514" r="34" fill="#ffffff"/>
+      <circle cx="215" cy="514" r="17" fill="#1bd878"/>
+      <circle cx="374" cy="514" r="34" fill="#ffffff"/>
+      <circle cx="374" cy="514" r="17" fill="#10a4db"/>
+      <circle cx="530" cy="577" r="34" fill="#ffffff"/>
+      <path d="M514 576 L526 589 L550 561" fill="none" stroke="#0c3153" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="704" cy="432" r="34" fill="#ffffff"/>
+      <path d="M692 414 L692 451 L724 433 Z" fill="#0c3153"/>
+      <circle cx="809" cy="513" r="34" fill="#ffffff"/>
+      <circle cx="809" cy="513" r="17" fill="#ffdd73"/>
+    </g>
+  </g>
+
+  <g filter="url(#pulse-shadow)">
+    <g transform="translate(168 246) rotate(-8)">
+      <rect width="154" height="108" rx="30" fill="#ffffff" opacity="0.94"/>
+      <path d="M34 74 V50 M72 74 V31 M110 74 V43" stroke="#0d4159" stroke-width="18" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(706 692) rotate(9)">
+      <rect width="150" height="112" rx="30" fill="#071a31"/>
+      <path d="M34 39 H117 M34 69 H95" stroke="#a9ffd3" stroke-width="15" stroke-linecap="round"/>
+      <circle cx="113" cy="75" r="16" fill="#ffdd73"/>
+    </g>
+  </g>
+
+  <path d="M177 895 C311 951 714 951 847 852" fill="none" stroke="#071226" stroke-opacity="0.30" stroke-width="44" stroke-linecap="round"/>
+</svg>

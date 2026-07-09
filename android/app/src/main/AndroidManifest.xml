@@ -161,7 +161,7 @@
 
         <activity-alias
             android:name=".Look_classic_10"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:roundIcon="@mipmap/ic_launcher_round"
@@ -385,7 +385,7 @@
 
         <activity-alias
             android:name=".Look_turquoise_10"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="true"
             android:icon="@mipmap/ic_launcher_turquoise"
             android:roundIcon="@mipmap/ic_launcher_round_turquoise"
@@ -460,230 +460,6 @@
             android:icon="@mipmap/ic_launcher_turquoise"
             android:roundIcon="@mipmap/ic_launcher_round_turquoise"
             android:label="@string/look_name_turquoise_15"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_0"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_0"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_1"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_1"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_2"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_2"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_3"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_3"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_4"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_4"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_5"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_5"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_6"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_6"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_7"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_7"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_8"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_8"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_9"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_9"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_10"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_10"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_11"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_11"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_12"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_12"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_13"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_13"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_14"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_14"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".Look_purple_15"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_purple"
-            android:roundIcon="@mipmap/ic_launcher_round_purple"
-            android:label="@string/look_name_purple_15"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -1139,6 +915,1798 @@
             </intent-filter>
         </activity-alias>
 
+
+        <activity-alias
+            android:name=".Look_bentogrid_0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_1"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_2"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_3"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_4"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_5"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_6"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_7"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_8"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_9"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_10"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_11"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_12"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_13"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_14"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_bentogrid_15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_bentogrid"
+            android:roundIcon="@mipmap/ic_launcher_round_bentogrid"
+            android:label="@string/look_name_bentogrid_15"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_1"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_2"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_3"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_4"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_5"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_6"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_7"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_8"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_9"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_10"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_11"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_12"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_13"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_14"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_glassimpact_15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_glassimpact"
+            android:roundIcon="@mipmap/ic_launcher_round_glassimpact"
+            android:label="@string/look_name_glassimpact_15"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_1"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_2"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_3"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_4"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_5"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_6"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_7"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_8"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_9"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_10"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_11"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_12"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_13"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_14"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_playstack_15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_playstack"
+            android:roundIcon="@mipmap/ic_launcher_round_playstack"
+            android:label="@string/look_name_playstack_15"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_1"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_2"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_3"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_4"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_5"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_6"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_7"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_8"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_9"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_10"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_11"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_12"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_13"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_14"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressring_15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressring"
+            android:roundIcon="@mipmap/ic_launcher_round_progressring"
+            android:label="@string/look_name_progressring_15"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_1"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_2"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_3"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_4"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_5"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_6"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_7"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_8"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_9"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_10"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_11"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_12"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_13"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_14"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_vault_15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_vault"
+            android:roundIcon="@mipmap/ic_launcher_round_vault"
+            android:label="@string/look_name_vault_15"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_1"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_2"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_3"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_4"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_5"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_6"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_7"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_8"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_9"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_10"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_11"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_12"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_13"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_14"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_orbithub_15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_orbithub"
+            android:roundIcon="@mipmap/ic_launcher_round_orbithub"
+            android:label="@string/look_name_orbithub_15"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_1"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_2"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_3"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_4"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_5"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_6"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_7"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_8"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_9"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_10"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_11"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_12"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_13"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_14"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_progressvault_15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_progressvault"
+            android:roundIcon="@mipmap/ic_launcher_round_progressvault"
+            android:label="@string/look_name_progressvault_15"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_0"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_1"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_2"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_3"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_4"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_5"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_6"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_7"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_8"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_9"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_10"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_11"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_12"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_13"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_14"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Look_timelinepulse_15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_timelinepulse"
+            android:roundIcon="@mipmap/ic_launcher_round_timelinepulse"
+            android:label="@string/look_name_timelinepulse_15"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

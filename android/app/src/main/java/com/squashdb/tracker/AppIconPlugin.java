@@ -21,16 +21,26 @@ public class AppIconPlugin extends Plugin {
     private static final String[] ICON_KEYS = {
         "classic",
         "turquoise",
-        "purple",
         "orange",
-        "pink"
+        "pink",
+        "bentogrid",
+        "glassimpact",
+        "playstack",
+        "progressring",
+        "vault",
+        "orbithub",
+        "progressvault",
+        "timelinepulse"
     };
 
     // Number of name presets per icon (must match the count baked into AndroidManifest.xml)
     private static final int NAME_COUNT = 16;
 
-    // Index of the name enabled by default (Look_classic_10 = "SquashDB")
+    // Index of the name enabled by default (Look_turquoise_10 = "SquashDB")
     private static final int DEFAULT_NAME_INDEX = 10;
+
+    // Must match the icon key of the alias with android:enabled="true" in AndroidManifest.xml
+    private static final String DEFAULT_ICON_KEY = "turquoise";
 
     private String aliasName(String iconKey, int nameIndex) {
         return "Look_" + iconKey + "_" + nameIndex;
@@ -83,8 +93,8 @@ public class AppIconPlugin extends Plugin {
     public void getLook(PluginCall call) {
         PackageManager pm = getContext().getPackageManager();
         String packageName = getContext().getPackageName();
-        // Must match the alias enabled by default in AndroidManifest.xml (Look_classic_10 = "SquashDB")
-        String activeIcon = "classic";
+        // Must match the alias enabled by default in AndroidManifest.xml (Look_turquoise_10 = "SquashDB")
+        String activeIcon = DEFAULT_ICON_KEY;
         int activeNameIndex = DEFAULT_NAME_INDEX;
 
         outer:
@@ -94,7 +104,7 @@ public class AppIconPlugin extends Plugin {
                 ComponentName component = new ComponentName(packageName, packageName + "." + alias);
                 int state = pm.getComponentEnabledSetting(component);
                 boolean enabled = state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                    || (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && key.equals("classic") && i == DEFAULT_NAME_INDEX);
+                    || (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && key.equals(DEFAULT_ICON_KEY) && i == DEFAULT_NAME_INDEX);
                 if (enabled) {
                     activeIcon = key;
                     activeNameIndex = i;

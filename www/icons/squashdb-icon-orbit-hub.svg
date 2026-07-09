@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">SquashDB Orbit Hub Icon</title>
+  <desc id="desc">A rounded app icon showing a database hub with an S-shaped progress path and orbiting media cards.</desc>
+  <defs>
+    <linearGradient id="hub-bg" x1="96" y1="64" x2="928" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#071526"/>
+      <stop offset="0.46" stop-color="#0a5366"/>
+      <stop offset="1" stop-color="#15d6a7"/>
+    </linearGradient>
+    <radialGradient id="hub-glow" cx="50%" cy="30%" r="72%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.36"/>
+      <stop offset="0.44" stop-color="#3cf6e6" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#06101e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="hub-db" x1="310" y1="294" x2="720" y2="744" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8fff8"/>
+      <stop offset="0.32" stop-color="#90f6dc"/>
+      <stop offset="0.72" stop-color="#1898b5"/>
+      <stop offset="1" stop-color="#074463"/>
+    </linearGradient>
+    <linearGradient id="hub-top" x1="364" y1="306" x2="650" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.5" stop-color="#d9fff5"/>
+      <stop offset="1" stop-color="#42d8c1"/>
+    </linearGradient>
+    <linearGradient id="hub-s" x1="379" y1="280" x2="645" y2="686" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#e7fff9"/>
+      <stop offset="1" stop-color="#b1fff1"/>
+    </linearGradient>
+    <filter id="hub-shadow" x="-24%" y="-24%" width="148%" height="148%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#02101a" flood-opacity="0.45"/>
+    </filter>
+    <filter id="hub-soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#hub-bg)"/>
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#hub-glow)"/>
+  <path d="M112 775 C245 705 317 801 450 742 C585 681 657 507 866 470" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="76" stroke-linecap="round"/>
+  <path d="M93 242 C236 126 399 97 543 116 C716 139 833 243 924 353" fill="none" stroke="#9ffff0" stroke-opacity="0.12" stroke-width="42" stroke-linecap="round"/>
+
+  <g opacity="0.72">
+    <ellipse cx="512" cy="512" rx="365" ry="164" transform="rotate(-18 512 512)" fill="none" stroke="#bffef4" stroke-width="8" stroke-dasharray="22 24" stroke-linecap="round"/>
+    <ellipse cx="512" cy="512" rx="300" ry="132" transform="rotate(27 512 512)" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="5"/>
+  </g>
+
+  <g filter="url(#hub-shadow)">
+    <ellipse cx="512" cy="704" rx="216" ry="52" fill="#03101c" opacity="0.34" filter="url(#hub-soft)"/>
+    <path d="M340 415 C340 377 417 346 512 346 C607 346 684 377 684 415 L684 618 C684 659 607 692 512 692 C417 692 340 659 340 618 Z" fill="url(#hub-db)"/>
+    <path d="M340 505 C340 546 417 579 512 579 C607 579 684 546 684 505" fill="none" stroke="#d8fff7" stroke-opacity="0.42" stroke-width="12"/>
+    <path d="M340 586 C340 627 417 660 512 660 C607 660 684 627 684 586" fill="none" stroke="#0b5971" stroke-opacity="0.48" stroke-width="18"/>
+    <ellipse cx="512" cy="415" rx="172" ry="69" fill="url(#hub-top)"/>
+    <ellipse cx="512" cy="415" rx="124" ry="43" fill="#ffffff" opacity="0.23"/>
+    <path d="M404 406 C455 366 574 361 634 403" fill="none" stroke="#ffffff" stroke-opacity="0.65" stroke-width="16" stroke-linecap="round"/>
+    <path d="M597 309 C529 281 448 301 423 357 C401 406 438 438 514 455 C604 475 645 517 619 584 C589 661 457 686 393 620" fill="none" stroke="#033348" stroke-opacity="0.26" stroke-width="102" stroke-linecap="round"/>
+    <path d="M597 309 C529 281 448 301 423 357 C401 406 438 438 514 455 C604 475 645 517 619 584 C589 661 457 686 393 620" fill="none" stroke="url(#hub-s)" stroke-width="70" stroke-linecap="round"/>
+    <path d="M586 326 C532 306 476 321 457 360" fill="none" stroke="#ffffff" stroke-opacity="0.78" stroke-width="18" stroke-linecap="round"/>
+    <path d="M571 612 C538 646 463 655 416 613" fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="15" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#hub-shadow)">
+    <g transform="translate(153 363) rotate(-13)">
+      <rect x="0" y="0" width="142" height="102" rx="31" fill="#e8fffb" opacity="0.95"/>
+      <path d="M55 31 L55 71 L91 51 Z" fill="#0f8aa5"/>
+      <rect x="18" y="20" width="11" height="62" rx="5" fill="#0f8aa5" opacity="0.42"/>
+      <rect x="114" y="20" width="11" height="62" rx="5" fill="#0f8aa5" opacity="0.42"/>
+    </g>
+    <g transform="translate(716 314) rotate(17)">
+      <rect x="0" y="0" width="130" height="98" rx="30" fill="#07394d"/>
+      <path d="M35 50 H94" stroke="#9efff0" stroke-width="22" stroke-linecap="round"/>
+      <path d="M36 36 V64 M22 50 H50" stroke="#eafffb" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="90" cy="39" r="8" fill="#eafffb"/>
+      <circle cx="104" cy="58" r="8" fill="#74f9dc"/>
+    </g>
+    <g transform="translate(718 634) rotate(-15)">
+      <rect x="0" y="0" width="132" height="118" rx="26" fill="#d8fff5"/>
+      <path d="M28 25 C51 11 77 14 105 30 V94 C78 78 50 78 28 94 Z" fill="#0e7d96"/>
+      <path d="M28 25 V94" stroke="#eafffb" stroke-width="7" stroke-linecap="round" opacity="0.7"/>
+      <path d="M60 30 V86" stroke="#eafffb" stroke-width="5" stroke-linecap="round" opacity="0.45"/>
+    </g>
+    <g transform="translate(219 635) rotate(20)">
+      <rect x="0" y="0" width="126" height="96" rx="28" fill="#06283d"/>
+      <circle cx="40" cy="47" r="22" fill="#9efff0"/>
+      <path d="M36 35 L36 59 L57 47 Z" fill="#06283d"/>
+      <path d="M76 29 H103 M76 48 H103 M76 67 H94" stroke="#eafffb" stroke-width="8" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <circle cx="792" cy="503" r="13" fill="#eafffb" opacity="0.8"/>
+  <circle cx="260" cy="509" r="9" fill="#eafffb" opacity="0.52"/>
+  <circle cx="641" cy="220" r="11" fill="#a7fff1" opacity="0.72"/>
+  <path d="M120 888 C271 940 760 952 907 822" fill="none" stroke="#071321" stroke-opacity="0.25" stroke-width="40" stroke-linecap="round"/>
+</svg>
