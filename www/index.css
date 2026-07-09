@@ -1,6 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 
 :root {
+  /* Multiplier applied to every transition/animation duration below (see
+     applyPreferenceAttributes() in app.js, driven by the Animation Speed setting).
+     1 = normal, 0 = instant ("Off"), <1 = faster, >1 = slower. */
+  --anim-speed: 1;
+
   /* Default: Dark Theme */
   --bg-color: #0b0f19;
   --card-bg: rgba(22, 28, 45, 0.7);
@@ -74,7 +79,7 @@ body {
   justify-content: center;
   align-items: stretch;
   overflow-x: hidden;
-  transition: background-color 0.3s ease;
+  transition: background-color calc(0.3s * var(--anim-speed)) ease;
 }
 
 body[data-accent="carnation-pink"] { --primary: #f472b6; --primary-hover: #ec4899; --primary-glow: rgba(244, 114, 182, 0.18); }
@@ -147,7 +152,7 @@ body[data-theme="material-you"] {
   border-left: 1px solid var(--card-border);
   border-right: 1px solid var(--card-border);
   padding-bottom: calc(84px + env(safe-area-inset-bottom));
-  transition: background-color 0.3s ease;
+  transition: background-color calc(0.3s * var(--anim-speed)) ease;
   overflow: hidden;
 }
 
@@ -207,7 +212,7 @@ h1 i {
   justify-content: center;
   cursor: pointer;
   font-size: 16px;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .icon-btn:hover {
@@ -247,7 +252,7 @@ h1 i {
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .search-input:focus {
@@ -279,7 +284,7 @@ h1 i {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   color: var(--text-secondary);
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -305,7 +310,7 @@ main {
 
 .tab-content {
   display: none;
-  animation: fadeIn 0.18s ease forwards;
+  animation: fadeIn calc(0.18s * var(--anim-speed)) ease forwards;
   contain: content;
 }
 
@@ -367,7 +372,7 @@ main {
   justify-content: center;
   cursor: pointer;
   font-size: 12px;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .layout-btn.active {
@@ -590,6 +595,11 @@ main {
 }
 
 /* Notes layout (List only) */
+.dashboard-lazy-sentinel {
+  width: 100%;
+  height: 1px;
+}
+
 .notes-container {
   display: flex;
   flex-direction: column;
@@ -662,7 +672,7 @@ main {
   cursor: pointer;
   display: grid;
   place-content: center;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .note-checkbox::before {
@@ -670,7 +680,7 @@ main {
   width: 10px;
   height: 10px;
   transform: scale(0);
-  transition: 120ms transform ease-in-out;
+  transition: calc(120ms * var(--anim-speed)) transform ease-in-out;
   box-shadow: inset 1em 1em var(--text-primary);
   transform-origin: center;
   clip-path: polygon(14% 44%, 0 58%, 35% 93%, 100% 27%, 86% 13%, 35% 65%);
@@ -715,7 +725,7 @@ main {
   line-height: 1.3;
   color: var(--text-primary);
   word-break: break-word;
-  transition: all 0.3s ease;
+  transition: all calc(0.3s * var(--anim-speed)) ease;
 }
 
 .completed .note-title {
@@ -788,7 +798,7 @@ main {
   height: 100%;
   background: linear-gradient(90deg, var(--theme-color), var(--primary));
   border-radius: var(--border-radius-full);
-  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width calc(0.4s * var(--anim-speed)) cubic-bezier(0.4, 0, 0.2, 1);
   width: 0%;
 }
 
@@ -828,7 +838,7 @@ main {
   justify-content: center;
   cursor: pointer;
   font-size: 11px;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .note-action-btn:hover {
@@ -862,7 +872,7 @@ main {
   box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
   border: none;
   z-index: 30;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition: transform calc(0.18s * var(--anim-speed)) ease, box-shadow calc(0.18s * var(--anim-speed)) ease, background-color calc(0.18s * var(--anim-speed)) ease;
   will-change: transform;
 }
 
@@ -905,7 +915,7 @@ main {
   cursor: pointer;
   flex: 1;
   height: 48px;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
   text-decoration: none;
   appearance: none;
   border-radius: var(--border-radius-full);
@@ -913,7 +923,7 @@ main {
 
 .nav-item i {
   font-size: 20px;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .nav-item.active {
@@ -925,6 +935,71 @@ main {
 }
 
 /* Dynamic Add/Edit Modal (Bottom Sheet style) */
+.app-lock-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-color);
+  z-index: 500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+
+.app-lock-card {
+  width: min(100%, 340px);
+  text-align: center;
+}
+
+.app-lock-icon {
+  width: 40px;
+  height: 40px;
+  color: var(--primary);
+  margin-bottom: 10px;
+}
+
+.app-lock-card h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+}
+
+.app-lock-text-input {
+  text-align: center;
+  letter-spacing: 0.15em;
+  font-size: 18px;
+}
+
+.app-lock-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.app-lock-pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  width: min(100%, 240px);
+  margin: 10px auto 0;
+  touch-action: none;
+}
+
+.app-lock-pattern-dot {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+  transition: background-color calc(0.14s * var(--anim-speed)) ease, border-color calc(0.14s * var(--anim-speed)) ease;
+}
+
+.app-lock-pattern-dot.active {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -940,7 +1015,7 @@ main {
   align-items: flex-end;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.16s ease;
+  transition: opacity calc(0.16s * var(--anim-speed)) ease;
 }
 
 .modal-overlay.active {
@@ -958,7 +1033,7 @@ main {
   padding: 24px;
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
   transform: translateY(100%);
-  transition: transform 0.18s ease;
+  transition: transform calc(0.18s * var(--anim-speed)) ease;
   max-height: 85vh;
   overflow-y: auto;
 }
@@ -1073,7 +1148,7 @@ main {
   .modal-overlay {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    transition: opacity 0.12s ease;
+    transition: opacity calc(0.12s * var(--anim-speed)) ease;
   }
 
   header,
@@ -1089,7 +1164,7 @@ main {
   }
 
   .fab {
-    transition: transform 0.14s ease, box-shadow 0.14s ease;
+    transition: transform calc(0.14s * var(--anim-speed)) ease, box-shadow calc(0.14s * var(--anim-speed)) ease;
   }
 
   .fab:hover {
@@ -1159,7 +1234,7 @@ main {
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .form-control:focus {
@@ -1218,7 +1293,7 @@ main {
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1261,7 +1336,7 @@ main {
   border-radius: var(--border-radius-sm);
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .date-filter-btn.active {
@@ -1283,7 +1358,7 @@ main {
   border-radius: var(--border-radius-sm);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
 }
 
 .timeline-filter-icon-btn i {
@@ -1537,7 +1612,7 @@ main {
   height: 100%;
   background: var(--theme-color);
   border-radius: var(--border-radius-full);
-  transition: width 0.5s ease-out;
+  transition: width calc(0.5s * var(--anim-speed)) ease-out;
   width: 0%;
 }
 
@@ -1601,7 +1676,7 @@ main {
   font-weight: 700;
   cursor: pointer;
   box-shadow: none;
-  transition: transform 0.14s ease, border-color 0.14s ease, background-color 0.14s ease, color 0.14s ease;
+  transition: transform calc(0.14s * var(--anim-speed)) ease, border-color calc(0.14s * var(--anim-speed)) ease, background-color calc(0.14s * var(--anim-speed)) ease, color calc(0.14s * var(--anim-speed)) ease;
 }
 
 .page-back-btn i {
@@ -1658,7 +1733,7 @@ main {
   background: rgba(255, 255, 255, 0.03);
   cursor: grab;
   box-shadow: none;
-  transition: transform 0.14s ease, border-color 0.14s ease, background-color 0.14s ease;
+  transition: transform calc(0.14s * var(--anim-speed)) ease, border-color calc(0.14s * var(--anim-speed)) ease, background-color calc(0.14s * var(--anim-speed)) ease;
 }
 
 .sortable-item:hover {
@@ -1720,6 +1795,60 @@ main {
 .setting-desc {
   font-size: 10px;
   color: var(--text-muted);
+}
+
+.metadata-source-row {
+  gap: 10px;
+}
+
+.metadata-path-summary {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.json-mapper-tree {
+  max-height: 320px;
+  overflow: auto;
+  font-family: monospace;
+  font-size: 12px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-sm);
+  padding: 8px;
+}
+
+.json-indent {
+  margin-left: 14px;
+}
+
+.json-key {
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.json-key:hover {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+.json-array-key {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .settings-page-header {
@@ -1867,7 +1996,7 @@ main {
   border-radius: var(--border-radius-sm);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: transform 0.14s ease, border-color 0.14s ease, color 0.14s ease, background-color 0.14s ease;
+  transition: transform calc(0.14s * var(--anim-speed)) ease, border-color calc(0.14s * var(--anim-speed)) ease, color calc(0.14s * var(--anim-speed)) ease, background-color calc(0.14s * var(--anim-speed)) ease;
 }
 
 .icon-picker-option i {
@@ -1903,7 +2032,7 @@ main {
   border-radius: var(--border-radius-md);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: transform 0.14s ease, border-color 0.14s ease, color 0.14s ease, background-color 0.14s ease;
+  transition: transform calc(0.14s * var(--anim-speed)) ease, border-color calc(0.14s * var(--anim-speed)) ease, color calc(0.14s * var(--anim-speed)) ease, background-color calc(0.14s * var(--anim-speed)) ease;
 }
 
 .app-icon-option img {
@@ -1998,7 +2127,7 @@ main {
   right: 0;
   bottom: 0;
   background-color: rgba(255, 255, 255, 0.1);
-  transition: .3s;
+  transition: calc(0.3s * var(--anim-speed));
   border-radius: 24px;
 }
 
@@ -2010,7 +2139,7 @@ main {
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .3s;
+  transition: calc(0.3s * var(--anim-speed));
   border-radius: 50%;
 }
 
@@ -2064,7 +2193,7 @@ input:checked + .slider:before {
   cursor: pointer;
   color: var(--text-muted);
   font-size: 18px;
-  transition: color 0.15s ease;
+  transition: color calc(0.15s * var(--anim-speed)) ease;
 }
 
 .star.active {
