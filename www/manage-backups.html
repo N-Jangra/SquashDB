@@ -14,10 +14,16 @@
       <section class="tab-content active">
         <div class="settings-section">
           <h4 class="settings-section-title">Manage backups and restore</h4>
+          <p class="settings-row-note" id="backup-folder-path-display">No backup folder selected yet.</p>
+          <p class="settings-row-note" id="backup-folder-status-notice" style="display:none; color: var(--danger);">
+            Your backup folder is missing or no longer accessible. Tap "Change Backup Folder" to pick it again.
+          </p>
           <div class="btn-group-vertical">
             <button class="btn btn-secondary" id="backup-export"><i data-lucide="download"></i> Export Data (JSON)</button>
             <button class="btn btn-secondary" id="backup-import-trigger"><i data-lucide="upload"></i> Import Data (JSON)</button>
-            <input type="file" id="backup-import-file" style="display:none;" accept=".json">
+            <input type="file" id="backup-import-file" style="display:none;" accept=".json,.tar">
+            <button class="btn btn-secondary" id="backup-choose-folder"><i data-lucide="folder"></i> Change Backup Folder</button>
+            <button class="btn btn-secondary" id="backup-sync-folder-tree"><i data-lucide="folder-tree"></i> Sync to Folder Tree</button>
             <button class="btn btn-secondary" id="db-reset" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.2);"><i data-lucide="trash-2"></i> Wipe All Data</button>
           </div>
         </div>
@@ -27,7 +33,7 @@
       </section>
     </main>
   </div>
-  <script src="metadata.js"></script>
+  <script src="applock.js"></script><script src="metadata.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

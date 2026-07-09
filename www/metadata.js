@@ -9,6 +9,523 @@ let metadataSearchState = {
   items: []
 };
 
+const BUILTIN_METADATA_SOURCES = {
+  tvmaze: { name: "TVmaze", categories: ["series", "kdrama", "cdrama", "anime"] },
+  wikidata: { name: "Wikidata", categories: ["movie", "game"] },
+  openlibrary: { name: "Open Library", categories: ["manga", "novel"] }
+};
+
+// Ensures state.preferences.metadataSources has the expected shape, filling in
+// defaults for fields missing from an older saved prefs blob.
+function normalizeMetadataSources() {
+  const defaults = {
+    builtinOrder: ["tvmaze", "wikidata", "openlibrary"],
+    builtinEnabled: { tvmaze: true, wikidata: true, openlibrary: true },
+    custom: []
+  };
+
+  const current = state.preferences.metadataSources;
+  if (!current || typeof current !== "object") {
+    state.preferences.metadataSources = defaults;
+    return;
+  }
+
+  if (!Array.isArray(current.builtinOrder) || current.builtinOrder.length === 0) {
+    current.builtinOrder = defaults.builtinOrder;
+  }
+  current.builtinOrder = current.builtinOrder.filter(key => BUILTIN_METADATA_SOURCES[key]);
+  Object.keys(BUILTIN_METADATA_SOURCES).forEach(key => {
+    if (!current.builtinOrder.includes(key)) current.builtinOrder.push(key);
+  });
+
+  if (!current.builtinEnabled || typeof current.builtinEnabled !== "object") {
+    current.builtinEnabled = { ...defaults.builtinEnabled };
+  }
+  Object.keys(BUILTIN_METADATA_SOURCES).forEach(key => {
+    if (typeof current.builtinEnabled[key] !== "boolean") current.builtinEnabled[key] = true;
+  });
+
+  if (!Array.isArray(current.custom)) current.custom = [];
+  current.custom = current.custom.filter(src => src && typeof src === "object" && src.id);
+  current.custom.forEach(src => {
+    if (typeof src.enabled !== "boolean") src.enabled = true;
+    if (!Array.isArray(src.categories)) src.categories = [];
+    if (typeof src.name !== "string") src.name = "Untitled Source";
+    if (typeof src.searchUrlTemplate !== "string") src.searchUrlTemplate = "";
+    if (typeof src.apiKey !== "string") src.apiKey = "";
+    if (typeof src.resultsPath !== "string") src.resultsPath = "";
+    if (typeof src.titlePath !== "string") src.titlePath = "";
+    if (typeof src.thumbnailPath !== "string") src.thumbnailPath = "";
+    if (typeof src.subtitlePath !== "string") src.subtitlePath = "";
+  });
+
+  state.preferences.metadataSources = current;
+}
+
+function createCustomMetadataSource({ name, categories }) {
+  normalizeMetadataSources();
+  const source = {
+    id: crypto.randomUUID(),
+    name: (name || "Untitled Source").trim() || "Untitled Source",
+    categories: Array.isArray(categories) ? categories : [],
+    enabled: true,
+    searchUrlTemplate: "",
+    apiKey: "",
+    resultsPath: "",
+    titlePath: "",
+    thumbnailPath: "",
+    subtitlePath: ""
+  };
+  state.preferences.metadataSources.custom.push(source);
+  saveData();
+  return source;
+}
+
+function updateCustomMetadataSource(id, patch) {
+  normalizeMetadataSources();
+  const source = state.preferences.metadataSources.custom.find(src => src.id === id);
+  if (!source) return null;
+  Object.assign(source, patch);
+  saveData();
+  return source;
+}
+
+function deleteCustomMetadataSource(id) {
+  normalizeMetadataSources();
+  state.preferences.metadataSources.custom = state.preferences.metadataSources.custom.filter(src => src.id !== id);
+  saveData();
+}
+
+function renderMetadataSourcesSettings() {
+  renderBuiltinMetadataSourcesList();
+  renderCustomMetadataSourcesList();
+
+  const createBtn = document.getElementById("create-metadata-source-btn");
+  if (createBtn && !createBtn.dataset.bound) {
+    createBtn.dataset.bound = "true";
+    createBtn.addEventListener("click", openCreateMetadataSourceModal);
+  }
+}
+
+function renderBuiltinMetadataSourcesList() {
+  const list = document.getElementById("builtin-metadata-sources-list");
+  if (!list) return;
+  normalizeMetadataSources();
+
+  list.innerHTML = "";
+  state.preferences.metadataSources.builtinOrder.forEach(key => {
+    const info = BUILTIN_METADATA_SOURCES[key];
+    if (!info) return;
+    const item = document.createElement("div");
+    item.className = "sortable-item metadata-source-row";
+    item.draggable = true;
+    item.dataset.source = key;
+    item.innerHTML = `
+      <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+      <span class="sortable-label">
+        ${info.name}
+        <span class="setting-desc">${info.categories.map(c => CATEGORIES[c]?.label || c).join(", ")}</span>
+      </span>
+      <label class="switch">
+        <input type="checkbox" data-builtin-source="${key}" ${state.preferences.metadataSources.builtinEnabled[key] ? "checked" : ""}>
+        <span class="slider"></span>
+      </label>
+    `;
+    list.appendChild(item);
+  });
+
+  let dragged = null;
+  list.querySelectorAll(".sortable-item").forEach(item => {
+    item.addEventListener("dragstart", () => {
+      dragged = item;
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      dragged = null;
+      const newOrder = Array.from(list.querySelectorAll(".sortable-item")).map(el => el.dataset.source);
+      state.preferences.metadataSources.builtinOrder = newOrder;
+      saveData();
+    });
+    item.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (!dragged || dragged === item) return;
+      const rect = item.getBoundingClientRect();
+      const after = e.clientY > rect.top + rect.height / 2;
+      list.insertBefore(dragged, after ? item.nextSibling : item);
+    });
+  });
+
+  list.querySelectorAll("input[data-builtin-source]").forEach(checkbox => {
+    checkbox.addEventListener("change", (e) => {
+      const key = e.target.dataset.builtinSource;
+      state.preferences.metadataSources.builtinEnabled[key] = e.target.checked;
+      saveData();
+    });
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderCustomMetadataSourcesList() {
+  const list = document.getElementById("custom-metadata-sources-list");
+  if (!list) return;
+  normalizeMetadataSources();
+
+  list.innerHTML = "";
+  const customSources = state.preferences.metadataSources.custom;
+
+  if (customSources.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "setting-desc";
+    empty.textContent = "No custom sources yet. Add one to look up metadata from another API.";
+    list.appendChild(empty);
+  }
+
+  customSources.forEach(source => {
+    const row = document.createElement("div");
+    row.className = "setting-row metadata-source-row";
+    row.innerHTML = `
+      <div class="setting-info">
+        <span class="setting-label">${source.name}</span>
+        <span class="setting-desc">${source.categories.map(c => CATEGORIES[c]?.label || c).join(", ") || "No categories selected"}</span>
+      </div>
+      <button type="button" class="note-action-btn edit-source-btn" data-id="${source.id}" title="Edit source"><i data-lucide="pencil"></i></button>
+      <button type="button" class="note-action-btn delete-source-btn" data-id="${source.id}" title="Delete source"><i data-lucide="trash-2"></i></button>
+      <label class="switch">
+        <input type="checkbox" data-custom-source="${source.id}" ${source.enabled ? "checked" : ""}>
+        <span class="slider"></span>
+      </label>
+    `;
+    list.appendChild(row);
+  });
+
+  list.querySelectorAll("input[data-custom-source]").forEach(checkbox => {
+    checkbox.addEventListener("change", (e) => {
+      updateCustomMetadataSource(e.target.dataset.customSource, { enabled: e.target.checked });
+    });
+  });
+
+  list.querySelectorAll(".delete-source-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const source = customSources.find(src => src.id === btn.dataset.id);
+      if (!source) return;
+      if (!confirm(`Delete the "${source.name}" metadata source? This cannot be undone.`)) return;
+      deleteCustomMetadataSource(btn.dataset.id);
+      renderCustomMetadataSourcesList();
+    });
+  });
+
+  list.querySelectorAll(".edit-source-btn").forEach(btn => {
+    btn.addEventListener("click", () => openEditMetadataSourceModal(btn.dataset.id));
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
+
+// Basic add/edit modal for stage 1: name + which categories it applies to.
+// URL template, API key, and JSON-path field mapping are wired in a later stage.
+function openCreateMetadataSourceModal() {
+  openMetadataSourceModal(null);
+}
+
+function openEditMetadataSourceModal(id) {
+  openMetadataSourceModal(id);
+}
+
+function openMetadataSourceModal(editId) {
+  const existing = editId
+    ? state.preferences.metadataSources.custom.find(src => src.id === editId)
+    : null;
+
+  let modal = document.getElementById("metadata-source-modal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "metadata-source-modal";
+    modal.className = "modal-overlay";
+    document.body.appendChild(modal);
+  }
+
+  const categoryCheckboxes = Object.keys(CATEGORIES).map(key => `
+    <label class="checkbox-row">
+      <input type="checkbox" value="${key}" ${existing?.categories?.includes(key) ? "checked" : ""}>
+      ${CATEGORIES[key].label}
+    </label>
+  `).join("");
+
+  // Working copy of path mappings, edited via the JSON tree picker before Save persists them.
+  const draftPaths = {
+    resultsPath: existing?.resultsPath || "",
+    titlePath: existing?.titlePath || "",
+    thumbnailPath: existing?.thumbnailPath || "",
+    subtitlePath: existing?.subtitlePath || ""
+  };
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>${existing ? "Edit" : "Add"} Metadata Source</h3>
+        <button type="button" class="modal-close-btn" id="metadata-source-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="form-group">
+        <label for="metadata-source-name">Source Name</label>
+        <input type="text" id="metadata-source-name" class="form-control" placeholder="e.g. My API" value="${existing ? existing.name : ""}" maxlength="40">
+      </div>
+      <div class="form-group">
+        <label>Applies to</label>
+        <div id="metadata-source-categories" class="checkbox-grid">${categoryCheckboxes}</div>
+      </div>
+      <div class="form-group">
+        <label for="metadata-source-url">Search URL Template</label>
+        <input type="text" id="metadata-source-url" class="form-control" placeholder="https://api.example.com/search?q={query}&api_key={apiKey}" value="${existing ? existing.searchUrlTemplate : ""}">
+        <span class="setting-desc">Use {query} for the search title and {apiKey} for the API key below.</span>
+      </div>
+      <div class="form-group">
+        <label for="metadata-source-apikey">API Key (optional)</label>
+        <input type="text" id="metadata-source-apikey" class="form-control" placeholder="Leave blank if not needed" value="${existing ? existing.apiKey : ""}">
+      </div>
+      <div class="form-group">
+        <label>Field Mapping</label>
+        <div class="metadata-path-summary" id="metadata-path-summary"></div>
+        <button type="button" class="btn btn-secondary" id="metadata-source-map-fields" style="width:100%;">
+          <i data-lucide="git-branch"></i> Fetch Sample &amp; Map Fields
+        </button>
+      </div>
+      <button type="button" class="btn btn-primary" id="metadata-source-save" style="width:100%;">Save</button>
+    </div>
+  `;
+
+  modal.classList.add("active");
+  if (window.lucide) lucide.createIcons();
+  renderMetadataPathSummary(draftPaths);
+
+  document.getElementById("metadata-source-close").addEventListener("click", () => {
+    modal.classList.remove("active");
+  });
+
+  document.getElementById("metadata-source-map-fields").addEventListener("click", () => {
+    const urlTemplate = document.getElementById("metadata-source-url").value.trim();
+    const apiKey = document.getElementById("metadata-source-apikey").value.trim();
+    if (!urlTemplate) {
+      alert("Please enter a search URL template first.");
+      return;
+    }
+    openJsonFieldMapperModal(urlTemplate, apiKey, draftPaths, () => renderMetadataPathSummary(draftPaths));
+  });
+
+  document.getElementById("metadata-source-save").addEventListener("click", () => {
+    const name = document.getElementById("metadata-source-name").value.trim();
+    if (!name) {
+      alert("Please enter a source name.");
+      return;
+    }
+    const categories = Array.from(document.querySelectorAll("#metadata-source-categories input:checked")).map(el => el.value);
+    const searchUrlTemplate = document.getElementById("metadata-source-url").value.trim();
+    const apiKey = document.getElementById("metadata-source-apikey").value.trim();
+
+    const patch = { name, categories, searchUrlTemplate, apiKey, ...draftPaths };
+
+    if (existing) {
+      updateCustomMetadataSource(existing.id, patch);
+    } else {
+      createCustomMetadataSource(patch);
+    }
+
+    modal.classList.remove("active");
+    renderCustomMetadataSourcesList();
+  });
+}
+
+// Renders a fetched JSON sample as a clickable tree so the user can pick which
+// node is the results array and which sub-fields map to title/thumbnail/subtitle,
+// without needing to type dot/bracket path syntax by hand.
+async function openJsonFieldMapperModal(urlTemplate, apiKey, draftPaths, onSaved) {
+  let modal = document.getElementById("json-field-mapper-modal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "json-field-mapper-modal";
+    modal.className = "modal-overlay";
+    document.body.appendChild(modal);
+  }
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Map Fields</h3>
+        <button type="button" class="modal-close-btn" id="json-mapper-close"><i data-lucide="x"></i></button>
+      </div>
+      <p class="setting-desc" id="json-mapper-status">Fetching a sample response using "squash" as the test query...</p>
+      <div id="json-mapper-tree" class="json-mapper-tree"></div>
+    </div>
+  `;
+  modal.classList.add("active");
+  if (window.lucide) lucide.createIcons();
+  document.getElementById("json-mapper-close").addEventListener("click", () => modal.classList.remove("active"));
+
+  const status = document.getElementById("json-mapper-status");
+  const treeEl = document.getElementById("json-mapper-tree");
+
+  let sample;
+  try {
+    const url = urlTemplate.replace("{query}", encodeURIComponent("squash")).replace("{apiKey}", encodeURIComponent(apiKey));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    sample = await res.json();
+  } catch (err) {
+    status.textContent = `Could not fetch a sample: ${err.message}. Check the URL template and try again.`;
+    return;
+  }
+
+  let pickMode = "results"; // results -> title -> thumbnail -> subtitle -> done
+  const pickLabels = { results: "Click the array that holds each search result", title: "Now click the title field inside one result", thumbnail: "Now click the thumbnail/image field (optional — close to skip)", subtitle: "Now click a subtitle/description field (optional — close to skip)" };
+  status.textContent = pickLabels.results;
+
+  let resultsArrayPath = null;
+
+  function advance(pathAfterResults, isArrayClick) {
+    if (pickMode === "results") {
+      if (!isArrayClick) return;
+      resultsArrayPath = pathAfterResults;
+      draftPaths.resultsPath = pathAfterResults.join(".");
+      pickMode = "title";
+      status.textContent = pickLabels.title;
+      return;
+    }
+
+    if (!resultsArrayPath) return;
+    // pathAfterResults includes the sample item's "0" index right after the array
+    // path (e.g. resultsPath=["data","results"], leaf path=["data","results","0","name"]),
+    // so the relative field path strips both.
+    const relativePath = pathAfterResults.slice(resultsArrayPath.length + 1).join(".");
+    if (!relativePath) return;
+
+    if (pickMode === "title") {
+      draftPaths.titlePath = relativePath;
+      pickMode = "thumbnail";
+      status.textContent = pickLabels.thumbnail;
+    } else if (pickMode === "thumbnail") {
+      draftPaths.thumbnailPath = relativePath;
+      pickMode = "subtitle";
+      status.textContent = pickLabels.subtitle;
+    } else if (pickMode === "subtitle") {
+      draftPaths.subtitlePath = relativePath;
+      status.textContent = "Field mapping complete. Close this window to continue.";
+      onSaved();
+    }
+  }
+
+  treeEl.innerHTML = "";
+  treeEl.appendChild(renderJsonNode(sample, [], advance));
+}
+
+// Recursively builds clickable DOM nodes for a JSON value. Each key/array node
+// is a <span> that calls onPick(fullPathArray, isArray) when clicked.
+function renderJsonNode(value, path, onPick) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "json-node";
+
+  if (Array.isArray(value)) {
+    const label = document.createElement("span");
+    label.className = "json-key json-array-key";
+    label.textContent = `${path[path.length - 1] ?? "root"} [array]`;
+    label.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onPick(path, true);
+    });
+    wrapper.appendChild(label);
+
+    const sampleItem = value[0];
+    if (sampleItem !== undefined) {
+      const child = document.createElement("div");
+      child.className = "json-indent";
+      child.appendChild(renderJsonNode(sampleItem, [...path, "0"], onPick));
+      wrapper.appendChild(child);
+    }
+    return wrapper;
+  }
+
+  if (value && typeof value === "object") {
+    Object.keys(value).forEach(key => {
+      const child = document.createElement("div");
+      child.className = "json-indent";
+      child.appendChild(renderJsonNode(value[key], [...path, key], onPick));
+      wrapper.appendChild(child);
+    });
+    return wrapper;
+  }
+
+  const leaf = document.createElement("span");
+  leaf.className = "json-key json-leaf-key";
+  leaf.textContent = `${path[path.length - 1]}: ${JSON.stringify(value)}`;
+  leaf.addEventListener("click", (e) => {
+    e.stopPropagation();
+    onPick(path, false);
+  });
+  wrapper.appendChild(leaf);
+  return wrapper;
+}
+
+// Walks a dot-path like "data.results" or "image.medium" against a live object.
+function resolveJsonPath(obj, path) {
+  if (!path) return undefined;
+  return path.split(".").reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
+}
+
+// Runs a single custom source's search request and normalizes results into
+// the same {id, title, subtitle, thumbnail, kind} shape the built-in sources use.
+async function fetchCustomMetadataSource(source, query, category) {
+  if (!source.searchUrlTemplate || !source.resultsPath || !source.titlePath) return [];
+
+  const url = source.searchUrlTemplate
+    .replace("{query}", encodeURIComponent(query))
+    .replace("{apiKey}", encodeURIComponent(source.apiKey || ""));
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const results = resolveJsonPath(data, source.resultsPath);
+    if (!Array.isArray(results)) return [];
+
+    return results.map((entry, index) => ({
+      id: `${source.id}:${index}`,
+      title: resolveJsonPath(entry, source.titlePath) || query,
+      subtitle: source.subtitlePath ? (resolveJsonPath(entry, source.subtitlePath) || "") : "",
+      thumbnail: source.thumbnailPath ? (resolveJsonPath(entry, source.thumbnailPath) || "") : "",
+      kind: category,
+      customSourceId: source.id
+    })).slice(0, 8);
+  } catch (err) {
+    console.warn(`Custom metadata source "${source.name}" failed`, err);
+    return [];
+  }
+}
+
+// Runs every enabled custom source configured for this category and returns
+// their combined, normalized results.
+async function fetchAllCustomMetadataSources(category, query) {
+  normalizeMetadataSources();
+  const sources = state.preferences.metadataSources.custom.filter(
+    src => src.enabled && src.categories.includes(category)
+  );
+  const resultsPerSource = await Promise.all(sources.map(src => fetchCustomMetadataSource(src, query, category)));
+  return resultsPerSource.flat();
+}
+
+function builtinSourceEnabled(key) {
+  normalizeMetadataSources();
+  return Boolean(state.preferences.metadataSources.builtinEnabled[key]);
+}
+
+function renderMetadataPathSummary(draftPaths) {
+  const el = document.getElementById("metadata-path-summary");
+  if (!el) return;
+  const hasMapping = draftPaths.resultsPath && draftPaths.titlePath;
+  el.textContent = hasMapping
+    ? `Results: ${draftPaths.resultsPath} · Title: ${draftPaths.titlePath}${draftPaths.thumbnailPath ? ` · Thumbnail: ${draftPaths.thumbnailPath}` : ""}${draftPaths.subtitlePath ? ` · Subtitle: ${draftPaths.subtitlePath}` : ""}`
+    : "No field mapping yet.";
+}
+
 async function fetchAndApplyMetadataFromTitle() {
   const category = document.getElementById("entry-category")?.value;
   const title = document.getElementById("entry-title")?.value.trim();
@@ -19,114 +536,118 @@ async function fetchAndApplyMetadataFromTitle() {
 
   try {
     if (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime") {
-      const searchRes = await fetch(`https://api.tvmaze.com/search/shows?q=${normalized}`);
-      if (!searchRes.ok) return;
-      const searchJson = await searchRes.json();
-      const items = Array.isArray(searchJson) ? searchJson.slice(0, 8).map(entry => ({
-        id: entry.show?.id,
-        title: entry.show?.name || title,
-        subtitle: [entry.show?.premiered || "", entry.show?.language || ""].filter(Boolean).join(" · "),
-        thumbnail: entry.show?.image?.medium || entry.show?.image?.original || "",
-        kind: category
-      })).filter(item => item.id) : [];
+      let items = [];
+      if (builtinSourceEnabled("tvmaze")) {
+        const searchRes = await fetch(`https://api.tvmaze.com/search/shows?q=${normalized}`);
+        if (searchRes.ok) {
+          const searchJson = await searchRes.json();
+          items = Array.isArray(searchJson) ? searchJson.slice(0, 8).map(entry => ({
+            id: entry.show?.id,
+            title: entry.show?.name || title,
+            subtitle: [entry.show?.premiered || "", entry.show?.language || ""].filter(Boolean).join(" · "),
+            thumbnail: entry.show?.image?.medium || entry.show?.image?.original || "",
+            kind: category
+          })).filter(item => item.id) : [];
+        }
+      }
+      items = items.concat(await fetchAllCustomMetadataSources(category, title));
       if (items.length > 1) {
         showMetadataResults(category, items, title);
         return;
       }
       if (!items[0]) return;
-      await applySelectedSeriesMetadata(items[0].id, items[0].title);
+      if (items[0].customSourceId) {
+        applyCustomMetadataResult(items[0]);
+      } else {
+        await applySelectedSeriesMetadata(items[0].id, items[0].title);
+      }
       return;
     }
 
     if (category === "movie") {
-      const searchRes = await fetch(`https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${normalized}&language=en&type=item&limit=8&format=json&origin=*`);
-      if (!searchRes.ok) return;
-      const data = await searchRes.json();
-      const items = Array.isArray(data.search) ? data.search.map(entry => ({
-        id: entry.id,
-        title: entry.label || title,
-        subtitle: entry.description || "Movie",
-        thumbnail: "",
-        kind: "movie"
-      })) : [];
+      let items = [];
+      if (builtinSourceEnabled("wikidata")) {
+        const searchRes = await fetch(`https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${normalized}&language=en&type=item&limit=8&format=json&origin=*`);
+        if (searchRes.ok) {
+          const data = await searchRes.json();
+          items = Array.isArray(data.search) ? data.search.map(entry => ({
+            id: entry.id,
+            title: entry.label || title,
+            subtitle: entry.description || "Movie",
+            thumbnail: "",
+            kind: "movie"
+          })) : [];
+        }
+      }
+      items = items.concat(await fetchAllCustomMetadataSources("movie", title));
       if (items.length > 1) {
         showMetadataResults("movie", items, title);
         return;
       }
       if (!items[0]) return;
-      await applySelectedMovieMetadata(items[0].id, items[0].title);
+      if (items[0].customSourceId) {
+        applyCustomMetadataResult(items[0]);
+      } else {
+        await applySelectedMovieMetadata(items[0].id, items[0].title);
+      }
       return;
     }
 
     if (category === "game") {
-      const searchRes = await fetch(`https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${normalized}&language=en&type=item&limit=8&format=json&origin=*`);
-      if (!searchRes.ok) return;
-      const data = await searchRes.json();
-      const items = Array.isArray(data.search) ? data.search.map(entry => ({
-        id: entry.id,
-        title: entry.label || title,
-        subtitle: entry.description || "Game",
-        thumbnail: "",
-        kind: "game"
-      })) : [];
+      let items = [];
+      if (builtinSourceEnabled("wikidata")) {
+        const searchRes = await fetch(`https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${normalized}&language=en&type=item&limit=8&format=json&origin=*`);
+        if (searchRes.ok) {
+          const data = await searchRes.json();
+          items = Array.isArray(data.search) ? data.search.map(entry => ({
+            id: entry.id,
+            title: entry.label || title,
+            subtitle: entry.description || "Game",
+            thumbnail: "",
+            kind: "game"
+          })) : [];
+        }
+      }
+      items = items.concat(await fetchAllCustomMetadataSources("game", title));
       if (items.length > 1) {
         showMetadataResults("game", items, title);
         return;
       }
       if (!items[0]) return;
-      await applySelectedGameMetadata(items[0].id, items[0].title);
+      if (items[0].customSourceId) {
+        applyCustomMetadataResult(items[0]);
+      } else {
+        await applySelectedGameMetadata(items[0].id, items[0].title);
+      }
       return;
     }
 
-    if (category === "manga") {
-      const searchRes = await fetch(`https://openlibrary.org/search.json?title=${normalized}`);
-      if (!searchRes.ok) return;
-      const data = await searchRes.json();
-      const items = Array.isArray(data.docs) ? data.docs.slice(0, 8).map(doc => ({
-        key: doc.key,
-        title: doc.title || title,
-        subtitle: [doc.author_name?.[0], doc.first_publish_year ? `First published ${doc.first_publish_year}` : "", doc.edition_count ? `${doc.edition_count} volumes` : ""].filter(Boolean).join(" · "),
-        thumbnail: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : "",
-        editionCount: doc.edition_count || 0,
-        kind: category
-      })).filter(item => item.key) : [];
+    if (category === "manga" || category === "novel") {
+      let items = [];
+      if (builtinSourceEnabled("openlibrary")) {
+        const searchRes = await fetch(`https://openlibrary.org/search.json?title=${normalized}`);
+        if (searchRes.ok) {
+          const data = await searchRes.json();
+          items = Array.isArray(data.docs) ? data.docs.slice(0, 8).map(doc => ({
+            key: doc.key,
+            title: doc.title || title,
+            subtitle: [doc.author_name?.[0], doc.first_publish_year ? `First published ${doc.first_publish_year}` : "", doc.edition_count ? `${doc.edition_count} volumes` : ""].filter(Boolean).join(" · "),
+            thumbnail: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : "",
+            editionCount: doc.edition_count || 0,
+            kind: category
+          })).filter(item => item.key) : [];
+        }
+      }
+      items = items.concat(await fetchAllCustomMetadataSources(category, title));
       if (items.length > 1) {
         showMetadataResults(category, items, title);
         return;
       }
       if (!items[0]) return;
-      applyMetadataPreview({
-        title: items[0].title,
-        meta: items[0].subtitle,
-        image: thumbnailsEnabled() ? items[0].thumbnail : ""
-      });
-      fetchedMetadataDraft = {
-        thumbnail: thumbnailsEnabled() ? items[0].thumbnail : ""
-      };
-      const totalVolumesInput = document.getElementById("field-total-volumes");
-      if (totalVolumesInput && !totalVolumesInput.value && items[0].editionCount) {
-        totalVolumesInput.value = items[0].editionCount;
-      }
-      return;
-    }
-
-    if (category === "novel") {
-      const searchRes = await fetch(`https://openlibrary.org/search.json?title=${normalized}`);
-      if (!searchRes.ok) return;
-      const data = await searchRes.json();
-      const items = Array.isArray(data.docs) ? data.docs.slice(0, 8).map(doc => ({
-        key: doc.key,
-        title: doc.title || title,
-        subtitle: [doc.author_name?.[0], doc.first_publish_year ? `First published ${doc.first_publish_year}` : "", doc.edition_count ? `${doc.edition_count} volumes` : ""].filter(Boolean).join(" · "),
-        thumbnail: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : "",
-        editionCount: doc.edition_count || 0,
-        kind: category
-      })).filter(item => item.key) : [];
-      if (items.length > 1) {
-        showMetadataResults(category, items, title);
+      if (items[0].customSourceId) {
+        applyCustomMetadataResult(items[0]);
         return;
       }
-      if (!items[0]) return;
       applyMetadataPreview({
         title: items[0].title,
         meta: items[0].subtitle,
@@ -228,7 +749,9 @@ async function selectMetadataResult(index) {
   if (titleInput && result.title) {
     titleInput.value = result.title;
   }
-  if (kind === "movie") {
+  if (result.customSourceId) {
+    applyCustomMetadataResult(result);
+  } else if (kind === "movie") {
     await applySelectedMovieMetadata(result.id, result.title, selectedThumbnail);
   } else if (kind === "series" || kind === "kdrama" || kind === "cdrama" || kind === "anime") {
     await applySelectedSeriesMetadata(result.id, result.title, selectedThumbnail);
@@ -242,6 +765,18 @@ async function selectMetadataResult(index) {
       totalVolumesInput.value = result.editionCount;
     }
   }
+}
+
+// Custom sources only expose the fields mapped in the search-result JSON path
+// (title/subtitle/thumbnail) — unlike the built-ins there's no follow-up detail
+// endpoint, so this just applies whatever the mapped fields gave us.
+function applyCustomMetadataResult(result) {
+  applyMetadataPreview({
+    title: result.title,
+    meta: result.subtitle || "",
+    image: thumbnailsEnabled() ? result.thumbnail : ""
+  });
+  fetchedMetadataDraft = { thumbnail: thumbnailsEnabled() ? (result.thumbnail || "") : "" };
 }
 
 async function applySelectedSeriesMetadata(showId, title, fallbackThumbnail = "") {
