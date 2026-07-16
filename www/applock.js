@@ -220,8 +220,18 @@ function renderAppLockInputArea(method) {
 // drag through others, release to submit). No minimum-4 restriction like stock
 // Android — onComplete only requires 2+ dots (a single dot isn't a "pattern").
 function renderPatternGrid(container, onComplete) {
-  container.innerHTML = `<div class="app-lock-pattern-grid" id="app-lock-pattern-grid"></div>`;
+  container.innerHTML = `
+    <div class="app-lock-pattern-grid" id="app-lock-pattern-grid">
+      <svg class="app-lock-pattern-lines" id="app-lock-pattern-lines">
+        <defs>
+          <marker id="app-lock-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--primary)"></path>
+          </marker>
+        </defs>
+      </svg>
+    </div>`;
   const grid = document.getElementById("app-lock-pattern-grid");
+  const svg = document.getElementById("app-lock-pattern-lines");
   const dots = [];
   for (let i = 0; i < 9; i++) {
     const dot = document.createElement("div");
@@ -234,16 +244,46 @@ function renderPatternGrid(container, onComplete) {
   let drawing = false;
   let selected = [];
 
+  const dotCenter = (dot) => {
+    const gridRect = grid.getBoundingClientRect();
+    const rect = dot.getBoundingClientRect();
+    return {
+      x: rect.left - gridRect.left + rect.width / 2,
+      y: rect.top - gridRect.top + rect.height / 2
+    };
+  };
+
+  const redrawLines = () => {
+    while (svg.lastChild && svg.lastChild.tagName !== "defs") svg.removeChild(svg.lastChild);
+    for (let i = 0; i < selected.length - 1; i++) {
+      const from = dotCenter(dots[selected[i]]);
+      const to = dotCenter(dots[selected[i + 1]]);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", from.x);
+      line.setAttribute("y1", from.y);
+      line.setAttribute("x2", to.x);
+      line.setAttribute("y2", to.y);
+      line.setAttribute("class", "app-lock-pattern-line");
+      if (i === selected.length - 2) line.setAttribute("marker-end", "url(#app-lock-arrow)");
+      svg.appendChild(line);
+    }
+  };
+
   const reset = () => {
     selected = [];
-    dots.forEach(d => d.classList.remove("active"));
+    dots.forEach(d => d.classList.remove("active", "pattern-start", "pattern-end"));
+    redrawLines();
   };
 
   const selectDot = (dot) => {
     const idx = parseInt(dot.dataset.index, 10);
     if (!selected.includes(idx)) {
+      dots.forEach(d => d.classList.remove("pattern-end"));
       selected.push(idx);
       dot.classList.add("active");
+      if (selected.length === 1) dot.classList.add("pattern-start");
+      dot.classList.add("pattern-end");
+      redrawLines();
     }
   };
 
