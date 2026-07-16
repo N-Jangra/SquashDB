@@ -61,6 +61,7 @@ async function initShowDetail() {
       }
       if (showDetailIsOnline()) {
         try {
+          await refreshTvmazeItemMetadata(item);
           await fetchAndCacheEpisodes(item.tvmazeShowId, item);
         } catch (err) {
           console.warn("Could not refresh episode list", err);
@@ -365,6 +366,33 @@ async function initShowDetail() {
     }
   } else {
     renderShowDetailHeader({ title, thumbnail: "", meta: "Missing show information." });
+  }
+}
+
+// Re-syncs a tracked item's show-level metadata (production status, network,
+// genres, summary, runtime, thumbnail) from TVmaze whenever its detail page
+// is opened online, so changes on the source site — a show ending, moving
+// network, new artwork — flow into the local copy. Mutates the item in place
+// so the render below picks up the fresh values.
+async function refreshTvmazeItemMetadata(item) {
+  try {
+    const res = await fetch(`https://api.tvmaze.com/shows/${item.tvmazeShowId}`);
+    if (!res.ok) return;
+    const show = await res.json();
+    const runtime = Math.round(show.averageRuntime || show.runtime || 0);
+    item.productionStatus = show.status || item.productionStatus || "";
+    item.network = show.webChannel?.name || show.network?.name || item.network || "";
+    if (Array.isArray(show.genres) && show.genres.length) item.genres = show.genres.slice(0, 3);
+    const summary = stripHtml(show.summary || "");
+    if (summary) item.summary = summary;
+    if (runtime) item.episodeRuntime = runtime;
+    if (thumbnailsEnabled()) {
+      const thumbnail = show.image?.original || show.image?.medium || "";
+      if (thumbnail) item.thumbnail = thumbnail;
+    }
+    saveData();
+  } catch (err) {
+    console.warn("Could not refresh show metadata", err);
   }
 }
 
