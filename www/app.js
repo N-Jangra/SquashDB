@@ -156,8 +156,13 @@ let state = {
       timeline: "calendar",
       discover: "search",
       sources: "database",
+      explore: "compass",
       stats: "pie-chart",
       settings: "settings"
+    },
+    navBar: {
+      order: ["dashboard", "timeline", "discover", "sources", "explore", "stats", "settings"],
+      visible: { dashboard: true, timeline: false, discover: true, sources: false, explore: true, stats: false, settings: true }
     },
     appLook: "default",
     appLock: {
@@ -222,6 +227,7 @@ function runAppInit() {
   setupAppNavigation();
   setupPageBackButtons();
   setupHardwareBackButton();
+  applyNavBarConfig();
   setupPickerModal();
   updateLayoutToggleButtons();
   initializePage();
@@ -304,16 +310,49 @@ function loadData() {
   normalizeMetadataSources();
   normalizeAppLock();
   if (!state.preferences.navIcons || typeof state.preferences.navIcons !== "object") {
-    state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", discover: "search", sources: "database", stats: "pie-chart", settings: "settings" };
+    state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", discover: "search", sources: "database", explore: "compass", stats: "pie-chart", settings: "settings" };
   }
   state.preferences.navIcons = {
     dashboard: state.preferences.navIcons.dashboard || "layout-grid",
     timeline: state.preferences.navIcons.timeline || "calendar",
     discover: state.preferences.navIcons.discover || "search",
     sources: state.preferences.navIcons.sources || "database",
+    explore: state.preferences.navIcons.explore || "compass",
     stats: state.preferences.navIcons.stats || "pie-chart",
     settings: state.preferences.navIcons.settings || "settings"
   };
+
+  // Bottom bar arrangement: which tabs show and in what order. Explore stands
+  // in for Timeline/Sources/Statistics by default (it links to all of them);
+  // Settings can never be hidden so the config page always stays reachable.
+  const navBarDefaults = { dashboard: true, timeline: false, discover: true, sources: false, explore: true, stats: false, settings: true };
+  if (!state.preferences.navBar || typeof state.preferences.navBar !== "object") {
+    state.preferences.navBar = { order: [...NAV_BAR_KEYS], visible: { ...navBarDefaults } };
+  }
+  if (!Array.isArray(state.preferences.navBar.order)) state.preferences.navBar.order = [...NAV_BAR_KEYS];
+  state.preferences.navBar.order = state.preferences.navBar.order.filter(key => NAV_BAR_KEYS.includes(key));
+  NAV_BAR_KEYS.forEach(key => {
+    if (!state.preferences.navBar.order.includes(key)) state.preferences.navBar.order.push(key);
+  });
+  if (!state.preferences.navBar.visible || typeof state.preferences.navBar.visible !== "object") {
+    state.preferences.navBar.visible = { ...navBarDefaults };
+  }
+  NAV_BAR_KEYS.forEach(key => {
+    if (typeof state.preferences.navBar.visible[key] !== "boolean") {
+      state.preferences.navBar.visible[key] = navBarDefaults[key];
+    }
+  });
+  state.preferences.navBar.visible.settings = true;
+  // Explore replaces Timeline/Sources/Statistics in the bar when enabled
+  // (its page links to all three); otherwise Timeline and Statistics still
+  // share a single slot between themselves.
+  if (state.preferences.navBar.visible.explore) {
+    state.preferences.navBar.visible.timeline = false;
+    state.preferences.navBar.visible.sources = false;
+    state.preferences.navBar.visible.stats = false;
+  } else if (state.preferences.navBar.visible.timeline && state.preferences.navBar.visible.stats) {
+    state.preferences.navBar.visible.stats = false;
+  }
 
   const savedTheme = localStorage.getItem("squashdb_theme");
   if (savedTheme) {
@@ -378,6 +417,7 @@ function initializePage() {
   renderTrackingChoicesSettings();
   renderCategoryOrderSettings();
   renderMetadataSourcesSettings();
+  renderNavBarSettings();
   renderCategorySelectOptions();
   updateSettingsUI();
   updateBackupFolderStatusUI();
@@ -389,6 +429,7 @@ function getCurrentPageTab() {
     document.getElementById("tab-timeline") ? "tab-timeline" :
     document.getElementById("tab-discover") ? "tab-discover" :
     document.getElementById("tab-sources") ? "tab-sources" :
+    document.getElementById("tab-explore") ? "tab-explore" :
     document.getElementById("tab-stats") ? "tab-stats" :
     document.getElementById("tab-settings") ? "tab-settings" :
     null;
@@ -655,6 +696,23 @@ function setupEventListeners() {
     updateDashboardFilterButton();
   }
 
+  // Floating cross-links between Timeline and Statistics (each page carries
+  // a FAB to the other, since only one of the two sits in the bottom bar)
+  const statsFab = document.getElementById("stats-fab");
+  if (statsFab) {
+    statsFab.addEventListener("click", () => {
+      recordCurrentPage();
+      window.location.href = "statistics.html";
+    });
+  }
+  const timelineFab = document.getElementById("timeline-fab");
+  if (timelineFab) {
+    timelineFab.addEventListener("click", () => {
+      recordCurrentPage();
+      window.location.href = "timeline.html";
+    });
+  }
+
   // Bottom Navigation tabs
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -908,11 +966,123 @@ function updateAppLockSettingsSummary() {
   summaryEl.textContent = labels[state.preferences.appLock.method] || "Off";
 }
 
+const NAV_BAR_KEYS = ["dashboard", "timeline", "discover", "sources", "explore", "stats", "settings"];
+const NAV_BAR_LABELS = { dashboard: "Dashboard", timeline: "Timeline", discover: "Discover", sources: "Sources", explore: "Explore", stats: "Statistics", settings: "Settings" };
+const NAV_KEY_BY_TAB = {
+  "tab-dashboard": "dashboard",
+  "tab-timeline": "timeline",
+  "tab-discover": "discover",
+  "tab-sources": "sources",
+  "tab-explore": "explore",
+  "tab-stats": "stats",
+  "tab-settings": "settings"
+};
+
+// Reorders and hides the static bottom-nav items to match the user's
+// arrangement preference (see manage-nav-bar.html).
+function applyNavBarConfig() {
+  const nav = document.querySelector(".bottom-nav");
+  if (!nav) return;
+  const cfg = state.preferences.navBar;
+  if (!cfg) return;
+
+  const itemsByKey = {};
+  nav.querySelectorAll(".nav-item").forEach(item => {
+    const key = NAV_KEY_BY_TAB[item.dataset.tab];
+    if (key) itemsByKey[key] = item;
+  });
+
+  cfg.order.forEach(key => {
+    const item = itemsByKey[key];
+    if (!item) return;
+    item.style.display = cfg.visible[key] === false ? "none" : "";
+    nav.appendChild(item);
+  });
+}
+
+// Settings page: drag-to-reorder rows with show/hide toggles for each tab.
+function renderNavBarSettings() {
+  const list = document.getElementById("nav-bar-arrangement-list");
+  if (!list) return;
+
+  list.innerHTML = "";
+  state.preferences.navBar.order.forEach(key => {
+    const row = document.createElement("div");
+    row.className = "sortable-item metadata-source-row";
+    row.draggable = true;
+    row.dataset.navKey = key;
+    const locked = key === "settings";
+    row.innerHTML = `
+      <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+      <span class="sortable-label">
+        ${NAV_BAR_LABELS[key]}
+        ${locked ? `<span class="setting-desc">Always shown</span>` : ""}
+      </span>
+      <label class="switch">
+        <input type="checkbox" data-nav-visible="${key}" ${state.preferences.navBar.visible[key] ? "checked" : ""} ${locked ? "disabled" : ""}>
+        <span class="slider"></span>
+      </label>
+    `;
+    list.appendChild(row);
+  });
+
+  let dragged = null;
+  list.querySelectorAll(".sortable-item").forEach(item => {
+    item.addEventListener("dragstart", () => {
+      dragged = item;
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      dragged = null;
+      state.preferences.navBar.order = Array.from(list.querySelectorAll(".sortable-item")).map(el => el.dataset.navKey);
+      saveData();
+      applyNavBarConfig();
+    });
+    item.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (!dragged || dragged === item) return;
+      const rect = item.getBoundingClientRect();
+      const after = e.clientY > rect.top + rect.height / 2;
+      list.insertBefore(dragged, after ? item.nextSibling : item);
+    });
+  });
+
+  list.querySelectorAll("input[data-nav-visible]").forEach(checkbox => {
+    checkbox.addEventListener("change", (e) => {
+      const key = e.target.dataset.navVisible;
+      const vis = state.preferences.navBar.visible;
+      vis[key] = e.target.checked;
+      if (e.target.checked) {
+        // Explore stands in for Timeline/Sources/Statistics; outside of it,
+        // Timeline and Statistics still share a single slot.
+        if (key === "explore") {
+          vis.timeline = false;
+          vis.sources = false;
+          vis.stats = false;
+        } else if (key === "timeline") {
+          vis.stats = false;
+          vis.explore = false;
+        } else if (key === "stats") {
+          vis.timeline = false;
+          vis.explore = false;
+        } else if (key === "sources") {
+          vis.explore = false;
+        }
+      }
+      saveData();
+      renderNavBarSettings();
+      applyNavBarConfig();
+    });
+  });
+}
+
 const NAV_ICON_CHOICES = {
   dashboard: ["layout-grid", "home", "grid2x2", "layout-dashboard", "square-library", "book-marked", "library", "layout-list", "list-tree", "boxes", "compass", "rows", "menu", "folder-open", "box", "archive"],
   timeline: ["calendar", "clock", "history", "calendar-days", "calendar-clock", "hourglass", "timer", "calendar-heart", "calendar-check", "calendar-range", "alarm-clock", "clock4", "clock9", "calendar-plus", "sunrise", "moon"],
   discover: ["search", "compass", "globe", "telescope", "binoculars", "sparkles", "eye", "map", "navigation", "radar", "zap", "star", "search-check", "scan-search", "earth", "satellite-dish"],
   sources: ["database", "server", "layers", "package", "plug", "cloud", "hard-drive", "library-big", "antenna", "rss", "combine", "blocks", "cable", "boxes", "network", "warehouse"],
+  explore: ["compass", "map", "globe", "telescope", "rocket", "sparkles", "mountain", "ship", "milestone", "signpost", "footprints", "trees", "sailboat", "plane", "map-pinned", "orbit"],
   stats: ["pie-chart", "bar-chart2", "bar-chart3", "trending-up", "activity", "line-chart", "gauge", "chart-bar", "chart-pie", "bar-chart-horizontal", "flame", "sigma", "chart-column", "area-chart", "radar", "target"],
   settings: ["settings", "sliders-horizontal", "cog", "wrench", "settings2", "sliders", "toggle-left", "circle-user", "sparkles", "square-menu", "list-checks", "user-cog", "sliders-vertical", "user-round-cog", "shield-check", "key"]
 };
@@ -1045,6 +1215,7 @@ function applyNavIcons() {
     "tab-timeline": "timeline",
     "tab-discover": "discover",
     "tab-sources": "sources",
+    "tab-explore": "explore",
     "tab-stats": "stats",
     "tab-settings": "settings"
   };

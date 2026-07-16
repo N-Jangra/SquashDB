@@ -299,6 +299,99 @@ a.chip {
   opacity: 0.55;
 }
 
+/* Sources grid (sources.html + explore.html): icon tiles */
+.sources-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.source-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-md);
+  text-decoration: none;
+  color: var(--text-primary);
+  text-align: center;
+  transition: border-color calc(0.14s * var(--anim-speed)) ease;
+}
+
+.source-tile:hover {
+  border-color: var(--primary);
+}
+
+.source-tile-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary);
+}
+
+.source-tile-icon i {
+  width: 24px;
+  height: 24px;
+}
+
+.source-tile-name {
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-tile-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Explore page quick links to Timeline / Statistics */
+.explore-quick-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.explore-quick-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--border-radius-full);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  transition: border-color calc(0.14s * var(--anim-speed)) ease;
+}
+
+.explore-quick-link:hover {
+  border-color: var(--primary);
+}
+
+.explore-quick-link i {
+  width: 18px;
+  height: 18px;
+}
+
 .chip.active {
   background: var(--primary);
   color: white;

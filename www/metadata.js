@@ -10,16 +10,16 @@ let metadataSearchState = {
 };
 
 const BUILTIN_METADATA_SOURCES = {
-  tvmaze: { name: "TVmaze", categories: ["series", "kdrama", "cdrama", "anime"] },
-  wikidata: { name: "Wikidata", categories: ["movie", "game"] },
-  openlibrary: { name: "Open Library", categories: ["manga", "novel"] },
-  rawg: { name: "RAWG", categories: ["game"], needsApiKey: true, apiKeyUrl: "https://rawg.io/apidocs" },
-  anilist: { name: "AniList", categories: ["anime", "manga", "series", "kdrama", "cdrama"] },
-  jikan: { name: "MyAnimeList (Jikan)", categories: ["anime", "manga"] },
-  kitsu: { name: "Kitsu", categories: ["anime", "manga"] },
-  googlebooks: { name: "Google Books", categories: ["novel", "manga"] },
-  omdb: { name: "OMDb", categories: ["movie", "series", "kdrama", "cdrama", "anime"], needsApiKey: true, apiKeyUrl: "https://www.omdbapi.com/apikey.aspx" },
-  tmdb: { name: "TMDB", categories: ["movie", "series", "kdrama", "cdrama", "anime"], needsApiKey: true, apiKeyUrl: "https://www.themoviedb.org/settings/api" }
+  tvmaze: { name: "TVmaze", icon: "tv", categories: ["series", "kdrama", "cdrama", "anime"] },
+  wikidata: { name: "Wikidata", icon: "globe", categories: ["movie", "game"] },
+  openlibrary: { name: "Open Library", icon: "book-open", categories: ["manga", "novel"] },
+  rawg: { name: "RAWG", icon: "gamepad-2", categories: ["game"], needsApiKey: true, apiKeyUrl: "https://rawg.io/apidocs" },
+  anilist: { name: "AniList", icon: "clapperboard", categories: ["anime", "manga", "series", "kdrama", "cdrama"] },
+  jikan: { name: "MyAnimeList (Jikan)", icon: "list-video", categories: ["anime", "manga"] },
+  kitsu: { name: "Kitsu", icon: "cat", categories: ["anime", "manga"] },
+  googlebooks: { name: "Google Books", icon: "book", categories: ["novel", "manga"] },
+  omdb: { name: "OMDb", icon: "film", categories: ["movie", "series", "kdrama", "cdrama", "anime"], needsApiKey: true, apiKeyUrl: "https://www.omdbapi.com/apikey.aspx" },
+  tmdb: { name: "TMDB", icon: "video", categories: ["movie", "series", "kdrama", "cdrama", "anime"], needsApiKey: true, apiKeyUrl: "https://www.themoviedb.org/settings/api" }
 };
 
 // Ensures state.preferences.metadataSources has the expected shape, filling in

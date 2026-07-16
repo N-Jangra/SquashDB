@@ -14,7 +14,7 @@ function sourceIsUsable(key) {
   return enabled && hasKey;
 }
 
-// ---- Sources list page ----
+// ---- Sources grid (sources.html and explore.html) ----
 function renderSourcesList() {
   const list = document.getElementById("sources-list");
   if (!list) return;
@@ -27,18 +27,29 @@ function renderSourcesList() {
     const hasKey = !info.needsApiKey || Boolean(state.preferences.metadataSources.builtinApiKeys[key]);
     const status = !enabled ? "Disabled" : (!hasKey ? "API key needed" : "");
     return `
-      <a class="settings-row settings-row-link${enabled && hasKey ? "" : " source-row-unavailable"}" href="source-search.html?source=${key}">
-        <div class="settings-row-icon"><i data-lucide="database"></i></div>
-        <div class="settings-row-body">
-          <label>${info.name}</label>
-          <span>${info.categories.map(c => CATEGORIES[c]?.label || c).join(", ")}${status ? ` · ${status}` : ""}</span>
-        </div>
-        <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+      <a class="source-tile${enabled && hasKey ? "" : " source-row-unavailable"}" href="source-search.html?source=${key}">
+        <span class="source-tile-icon"><i data-lucide="${info.icon || "database"}"></i></span>
+        <span class="source-tile-name">${info.name}</span>
+        <span class="source-tile-desc">${status || info.categories.map(c => CATEGORIES[c]?.label || c).join(", ")}</span>
       </a>
     `;
   }).join("");
 
   if (window.lucide) lucide.createIcons();
+}
+
+// Explore page quick links (Timeline / Statistics) — plain anchors, but routed
+// through recordCurrentPage so the in-app back stack stays correct.
+function setupExploreQuickLinks() {
+  document.querySelectorAll(".explore-quick-link").forEach(link => {
+    if (link.dataset.bound) return;
+    link.dataset.bound = "true";
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      recordCurrentPage();
+      window.location.href = link.getAttribute("href");
+    });
+  });
 }
 
 // ---- Per-source search page ----
@@ -254,5 +265,6 @@ function renderSourceSearchResults() {
 
 document.addEventListener("DOMContentLoaded", () => {
   renderSourcesList();
+  setupExploreQuickLinks();
   initSourceSearchPage();
 });
