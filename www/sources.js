@@ -28,11 +28,12 @@ function renderSourcesList() {
     const status = !enabled ? "Disabled" : (!hasKey ? "API key needed" : "");
     return `
       <a class="settings-row settings-row-link${enabled && hasKey ? "" : " source-row-unavailable"}" href="source-search.html?source=${key}">
-        <div class="setting-info">
+        <div class="settings-row-icon"><i data-lucide="database"></i></div>
+        <div class="settings-row-body">
           <label>${info.name}</label>
-          <span class="setting-desc">${info.categories.map(c => CATEGORIES[c]?.label || c).join(", ")}${status ? ` · ${status}` : ""}</span>
+          <span>${info.categories.map(c => CATEGORIES[c]?.label || c).join(", ")}${status ? ` · ${status}` : ""}</span>
         </div>
-        <i data-lucide="chevron-right"></i>
+        <i data-lucide="chevron-right" class="settings-row-chevron"></i>
       </a>
     `;
   }).join("");
@@ -47,6 +48,24 @@ let sourceSearchState = {
   requestId: 0,
   results: []
 };
+
+// Top-rated/popular picks for a source before the user types anything.
+// Sources with no browsable ranked feed (OMDb, Wikidata games, Google Books
+// has only subject search) fall back to a subject query or nothing.
+function suggestSingleSource(key, category) {
+  switch (key) {
+    case "tvmaze": return fetchTvmazeTopRated(category);
+    case "anilist": return fetchAnilistTopRated(category === "manga" ? "MANGA" : "ANIME");
+    case "jikan": return fetchJikanTopRated(category === "manga" ? "manga" : "anime");
+    case "kitsu": return fetchKitsuTopRated(category === "manga" ? "manga" : "anime");
+    case "openlibrary": return fetchOpenLibraryTopRated(category);
+    case "googlebooks": return searchGoogleBooks(category === "manga" ? "subject:comics" : "subject:fiction", category);
+    case "wikidata": return category === "game" ? Promise.resolve([]) : fetchWikidataPopularMovies();
+    case "tmdb": return fetchTmdbTopRated(category === "movie" ? "movie" : "tv", category);
+    case "rawg": return fetchRawgTopRated();
+    default: return Promise.resolve([]);
+  }
+}
 
 // Routes a (source, category, query) triple to the right discover.js search
 // function. Each source speaks a different dialect, so this is the one place
@@ -103,6 +122,38 @@ function initSourceSearchPage() {
       debounceTimer = setTimeout(() => runSourceSearch(e.target.value), 400);
     });
   }
+
+  loadSourceSuggestions();
+}
+
+async function loadSourceSuggestions() {
+  const resultsEl = document.getElementById("source-search-results");
+  const emptyEl = document.getElementById("source-search-empty");
+  if (!resultsEl || !emptyEl) return;
+
+  resultsEl.innerHTML = "";
+  emptyEl.style.display = "flex";
+  emptyEl.querySelector("h3").textContent = "Loading top picks…";
+  emptyEl.querySelector("p").textContent = "";
+
+  const requestId = ++sourceSearchState.requestId;
+  let results = [];
+  try {
+    results = await suggestSingleSource(sourceSearchState.key, sourceSearchState.category);
+  } catch (err) {
+    console.warn(`${sourceSearchState.key} suggestions failed`, err);
+  }
+  if (requestId !== sourceSearchState.requestId) return;
+
+  sourceSearchState.results = (results || []).slice(0, 15);
+  if (sourceSearchState.results.length === 0) {
+    resultsEl.innerHTML = "";
+    emptyEl.style.display = "flex";
+    emptyEl.querySelector("h3").textContent = "Search This Source";
+    emptyEl.querySelector("p").textContent = "Type a title to search only this metadata source.";
+    return;
+  }
+  renderSourceSearchResults();
 }
 
 function renderSourceCategoryChips(info) {
@@ -127,6 +178,7 @@ function renderSourceCategoryChips(info) {
       chipsEl.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c === chip));
       const query = document.getElementById("source-search-input")?.value || "";
       if (query.trim()) runSourceSearch(query);
+      else loadSourceSuggestions();
     });
   });
 
@@ -140,11 +192,7 @@ async function runSourceSearch(query) {
 
   const trimmed = query.trim();
   if (!trimmed) {
-    sourceSearchState.results = [];
-    resultsEl.innerHTML = "";
-    emptyEl.style.display = "flex";
-    emptyEl.querySelector("h3").textContent = "Search This Source";
-    emptyEl.querySelector("p").textContent = "Type a title to search only this metadata source.";
+    loadSourceSuggestions();
     return;
   }
 

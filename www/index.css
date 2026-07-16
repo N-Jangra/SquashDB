@@ -1942,6 +1942,12 @@ main {
   font-weight: 600;
 }
 
+/* Space out the stat blocks — the section itself has no flex gap */
+#tab-stats .stats-grid,
+#tab-stats .stats-chart-card {
+  margin-bottom: 14px;
+}
+
 .stats-chart-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -2246,6 +2252,12 @@ main {
 .metadata-source-row {
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* Label fills the row so the enable toggle sits flush right */
+.metadata-source-row .sortable-label {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .metadata-source-apikey-row {
