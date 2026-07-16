@@ -2087,6 +2087,12 @@ main {
 
 .metadata-source-row {
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.metadata-source-apikey-row {
+  flex: 1 1 100%;
+  margin-top: 4px;
 }
 
 .metadata-path-summary {
