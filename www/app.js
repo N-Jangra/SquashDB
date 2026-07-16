@@ -10,6 +10,9 @@ const CATEGORY_ICON_CHOICES = [
 // Default status set used for custom categories
 const DEFAULT_CUSTOM_STATUSES = ["Backlog", "In Progress", "On Hold", "Dropped", "Completed"];
 
+// Categories tracked by season/episode (TVmaze-backed) rather than volumes/chapters/playtime
+const EPISODE_TRACKED_CATEGORIES = ["series", "kdrama", "cdrama", "anime"];
+
 // Built-in category configuration
 const BUILTIN_CATEGORIES = {
   game: {
@@ -175,6 +178,15 @@ let state = {
 
 function thumbnailsEnabled() {
   return Boolean(state.preferences.metadataThumbnails);
+}
+
+// Every thumbnail slot is compulsory: real image if we have one and thumbnails
+// are enabled, otherwise a "not found" placeholder icon — never an empty slot.
+function thumbnailOrPlaceholder(thumbnailUrl, className) {
+  if (thumbnailsEnabled() && thumbnailUrl) {
+    return `<img class="${className}" src="${thumbnailUrl}" alt="" loading="lazy">`;
+  }
+  return `<span class="${className} thumb-placeholder" title="No thumbnail found"><i data-lucide="image-off"></i></span>`;
 }
 
 // Initialize Application
@@ -358,6 +370,10 @@ function getCurrentPagePath() {
   return window.location.pathname.split("/").pop() || "index.html";
 }
 
+function getCurrentPagePathWithQuery() {
+  return getCurrentPagePath() + window.location.search;
+}
+
 function getAppPageStack() {
   try {
     const raw = sessionStorage.getItem("squashdb_page_stack");
@@ -374,13 +390,14 @@ function setAppPageStack(stack) {
 
 function recordCurrentPage() {
   const current = getCurrentPagePath();
+  const currentWithQuery = getCurrentPagePathWithQuery();
   const stack = getAppPageStack();
   if (stack[stack.length - 1] !== current) {
     stack.push(current);
     setAppPageStack(stack);
   }
-  if (history.state?.squashdbPage !== current) {
-    history.replaceState({ squashdbPage: current }, "", current);
+  if (history.state?.squashdbPage !== currentWithQuery) {
+    history.replaceState({ squashdbPage: currentWithQuery }, "", currentWithQuery);
   }
 }
 
@@ -1617,7 +1634,7 @@ function buildNoteCard(item) {
     ${swipeActionsHTML}
     <div class="note-row-content">
       <input type="checkbox" class="note-checkbox" ${isCompleted ? "checked" : ""} data-id="${item.id}" title="Toggle Completion">
-      ${thumbnailsEnabled() && item.thumbnail ? `<img class="note-thumb" src="${item.thumbnail}" alt="" loading="lazy">` : ""}
+      ${thumbnailOrPlaceholder(item.thumbnail, "note-thumb")}
       <div class="note-row-body">
         <span class="note-title">${item.title}</span>
         <span class="note-subtitle">${subtitleParts.join(" · ")}</span>
@@ -1862,7 +1879,7 @@ function setupTimelineLazyLoad(container, completedItems) {
       tItem.className = "timeline-item";
       tItem.style.setProperty("--theme-color", CATEGORIES[item.category].color);
       tItem.innerHTML = `
-        ${thumbnailsEnabled() && item.thumbnail ? `<img class="timeline-item-thumb" src="${item.thumbnail}" alt="" loading="lazy">` : ""}
+        ${thumbnailOrPlaceholder(item.thumbnail, "timeline-item-thumb")}
         <div class="timeline-item-content">
           <span class="timeline-item-text">${item.title}</span>
           <span class="timeline-item-meta">Completed on ${formatDate(item.completionDate)}</span>
@@ -1981,7 +1998,7 @@ function attachCardEvents() {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const id = btn.getAttribute("data-id");
-      openModal(id);
+      openItemForCategory(id);
     });
   });
 
@@ -2041,7 +2058,7 @@ function bindTapHold(card) {
   card.addEventListener("touchend", cancel);
   card.addEventListener("touchmove", cancel);
   card.addEventListener("click", () => {
-    if (!longPressed) openModal(card.dataset.id);
+    if (!longPressed) openItemForCategory(card.dataset.id);
   });
 }
 
@@ -2086,7 +2103,7 @@ function bindSwipe(card) {
 
   content.addEventListener("click", () => {
     if (Math.abs(currentX) < 5) {
-      openModal(card.dataset.id);
+      openItemForCategory(card.dataset.id);
     }
   });
 }
@@ -2107,7 +2124,7 @@ function openRowActionMenu(id) {
   editBtn.innerHTML = `<i data-lucide="edit-2" class="picker-option-check" style="visibility:visible;"></i><span>Edit</span>`;
   editBtn.addEventListener("click", () => {
     closeSettingsPicker();
-    openModal(id);
+    openItemForCategory(id);
   });
   list.appendChild(editBtn);
 
@@ -2243,6 +2260,20 @@ function deleteEntry(id) {
   renderDashboard();
   renderTimeline();
   renderStats();
+}
+
+// Opens the right editor for an existing item: the full season/episode detail
+// page for episode-tracked categories (series/kdrama/cdrama/anime), or the
+// classic edit modal for everything else (movie/game/manga/novel).
+const SHOW_DETAIL_PAGE_CATEGORIES = [...EPISODE_TRACKED_CATEGORIES, "movie", "manga", "novel"];
+
+function openItemForCategory(id) {
+  const item = state.items.find(i => i.id === id);
+  if (item && SHOW_DETAIL_PAGE_CATEGORIES.includes(item.category)) {
+    window.location.href = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    return;
+  }
+  openModal(id);
 }
 
 // Open Form Modal (Add / Edit)
