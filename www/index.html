@@ -12,6 +12,10 @@
       --text: #f8fafc;
       --muted: #94a3b8;
       --primary: #6366f1;
+      /* Mirrors --anim-speed from index.css (set via the Animation Speed setting).
+         This page loads before app.js runs, so the multiplier is read directly
+         from localStorage below rather than through the shared preference code. */
+      --anim-speed: 1;
     }
 
     * { box-sizing: border-box; }
@@ -39,7 +43,7 @@
     .boot-inner {
       width: min(100%, 320px);
       text-align: center;
-      animation: floatIn 420ms ease-out both;
+      animation: floatIn calc(420ms * var(--anim-speed)) ease-out both;
     }
 
     .logo {
@@ -49,7 +53,7 @@
       display: grid;
       place-items: center;
       overflow: hidden;
-      animation: logoPulse 1.8s ease-in-out infinite;
+      animation: logoPulse calc(1.8s * var(--anim-speed)) ease-in-out infinite;
     }
 
     .logo img {
@@ -87,7 +91,7 @@
       border-radius: 999px;
       background: var(--primary);
       opacity: 0.5;
-      animation: pulse 1s infinite ease-in-out;
+      animation: pulse calc(1s * var(--anim-speed)) infinite ease-in-out;
     }
 
     .dots span:nth-child(2) { animation-delay: 0.15s; }
@@ -113,8 +117,23 @@
     }
   </style>
   <script>
+    // Read the Animation Speed preference directly from localStorage (app.js
+    // hasn't run yet on this boot page) so the splash's CSS animations and
+    // its minimum hold time both match the user's chosen speed.
+    const ANIMATION_SPEED_MULTIPLIERS = { off: 0.001, fast: 0.5, normal: 1, slow: 1.75 };
+    let animSpeedMultiplier = 1;
+    try {
+      const savedPrefs = JSON.parse(localStorage.getItem("squashdb_prefs") || "{}");
+      animSpeedMultiplier = ANIMATION_SPEED_MULTIPLIERS[savedPrefs.animationSpeed] ?? 1;
+    } catch (e) {
+      animSpeedMultiplier = 1;
+    }
+    document.documentElement.style.setProperty("--anim-speed", animSpeedMultiplier);
+
+    const MIN_SPLASH_MS = 1500;
     window.addEventListener("DOMContentLoaded", () => {
-      window.location.replace("dashboard.html");
+      const holdMs = MIN_SPLASH_MS * animSpeedMultiplier;
+      setTimeout(() => window.location.replace("dashboard.html"), holdMs);
     });
   </script>
 </head>

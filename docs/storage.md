@@ -1,0 +1,76 @@
+# App Storage: What Persists, Where, and For How Long
+
+This is the question that comes up most, so it's answered directly here rather than only implied by the schema docs.
+
+## The three storage layers
+
+| Layer | What lives here | Persistence | Cleared by |
+|---|---|---|---|
+| **`localStorage`** | Everything in [db-schema.md](db-schema.md) — all items, all preferences | Indefinite. Not a cache; Android/Chromium does not auto-clear it on a timer. | Manually clearing app storage (Settings → Apps → SquashDB → Storage → Clear Data), uninstalling the app, or (rare) OS storage-pressure eviction as an absolute last resort. |
+| **WebView HTTP cache** | Thumbnail image *bytes*, transiently, whenever an `<img>` tag actually renders a `thumbnail` URL | Ephemeral — follows normal HTTP cache-control rules from whichever CDN served the image (TVmaze/Wikimedia/Open Library/custom source). Typically hours to a few days, but not guaranteed. | Any time, silently, once the WebView's cache size limit is hit — this is a real browser cache, unlike `localStorage`. |
+| **`squash-db/` SAF folder** (Android only, opt-in) | `index.json` + `thumbnail.webp` per item, mirrored from `localStorage`; full `.tar` backups | Indefinite, real files on the filesystem/SD card/cloud-synced folder the user picked. | Only if the user (or another app) deletes the folder/files directly. The app itself never deletes from here — sync is additive-only. |
+| **`sessionStorage`** | Just one key: whether the app-lock has been unlocked this session (`squashdb_lock_unlocked`) | Cleared automatically whenever the app process is killed — by design, so the lock re-triggers on every real reopen, not just page navigation. | Killing/restarting the app (normal), or the OS reclaiming background process memory. |
+
+**The practical consequence**: item data (title, status, rating, notes, etc.) is durable from the moment it's saved. Thumbnails are not — `item.thumbnail` only ever stores a URL, so if that URL goes offline, the CDN evicts the cached bytes, or you're offline, the thumbnail image will fail to load even though the item itself is completely intact. This is why a thumbnail can "disappear" while everything else about the item stays correct.
+
+## Why there's no popup asking for a folder on startup
+
+This is intentional. Nothing in the startup path (`DOMContentLoaded` → `initializePage()`) calls the native folder picker. The picker is only invoked by:
+- Tapping **Export** (Backups & Restore)
+- Tapping **Sync to Folder Tree** (Backups & Restore)
+- An auto-sync firing (see below)
+- Tapping **Change Backup Folder** explicitly
+
+On startup, `checkBackupFolderOnStartup()` runs a **silent** check (`hasPersistedFolder()`) against the previously saved SAF URI — no dialog, ever. If that check fails (folder deleted/moved, permission revoked, or none was ever picked), it just sets a flag (`squashdb_backup_folder_invalid` in `localStorage`) that surfaces as a small red notice on the Backups & Restore page. The actual re-pick still only happens when the user taps a button there.
+
+## Auto-sync to `squash-db/`
+
+`scheduleFolderTreeAutoSync()` is called from `saveData()` — i.e., after every item add/edit/delete/status-toggle — and debounced by the **Animation Speed**-unrelated **Folder Sync Delay** setting (Settings → Folder Sync Delay): Immediately / 5s / 10s / 30s / 1 minute (default 30s). "Immediately" still respects `saveData()`'s own 120ms internal debounce; it just skips the extra idle wait on top of that.
+
+Each sync pass (`syncFolderTreeMirror()`):
+1. Resolves (or silently reuses) the backup folder URI.
+2. For each item, compares a JSON hash against `squashdb_synced_item_hashes` (in `localStorage`) — unchanged items are skipped, so a sync pass only writes what actually changed.
+3. Writes `index.json`, fetches the thumbnail URL and re-encodes it to WebP (`thumbnailUrlToWebpBase64()`), writes `thumbnail.webp` if that succeeded.
+4. Writes a redacted copy of the metadata-source config to `squash-db/settings/metadata-sources.json`.
+5. Never deletes anything — items removed from the app leave their old folder behind on disk.
+
+The manual **"Sync to Folder Tree"** button surfaces a summary (`syncedCount`/`skippedUnchangedCount`/per-item errors) via an alert, since there's no other easy way to see sync failures without a device log.
+
+## Backup/export pipeline
+
+`exportData()` (Export button):
+1. Runs `syncFolderTreeMirror()` first, so the folder tree is current.
+2. Calls the native `exportTarArchive()`, which walks `squash-db/` and writes an uncompressed POSIX tar as a **sibling** of `squash-db/` (same chosen folder, not nested inside it) — `squashdb_backup_<date>.tar`, containing the whole `squash-db/` tree plus one extra root-level JSON entry with the same payload a plain export produces.
+3. On non-native platforms (desktop browser), this path is skipped entirely — export falls back to `showSaveFilePicker()` or a plain `<a download>` link, producing just a `.json` file, no `squash-db/` tree, no tar.
+
+`importData()` accepts either `.json` or `.tar`. For `.tar`, `parseTarArchive()` (hand-rolled, mirrors the native writer's layout) extracts the root-level `.json` entry and feeds it through the same `applyImportedBackupJson()` path as a plain JSON import. Import always **merges** by item ID — it never overwrites/replaces existing items, only adds ones not already present (see `restoreBackupData()`).
+
+## Daily auto-backup (last 3 kept)
+
+There's no background process while the app is closed, so this isn't a literal 24-hour timer — it's a check that runs once on every app launch, in `checkBackupFolderOnStartup()` → `runAutoBackupIfDue()`:
+
+1. Compares `Date.now()` against `squashdb_last_auto_backup_at` (in `localStorage`). If less than 24 hours have passed, or the folder is invalid/unset, or `state.items` is empty, nothing happens.
+2. Otherwise, writes a full tar snapshot via the same `writeTarBackup()` helper the manual Export button uses — same naming (`squashdb_backup_<YYYY-MM-DD>.tar` + `.json` sibling), same location (a sibling of `squash-db/` in the chosen SAF folder).
+3. Updates `squashdb_last_auto_backup_at`, then calls `pruneOldAutoBackups()`: lists the folder root, groups matching `squashdb_backup_<date>.(tar|json)` files by date, keeps the **3 newest dates**, and deletes every file (both `.tar` and its `.json` sibling) for any older date via the native `deleteFile()` method.
+
+This only ever deletes dated backup archive files it recognizes by name — it never touches `squash-db/` itself, unrelated files, or anything not matching the `squashdb_backup_<date>.(tar|json)` pattern. Since it's tied to app launches rather than a real clock, opening the app less than once a day means backups happen less often than every 24 hours (there's no missed-backup catch-up beyond "the next time you open it").
+
+## Auto-restore on a fresh install (or any time items are empty)
+
+Uninstalling the app wipes `localStorage` (see the table above) and Android revokes the app's SAF folder permission — so a reinstall always starts with **zero memory of the old folder**, and the user must re-pick it manually. There is no way around that first manual step.
+
+Once a backup folder is picked (whether via the implicit pick inside `getOrPickBackupFolderUri()` — triggered by Export/Sync — or the explicit **Change Backup Folder** button) **and** `state.items` is currently empty, `checkForExistingBackupToRestore()` runs automatically:
+1. Lists the folder's root contents via the native `listFiles()`.
+2. Filters for `squashdb_backup_<YYYY-MM-DD>.tar`/`.json` files and picks the newest by date (preferring `.tar` over `.json` on the same date, since the tar is the fuller snapshot).
+3. Shows a confirm dialog naming the file found.
+4. If confirmed, reads it (native `readBinaryFile()` for tar bytes, `readFile()` for plain json) and feeds it through the same merge-based `applyImportedBackupJson()` path Import already uses.
+
+This only fires when items are empty — it will not silently overwrite existing data, and it never runs without the user's explicit confirmation in the dialog.
+
+## Animation Speed vs. storage
+
+Unrelated to persistence, but frequently asked in the same breath: **Animation Speed** (Settings → Appearance) only scales CSS transition/animation durations via a `--anim-speed` custom property — it has no effect on storage, sync timing, or the Folder Sync Delay setting (now under Settings → Backup & Sync). They're independent controls that happen to both be time-based.
+
+## App Lock vs. storage
+
+Also unrelated to the mechanics above, but worth cross-referencing: the app-lock feature (Settings → Security → App Password) uses its own dedicated `localStorage`/`sessionStorage` keys (`squashdb_lock_failed_attempts`, `squashdb_lock_unlocked`) and does **not** encrypt anything described in this document — it only gates the UI. See [app-lock.md](app-lock.md) for the full mechanics and its threat model.

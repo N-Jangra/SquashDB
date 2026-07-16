@@ -9,73 +9,79 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-// Android bakes a launcher icon+label into each activity-alias at build time, so an
-// icon and a name can only be switched live by enabling one pre-declared alias out of
-// a fixed set and disabling the rest (see AndroidManifest.xml: Look_<icon>_<nameIndex>).
-// To let icon and name be chosen independently without reverting each other, every
-// icon x name combination is pre-baked as its own alias.
+// Android bakes a launcher icon+label into each activity-alias at build time, so the
+// app's home-screen look can only be switched live by enabling one pre-declared alias
+// out of a fixed set and disabling the rest (see AndroidManifest.xml: Look_<key>).
+// Each key already bakes in both an icon and a matching name, so there is no separate
+// name axis to combine with.
 @CapacitorPlugin(name = "AppIcon")
 public class AppIconPlugin extends Plugin {
 
-    // Must match the icon keys used in AndroidManifest.xml alias names (Look_<icon>_<index>)
-    private static final String[] ICON_KEYS = {
-        "classic",
-        "turquoise",
+    // Must match the alias names in AndroidManifest.xml (Look_<key>)
+    private static final String[] LOOK_KEYS = {
+        "default",
+        "fire",
+        "pinklogo",
         "purple",
-        "orange",
-        "pink"
+        "backlog",
+        "bingelog",
+        "checklist",
+        "listkeeper",
+        "myfiles",
+        "mylists",
+        "mywatchlist",
+        "notes",
+        "reminders",
+        "splash",
+        "squid",
+        "towatch",
+        "tracker",
+        "vault",
+        "watchlist",
+        "capacitor",
+        "calculator",
+        "freeotp",
+        "termux"
     };
 
-    // Number of name presets per icon (must match the count baked into AndroidManifest.xml)
-    private static final int NAME_COUNT = 16;
+    // Must match the key of the alias with android:enabled="true" in AndroidManifest.xml
+    private static final String DEFAULT_LOOK_KEY = "default";
 
-    // Index of the name enabled by default (Look_classic_10 = "SquashDB")
-    private static final int DEFAULT_NAME_INDEX = 10;
-
-    private String aliasName(String iconKey, int nameIndex) {
-        return "Look_" + iconKey + "_" + nameIndex;
+    private String aliasName(String lookKey) {
+        return "Look_" + lookKey;
     }
 
-    private boolean isValidIconKey(String iconKey) {
-        for (String key : ICON_KEYS) {
-            if (key.equals(iconKey)) return true;
+    private boolean isValidLookKey(String lookKey) {
+        for (String key : LOOK_KEYS) {
+            if (key.equals(lookKey)) return true;
         }
         return false;
     }
 
     @PluginMethod
     public void setLook(PluginCall call) {
-        String iconKey = call.getString("icon");
-        Integer nameIndex = call.getInt("nameIndex");
+        String lookKey = call.getString("look");
 
-        if (iconKey == null || !isValidIconKey(iconKey)) {
-            call.reject("Invalid or missing 'icon' parameter");
-            return;
-        }
-        if (nameIndex == null || nameIndex < 0 || nameIndex >= NAME_COUNT) {
-            call.reject("Invalid or missing 'nameIndex' parameter");
+        if (lookKey == null || !isValidLookKey(lookKey)) {
+            call.reject("Invalid or missing 'look' parameter");
             return;
         }
 
-        String targetAlias = aliasName(iconKey, nameIndex);
         PackageManager pm = getContext().getPackageManager();
         String packageName = getContext().getPackageName();
 
-        for (String key : ICON_KEYS) {
-            for (int i = 0; i < NAME_COUNT; i++) {
-                String alias = aliasName(key, i);
-                ComponentName component = new ComponentName(packageName, packageName + "." + alias);
-                int newState = alias.equals(targetAlias)
-                    ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                    : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-                pm.setComponentEnabledSetting(component, newState, PackageManager.DONT_KILL_APP);
-            }
+        for (String key : LOOK_KEYS) {
+            String alias = aliasName(key);
+            ComponentName component = new ComponentName(packageName, packageName + "." + alias);
+            int newState = key.equals(lookKey)
+                ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+            pm.setComponentEnabledSetting(component, newState, PackageManager.DONT_KILL_APP);
         }
 
         JSObject result = new JSObject();
         result.put("success", true);
-        result.put("icon", iconKey);
-        result.put("nameIndex", nameIndex);
+        result.put("look", lookKey);
         call.resolve(result);
     }
 
@@ -83,29 +89,23 @@ public class AppIconPlugin extends Plugin {
     public void getLook(PluginCall call) {
         PackageManager pm = getContext().getPackageManager();
         String packageName = getContext().getPackageName();
-        // Must match the alias enabled by default in AndroidManifest.xml (Look_classic_10 = "SquashDB")
-        String activeIcon = "classic";
-        int activeNameIndex = DEFAULT_NAME_INDEX;
+        // Must match the alias enabled by default in AndroidManifest.xml (Look_default)
+        String activeLook = DEFAULT_LOOK_KEY;
 
-        outer:
-        for (String key : ICON_KEYS) {
-            for (int i = 0; i < NAME_COUNT; i++) {
-                String alias = aliasName(key, i);
-                ComponentName component = new ComponentName(packageName, packageName + "." + alias);
-                int state = pm.getComponentEnabledSetting(component);
-                boolean enabled = state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                    || (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && key.equals("classic") && i == DEFAULT_NAME_INDEX);
-                if (enabled) {
-                    activeIcon = key;
-                    activeNameIndex = i;
-                    break outer;
-                }
+        for (String key : LOOK_KEYS) {
+            String alias = aliasName(key);
+            ComponentName component = new ComponentName(packageName, packageName + "." + alias);
+            int state = pm.getComponentEnabledSetting(component);
+            boolean enabled = state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                || (state == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && key.equals(DEFAULT_LOOK_KEY));
+            if (enabled) {
+                activeLook = key;
+                break;
             }
         }
 
         JSObject result = new JSObject();
-        result.put("icon", activeIcon);
-        result.put("nameIndex", activeNameIndex);
+        result.put("look", activeLook);
         call.resolve(result);
     }
 }

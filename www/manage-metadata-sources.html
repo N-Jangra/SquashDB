@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SquashDB - Metadata Sources</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="index.css">
+  <script src="lucide.min.js"></script>
+</head>
+<body>
+  <div id="app-container">
+    <main>
+      <section class="tab-content active">
+        <div class="settings-section">
+          <h4 class="settings-section-title">Built-in sources</h4>
+          <div id="builtin-metadata-sources-list" class="settings-section-inner"></div>
+        </div>
+        <div class="settings-section">
+          <h4 class="settings-section-title">Custom sources</h4>
+          <div id="custom-metadata-sources-list" class="settings-section-inner"></div>
+          <button type="button" id="create-metadata-source-btn" class="btn btn-secondary" style="width:100%;margin-top:8px;">
+            <i data-lucide="plus"></i> Add custom source
+          </button>
+        </div>
+        <div class="page-back-actions">
+          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script>
+</body>
+</html>

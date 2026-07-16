@@ -41,26 +41,26 @@
       </div>
       <div class="settings-row-value"><span id="ui-theme-picker-value">Dark</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
+    <button type="button" class="settings-row settings-row-picker" id="animation-speed-picker" data-pref="animationSpeed">
+      <div class="settings-row-icon"><i data-lucide="zap"></i></div>
+      <div class="settings-row-body">
+        <label>Animation Speed</label>
+        <span>Controls the speed of transitions and animations throughout the app.</span>
+      </div>
+      <div class="settings-row-value"><span id="animation-speed-picker-value">Normal</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
   </div>
 </div>
 <div class="settings-page-header">
-  <h4 class="settings-section-title">App</h4>
+  <h4 class="settings-section-title">App Identity</h4>
 </div>
 <div class="settings-section">
   <div class="settings-list">
     <a class="settings-row settings-row-link" href="manage-app-icon.html">
       <div class="settings-row-icon"><i data-lucide="app-window"></i></div>
       <div class="settings-row-body">
-        <label>App Icon</label>
-        <span>Change the app icon shown on your home screen.</span>
-      </div>
-      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
-    </a>
-    <a class="settings-row settings-row-link" href="manage-app-name.html">
-      <div class="settings-row-icon"><i data-lucide="text-cursor-input"></i></div>
-      <div class="settings-row-body">
-        <label>App Name</label>
-        <span>Change the app name shown on your home screen.</span>
+        <label>App Icons and Names</label>
+        <span>Change the app icon and name shown on your home screen.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -75,7 +75,30 @@
   </div>
 </div>
 <div class="settings-page-header">
-  <h4 class="settings-section-title">General</h4>
+  <h4 class="settings-section-title">Tracking</h4>
+</div>
+<div class="settings-section">
+  <div class="settings-list">
+    <a class="settings-row settings-row-link" href="manage-tracking.html">
+      <div class="settings-row-icon"><i data-lucide="list-checks"></i></div>
+      <div class="settings-row-body">
+        <label>Tracking Choices</label>
+        <span>Choose which lists show up and create new ones.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="manage-category-order.html">
+      <div class="settings-row-icon"><i data-lucide="arrow-down-up"></i></div>
+      <div class="settings-row-body">
+        <label>Category Order</label>
+        <span>Drag to reorder your enabled lists.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+  </div>
+</div>
+<div class="settings-page-header">
+  <h4 class="settings-section-title">Metadata</h4>
 </div>
 <div class="settings-section">
   <div class="settings-list">
@@ -95,27 +118,49 @@
       </div>
       <div class="settings-row-value"><span id="metadata-thumbnails-picker-value">On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <a class="settings-row settings-row-link" href="manage-tracking.html">
-      <div class="settings-row-icon"><i data-lucide="list-checks"></i></div>
+    <a class="settings-row settings-row-link" href="manage-metadata-sources.html">
+      <div class="settings-row-icon"><i data-lucide="server"></i></div>
       <div class="settings-row-body">
-        <label>Tracking Choices</label>
-        <span>Choose which lists show up and create new ones.</span>
+        <label>Metadata Sources</label>
+        <span>Enable, reorder, or add custom lookup sources.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
-    <a class="settings-row settings-row-link" href="manage-category-order.html">
-      <div class="settings-row-icon"><i data-lucide="arrow-down-up"></i></div>
+  </div>
+</div>
+<div class="settings-page-header">
+  <h4 class="settings-section-title">Backup &amp; Sync</h4>
+</div>
+<div class="settings-section">
+  <div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" id="folder-sync-delay-picker" data-pref="folderSyncDelay">
+      <div class="settings-row-icon"><i data-lucide="folder-sync"></i></div>
       <div class="settings-row-body">
-        <label>Category Order</label>
-        <span>Drag to reorder your enabled lists.</span>
+        <label>Folder Sync Delay</label>
+        <span>How long to wait after a change before syncing to the backup folder.</span>
       </div>
-      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
-    </a>
+      <div class="settings-row-value"><span id="folder-sync-delay-picker-value">30 seconds</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
     <a class="settings-row settings-row-link" href="manage-backups.html">
       <div class="settings-row-icon"><i data-lucide="database-backup"></i></div>
       <div class="settings-row-body">
         <label>Backups &amp; Restore</label>
         <span>Export your data or restore from a backup file.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+  </div>
+</div>
+<div class="settings-page-header">
+  <h4 class="settings-section-title">Security</h4>
+</div>
+<div class="settings-section">
+  <div class="settings-list">
+    <a class="settings-row settings-row-link" href="manage-app-lock.html">
+      <div class="settings-row-icon"><i data-lucide="lock"></i></div>
+      <div class="settings-row-body">
+        <label>App Password</label>
+        <span id="app-lock-settings-summary">Off</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -132,4 +177,4 @@
     <div id="picker-options-list" class="picker-options-list"></div>
   </div>
 </div>
-</div><script src="metadata.js"></script><script src="app.js"></script></body></html>
+</div><script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script></body></html>

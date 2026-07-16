@@ -139,14 +139,26 @@ let state = {
     dashboardRowActions: "menu",
     metadataMode: "offline",
     metadataThumbnails: true,
+    folderSyncDelay: "30000",
+    animationSpeed: "normal",
+    metadataSources: {
+      builtinOrder: ["tvmaze", "wikidata", "openlibrary"],
+      builtinEnabled: { tvmaze: true, wikidata: true, openlibrary: true },
+      custom: []
+    },
     navIcons: {
       dashboard: "layout-grid",
       timeline: "calendar",
       stats: "pie-chart",
       settings: "settings"
     },
-    appIconVariant: "classic",
-    appNameIndex: 10
+    appLook: "default",
+    appLock: {
+      method: "none",           // "none" | "pin" | "pattern" | "alphanumeric"
+      passwordHash: "",         // hex PBKDF2 hash of the PIN/pattern/password
+      passwordSalt: "",         // hex random salt used for passwordHash
+      securityQuestions: []     // [{ question, answerHash, answerSalt }, ...] (exactly 3 once set)
+    }
   },
   theme: "dark",
   currentTab: "tab-dashboard",
@@ -168,6 +180,18 @@ function thumbnailsEnabled() {
 // Initialize Application
 document.addEventListener("DOMContentLoaded", () => {
   loadData();
+
+  // If a lock method is set and this session hasn't been unlocked yet, block all
+  // further rendering until a correct PIN/pattern/password (or a security-question
+  // reset) unlocks the session — see applock.js.
+  if (guardAppLock()) {
+    document.addEventListener("app-unlocked", runAppInit, { once: true });
+    return;
+  }
+  runAppInit();
+});
+
+function runAppInit() {
   applyTheme();
   setupEventListeners();
   setupAppNavigation();
@@ -181,11 +205,11 @@ document.addEventListener("DOMContentLoaded", () => {
   updateCategoryChipVisibility();
   updateSettingsUI();
   applyNavIcons();
+  checkBackupFolderOnStartup();
   renderNavIconPickers();
   renderAppIconPicker();
-  renderAppNamePicker();
   lucide.createIcons();
-});
+}
 
 window.addEventListener("pagehide", flushPendingSave);
 document.addEventListener("visibilitychange", () => {
@@ -235,6 +259,14 @@ function loadData() {
   if (!state.preferences.dashboardRowActions) state.preferences.dashboardRowActions = "menu";
   if (!state.preferences.metadataMode) state.preferences.metadataMode = "offline";
   if (typeof state.preferences.metadataThumbnails !== "boolean") state.preferences.metadataThumbnails = true;
+  if (!["0", "5000", "10000", "30000", "60000"].includes(String(state.preferences.folderSyncDelay))) {
+    state.preferences.folderSyncDelay = "30000";
+  }
+  if (!["off", "fast", "normal", "slow"].includes(state.preferences.animationSpeed)) {
+    state.preferences.animationSpeed = "normal";
+  }
+  normalizeMetadataSources();
+  normalizeAppLock();
   if (!state.preferences.navIcons || typeof state.preferences.navIcons !== "object") {
     state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", stats: "pie-chart", settings: "settings" };
   }
@@ -307,8 +339,10 @@ function initializePage() {
   // Standalone manage pages and shared page widgets
   renderTrackingChoicesSettings();
   renderCategoryOrderSettings();
+  renderMetadataSourcesSettings();
   renderCategorySelectOptions();
   updateSettingsUI();
+  updateBackupFolderStatusUI();
   lucide.createIcons();
 }
 
@@ -444,6 +478,7 @@ function saveData() {
   saveQueued = true;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(flushPendingSave, 120);
+  scheduleFolderTreeAutoSync();
 }
 
 function normalizeSeasonEpisodes(raw) {
@@ -513,6 +548,13 @@ function applyPreferenceAttributes() {
   const accent = state.preferences.mainColor || "normal";
   document.body.setAttribute("data-theme", theme);
   document.body.setAttribute("data-accent", accent);
+  applyAnimationSpeed();
+}
+
+function applyAnimationSpeed() {
+  const speed = state.preferences.animationSpeed || "normal";
+  const multiplier = ANIMATION_SPEED_MULTIPLIERS[speed] ?? 1;
+  document.documentElement.style.setProperty("--anim-speed", multiplier);
 }
 
 function formatRatingValue(rating) {
@@ -636,6 +678,48 @@ function setupEventListeners() {
     importTrigger.addEventListener("click", () => importFileInput.click());
     importFileInput.addEventListener("change", importData);
   }
+
+  // Change Backup Folder
+  const chooseFolderBtn = document.getElementById("backup-choose-folder");
+  if (chooseFolderBtn) {
+    if (backupFolderPluginAvailable()) {
+      chooseFolderBtn.addEventListener("click", chooseBackupFolder);
+    } else {
+      chooseFolderBtn.style.display = "none";
+    }
+  }
+
+  // Sync to Folder Tree (squash-db/<category>/<item>/index.json + .thumbnail)
+  const syncFolderTreeBtn = document.getElementById("backup-sync-folder-tree");
+  if (syncFolderTreeBtn) {
+    if (backupFolderPluginAvailable()) {
+      syncFolderTreeBtn.addEventListener("click", async () => {
+        syncFolderTreeBtn.disabled = true;
+        try {
+          const summary = await syncFolderTreeMirror();
+          if (!summary) {
+            alert("Sync did not run — no backup folder is selected.");
+          } else if (summary.syncErrors.length > 0) {
+            alert(
+              `Synced ${summary.syncedCount} of ${summary.totalItems} items.\n` +
+              `${summary.syncErrors.length} failed:\n` +
+              summary.syncErrors.slice(0, 5).join("\n") +
+              (summary.syncErrors.length > 5 ? `\n...and ${summary.syncErrors.length - 5} more (see console log)` : "")
+            );
+          } else {
+            alert(`Folder tree synced successfully! (${summary.syncedCount} written, ${summary.skippedUnchangedCount} already up to date)`);
+          }
+        } catch (err) {
+          console.warn("Manual folder tree sync failed", err);
+          alert("Could not sync folder tree. Please try again.");
+        } finally {
+          syncFolderTreeBtn.disabled = false;
+        }
+      });
+    } else {
+      syncFolderTreeBtn.style.display = "none";
+    }
+  }
   // Reset Database
   const dbReset = document.getElementById("db-reset");
   if (dbReset) {
@@ -743,6 +827,15 @@ function updateSettingsUI() {
 
   renderCategoryOrderSettings();
   renderSettingsCards();
+  updateAppLockSettingsSummary();
+}
+
+function updateAppLockSettingsSummary() {
+  const summaryEl = document.getElementById("app-lock-settings-summary");
+  if (!summaryEl) return;
+  normalizeAppLock();
+  const labels = { none: "Off", pin: "PIN", pattern: "Pattern", alphanumeric: "Password" };
+  summaryEl.textContent = labels[state.preferences.appLock.method] || "Off";
 }
 
 const NAV_ICON_CHOICES = {
@@ -780,35 +873,33 @@ function renderNavIconPickers() {
   if (needsIcons && window.lucide) lucide.createIcons();
 }
 
-// App icon + name (Android home screen look, switched via native activity-alias).
-// Icon and name are chosen independently, but Android only allows enabling one
-// pre-baked alias at a time, so every icon x name pair must exist as its own alias
-// (see AndroidManifest.xml: Look_<icon>_<nameIndex>). Picking one preserves the other.
-const APP_ICON_CHOICES = [
-  { value: "classic", label: "Classic", preview: "icons/previews/ic_launcher.png" },
-  { value: "turquoise", label: "Turquoise", preview: "icons/previews/ic_launcher_turquoise.png" },
-  { value: "purple", label: "Purple", preview: "icons/previews/ic_launcher_purple.png" },
-  { value: "orange", label: "Orange", preview: "icons/previews/ic_launcher_orange.png" },
-  { value: "pink", label: "Pink", preview: "icons/previews/ic_launcher_pink.png" }
-];
-
-const APP_NAME_CHOICES = [
-  "Backlog",
-  "Binge Log",
-  "Checklist",
-  "ListKeeper",
-  "My Files",
-  "My Lists",
-  "My Watchlist",
-  "Notes",
-  "Reminders",
-  "Splash",
-  "SquashDB",
-  "Squid",
-  "ToWatch",
-  "Tracker",
-  "Vault",
-  "Watchlist"
+// App icon+name (Android home screen look, switched via native activity-alias).
+// Each look bakes in both an icon and a matching name as a single pre-declared
+// alias (see AndroidManifest.xml: Look_<key>), so there's one flat list to pick from.
+const APP_LOOK_CHOICES = [
+  { value: "default", label: "SquashDB", preview: "icons/previews/ic_launcher.png" },
+  { value: "fire", label: "SquashDB", preview: "icons/previews/ic_launcher_fire.png" },
+  { value: "pinklogo", label: "SquashDB", preview: "icons/previews/ic_launcher_pinklogo.png" },
+  { value: "purple", label: "SquashDB", preview: "icons/previews/ic_launcher_purple.png" },
+  { value: "backlog", label: "Backlog", preview: "icons/previews/ic_launcher_backlog.png" },
+  { value: "bingelog", label: "Binge Log", preview: "icons/previews/ic_launcher_bingelog.png" },
+  { value: "checklist", label: "Checklist", preview: "icons/previews/ic_launcher_checklist.png" },
+  { value: "listkeeper", label: "ListKeeper", preview: "icons/previews/ic_launcher_listkeeper.png" },
+  { value: "myfiles", label: "My Files", preview: "icons/previews/ic_launcher_myfiles.png" },
+  { value: "mylists", label: "My Lists", preview: "icons/previews/ic_launcher_mylists.png" },
+  { value: "mywatchlist", label: "My Watchlist", preview: "icons/previews/ic_launcher_mywatchlist.png" },
+  { value: "notes", label: "Notes", preview: "icons/previews/ic_launcher_notes.png" },
+  { value: "reminders", label: "Reminders", preview: "icons/previews/ic_launcher_reminders.png" },
+  { value: "splash", label: "Splash", preview: "icons/previews/ic_launcher_splash.png" },
+  { value: "squid", label: "Squid", preview: "icons/previews/ic_launcher_squid.png" },
+  { value: "towatch", label: "ToWatch", preview: "icons/previews/ic_launcher_towatch.png" },
+  { value: "tracker", label: "Tracker", preview: "icons/previews/ic_launcher_tracker.png" },
+  { value: "vault", label: "Vault", preview: "icons/previews/ic_launcher_vault.png" },
+  { value: "watchlist", label: "Watchlist", preview: "icons/previews/ic_launcher_watchlist.png" },
+  { value: "capacitor", label: "Capacitor", preview: "icons/previews/ic_launcher_capacitor.png" },
+  { value: "calculator", label: "Calculator", preview: "icons/previews/ic_launcher_calculator.png" },
+  { value: "freeotp", label: "FreeOTP", preview: "icons/previews/ic_launcher_freeotp.png" },
+  { value: "termux", label: "Termux", preview: "icons/previews/ic_launcher_termux.png" }
 ];
 
 function isNativeApp() {
@@ -820,32 +911,27 @@ function appIconPluginAvailable() {
 }
 
 async function getCurrentAppLook() {
-  let icon = state.preferences.appIconVariant || "classic";
-  let nameIndex = typeof state.preferences.appNameIndex === "number" ? state.preferences.appNameIndex : 0;
+  let look = state.preferences.appLook || "default";
 
   if (appIconPluginAvailable()) {
     try {
       const result = await window.Capacitor.Plugins.AppIcon.getLook();
-      if (result) {
-        if (result.icon) icon = result.icon;
-        if (typeof result.nameIndex === "number") nameIndex = result.nameIndex;
-      }
+      if (result && result.look) look = result.look;
     } catch (err) {
       console.warn("Could not read current app look", err);
     }
   }
-  return { icon, nameIndex };
+  return look;
 }
 
-async function applyAppLook(icon, nameIndex) {
-  state.preferences.appIconVariant = icon;
-  state.preferences.appNameIndex = nameIndex;
+async function applyAppLook(look) {
+  state.preferences.appLook = look;
   saveData();
 
   if (!appIconPluginAvailable()) return;
 
   try {
-    await window.Capacitor.Plugins.AppIcon.setLook({ icon, nameIndex });
+    await window.Capacitor.Plugins.AppIcon.setLook({ look });
   } catch (err) {
     console.warn("Failed to switch app look", err);
     alert("Could not update the app icon/name. Please try again.");
@@ -859,10 +945,10 @@ async function renderAppIconPicker() {
   const note = document.getElementById("app-icon-native-note");
   if (note) note.style.display = appIconPluginAvailable() ? "none" : "block";
 
-  const { icon: current } = await getCurrentAppLook();
+  const current = await getCurrentAppLook();
 
   grid.innerHTML = "";
-  APP_ICON_CHOICES.forEach(choice => {
+  APP_LOOK_CHOICES.forEach(choice => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `app-icon-option${choice.value === current ? " active" : ""}`;
@@ -870,42 +956,14 @@ async function renderAppIconPicker() {
       <img src="${choice.preview}" alt="${choice.label} icon">
       <span>${choice.label}</span>
     `;
-    btn.addEventListener("click", () => selectAppIcon(choice.value));
+    btn.addEventListener("click", () => selectAppLook(choice.value));
     grid.appendChild(btn);
   });
 }
 
-async function selectAppIcon(icon) {
-  const { nameIndex } = await getCurrentAppLook();
-  await applyAppLook(icon, nameIndex);
+async function selectAppLook(look) {
+  await applyAppLook(look);
   renderAppIconPicker();
-}
-
-async function renderAppNamePicker() {
-  const list = document.getElementById("app-name-picker");
-  if (!list) return;
-
-  const note = document.getElementById("app-name-native-note");
-  if (note) note.style.display = appIconPluginAvailable() ? "none" : "block";
-
-  const { nameIndex: current } = await getCurrentAppLook();
-
-  list.innerHTML = "";
-  APP_NAME_CHOICES.forEach((name, index) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `picker-option${index === current ? " active" : ""}`;
-    btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${name}</span>`;
-    btn.addEventListener("click", () => selectAppName(index));
-    list.appendChild(btn);
-  });
-  if (window.lucide) lucide.createIcons();
-}
-
-async function selectAppName(nameIndex) {
-  const { icon } = await getCurrentAppLook();
-  await applyAppLook(icon, nameIndex);
-  renderAppNamePicker();
 }
 
 // Apply the saved nav icons to whichever bottom-nav is present on this page
@@ -995,8 +1053,30 @@ const SETTINGS_PICKERS = {
       { value: "true", label: "On" },
       { value: "false", label: "Off" }
     ]
+  },
+  folderSyncDelay: {
+    default: "30000",
+    options: [
+      { value: "0", label: "Immediately" },
+      { value: "5000", label: "5 seconds" },
+      { value: "10000", label: "10 seconds" },
+      { value: "30000", label: "30 seconds" },
+      { value: "60000", label: "1 minute" }
+    ]
+  },
+  animationSpeed: {
+    default: "normal",
+    options: [
+      { value: "off", label: "Off" },
+      { value: "fast", label: "Fast" },
+      { value: "normal", label: "Normal" },
+      { value: "slow", label: "Slow" }
+    ]
   }
 };
+
+// Multiplier applied to every CSS transition/animation duration via --anim-speed.
+const ANIMATION_SPEED_MULTIPLIERS = { off: 0.001, fast: 0.5, normal: 1, slow: 1.75 };
 
 function getPickerValue(pref) {
   const picker = SETTINGS_PICKERS[pref];
@@ -1376,8 +1456,59 @@ function calculateProgress(item) {
   if (status === "Playing" || status === "In Progress" || status === "Reading") {
     return 50;
   }
-  
+
   return 0;
+}
+
+// Estimated time to finish an item, in minutes. Returns { total, remaining } or
+// null if the category/item doesn't have enough data to estimate (e.g. no runtime
+// set). "remaining" accounts for progress already made; "total" ignores it.
+function calculateTimeToComplete(item) {
+  const { category } = item;
+
+  if (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime") {
+    const runtime = parseInt(item.episodeRuntime) || 0;
+    if (runtime <= 0) return null;
+    const totalEp = parseInt(item.totalEpisodes) || getSeasonTotalEpisodes(item) || 0;
+    if (totalEp <= 0) return null;
+    const doneEp = Math.min(totalEp, parseInt(item.episodesDone) || 0);
+    return {
+      total: runtime * totalEp,
+      remaining: item.status === "Completed" ? 0 : runtime * (totalEp - doneEp)
+    };
+  }
+
+  if (category === "novel") {
+    const minutesPerChapter = parseInt(item.minutesPerChapter) || 0;
+    const totalCh = parseInt(item.totalChapters) || 0;
+    if (minutesPerChapter <= 0 || totalCh <= 0) return null;
+    const doneCh = Math.min(totalCh, parseInt(item.chaptersRead) || 0);
+    return {
+      total: minutesPerChapter * totalCh,
+      remaining: item.status === "Completed" ? 0 : minutesPerChapter * (totalCh - doneCh)
+    };
+  }
+
+  if (category === "movie") {
+    const runtime = parseInt(item.playtime) || 0;
+    if (runtime <= 0) return null;
+    return {
+      total: runtime,
+      remaining: item.status === "Completed" ? 0 : runtime
+    };
+  }
+
+  return null;
+}
+
+// Formats a minute count as e.g. "2h 15m", "45m", or "3h" for display.
+function formatMinutesAsDuration(minutes) {
+  const total = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (hours <= 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
 }
 
 // Render Dashboard Note Cards
@@ -1436,61 +1567,113 @@ function renderDashboard() {
     return 0;
   });
 
-  // 3. Render note elements
+  // 3. Render note elements incrementally: only a first batch is built up front,
+  // more are appended as the user scrolls near the bottom (see setupDashboardLazyLoad).
   if (filtered.length === 0) {
     emptyState.style.display = "flex";
     container.style.display = "none";
+    teardownDashboardLazyLoad();
   } else {
     emptyState.style.display = "none";
     container.style.display = "flex";
+    container.dataset.rowActions = state.preferences.dashboardRowActions || "menu";
+    setupDashboardLazyLoad(container, filtered);
+  }
+}
 
-    const rowActions = state.preferences.dashboardRowActions || "menu";
-    container.dataset.rowActions = rowActions;
+const DASHBOARD_BATCH_SIZE = 30;
+let dashboardLazyLoadObserver = null;
 
-    filtered.forEach(item => {
-      const card = document.createElement("div");
-      const isCompleted = item.status === "Completed";
-      card.className = `note-card ${isCompleted ? "completed" : ""}`;
-      card.dataset.id = item.id;
-      card.style.setProperty("--theme-color", CATEGORIES[item.category].color);
+function buildNoteCard(item) {
+  const rowActions = state.preferences.dashboardRowActions || "menu";
+  const card = document.createElement("div");
+  const isCompleted = item.status === "Completed";
+  card.className = `note-card ${isCompleted ? "completed" : ""}`;
+  card.dataset.id = item.id;
+  card.style.setProperty("--theme-color", CATEGORIES[item.category].color);
 
-      const progress = calculateProgress(item);
-      const subtitleParts = [item.status];
-      const showProgressPercent = !isCompleted && progress > 0 && (item.category === "series" || item.category === "kdrama" || item.category === "cdrama" || item.category === "anime" || item.category === "manga" || item.category === "novel");
-      if (showProgressPercent) subtitleParts.push(`${progress}%`);
-      if (item.rating) subtitleParts.push(formatRatingValue(item.rating));
-
-      const actionsHTML = rowActions === "menu"
-        ? `<button class="note-action-btn menu-btn" data-id="${item.id}" title="More"><i data-lucide="more-vertical"></i></button>`
-        : "";
-
-      const swipeActionsHTML = rowActions === "swipe" ? `
-        <div class="note-row-swipe-actions">
-          <button class="note-action-btn edit-btn" data-id="${item.id}" title="Edit"><i data-lucide="edit-2"></i></button>
-          <button class="note-action-btn delete-btn" data-id="${item.id}" title="Delete"><i data-lucide="trash-2"></i></button>
-        </div>
-      ` : "";
-
-      card.innerHTML = `
-        ${swipeActionsHTML}
-        <div class="note-row-content">
-          <input type="checkbox" class="note-checkbox" ${isCompleted ? "checked" : ""} data-id="${item.id}" title="Toggle Completion">
-          ${thumbnailsEnabled() && item.thumbnail ? `<img class="note-thumb" src="${item.thumbnail}" alt="" loading="lazy">` : ""}
-          <div class="note-row-body">
-            <span class="note-title">${item.title}</span>
-            <span class="note-subtitle">${subtitleParts.join(" · ")}</span>
-          </div>
-          <span class="note-tag" style="--theme-color: ${CATEGORIES[item.category].color}">${CATEGORIES[item.category].label}</span>
-          ${actionsHTML}
-        </div>
-      `;
-      container.appendChild(card);
-    });
+  const progress = calculateProgress(item);
+  const subtitleParts = [item.status];
+  const showProgressPercent = !isCompleted && progress > 0 && (item.category === "series" || item.category === "kdrama" || item.category === "cdrama" || item.category === "anime" || item.category === "manga" || item.category === "novel");
+  if (showProgressPercent) subtitleParts.push(`${progress}%`);
+  if (item.rating) subtitleParts.push(formatRatingValue(item.rating));
+  const timeToComplete = calculateTimeToComplete(item);
+  if (timeToComplete && !isCompleted && timeToComplete.remaining > 0) {
+    subtitleParts.push(`${formatMinutesAsDuration(timeToComplete.remaining)} left`);
   }
 
-  // Hook actions on notes cards
-  attachCardEvents();
-  lucide.createIcons();
+  const actionsHTML = rowActions === "menu"
+    ? `<button class="note-action-btn menu-btn" data-id="${item.id}" title="More"><i data-lucide="more-vertical"></i></button>`
+    : "";
+
+  const swipeActionsHTML = rowActions === "swipe" ? `
+    <div class="note-row-swipe-actions">
+      <button class="note-action-btn edit-btn" data-id="${item.id}" title="Edit"><i data-lucide="edit-2"></i></button>
+      <button class="note-action-btn delete-btn" data-id="${item.id}" title="Delete"><i data-lucide="trash-2"></i></button>
+    </div>
+  ` : "";
+
+  card.innerHTML = `
+    ${swipeActionsHTML}
+    <div class="note-row-content">
+      <input type="checkbox" class="note-checkbox" ${isCompleted ? "checked" : ""} data-id="${item.id}" title="Toggle Completion">
+      ${thumbnailsEnabled() && item.thumbnail ? `<img class="note-thumb" src="${item.thumbnail}" alt="" loading="lazy">` : ""}
+      <div class="note-row-body">
+        <span class="note-title">${item.title}</span>
+        <span class="note-subtitle">${subtitleParts.join(" · ")}</span>
+      </div>
+      <span class="note-tag" style="--theme-color: ${CATEGORIES[item.category].color}">${CATEGORIES[item.category].label}</span>
+      ${actionsHTML}
+    </div>
+  `;
+  return card;
+}
+
+function teardownDashboardLazyLoad() {
+  if (dashboardLazyLoadObserver) {
+    dashboardLazyLoadObserver.disconnect();
+    dashboardLazyLoadObserver = null;
+  }
+}
+
+// Renders `filtered` in batches: an initial batch up front, then more batches
+// as a sentinel element at the end of the list scrolls into view. Avoids building
+// hundreds of DOM nodes synchronously for large watchlists on every render.
+function setupDashboardLazyLoad(container, filtered) {
+  teardownDashboardLazyLoad();
+  container.innerHTML = "";
+
+  let renderedCount = 0;
+  const sentinel = document.createElement("div");
+  sentinel.className = "dashboard-lazy-sentinel";
+
+  function renderNextBatch() {
+    const nextItems = filtered.slice(renderedCount, renderedCount + DASHBOARD_BATCH_SIZE);
+    if (nextItems.length === 0) return;
+
+    const fragment = document.createDocumentFragment();
+    nextItems.forEach(item => fragment.appendChild(buildNoteCard(item)));
+    container.insertBefore(fragment, sentinel);
+    renderedCount += nextItems.length;
+
+    attachCardEvents();
+    lucide.createIcons();
+
+    if (renderedCount >= filtered.length) {
+      teardownDashboardLazyLoad();
+      sentinel.remove();
+    }
+  }
+
+  container.appendChild(sentinel);
+  renderNextBatch();
+
+  if (renderedCount < filtered.length) {
+    dashboardLazyLoadObserver = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) renderNextBatch();
+    }, { root: null, rootMargin: "400px" });
+    dashboardLazyLoadObserver.observe(sentinel);
+  }
 }
 
 // Generate stars icon HTML for note cards
@@ -1622,46 +1805,90 @@ function renderTimeline() {
   if (completedItems.length === 0) {
     emptyState.style.display = "flex";
     container.style.display = "none";
+    teardownTimelineLazyLoad();
     return;
   }
 
   emptyState.style.display = "none";
   container.style.display = "block";
 
+  setupTimelineLazyLoad(container, completedItems);
+}
+
+const TIMELINE_BATCH_SIZE = 30;
+let timelineLazyLoadObserver = null;
+
+function teardownTimelineLazyLoad() {
+  if (timelineLazyLoadObserver) {
+    timelineLazyLoadObserver.disconnect();
+    timelineLazyLoadObserver = null;
+  }
+}
+
+// Renders completedItems in batches (grouped by month), appending more as a
+// sentinel scrolls into view, instead of building every timeline entry at once.
+function setupTimelineLazyLoad(container, completedItems) {
+  teardownTimelineLazyLoad();
+  container.innerHTML = "";
+
+  let renderedCount = 0;
   let currentMonth = "";
   let monthGroup = null;
+  const sentinel = document.createElement("div");
+  sentinel.className = "dashboard-lazy-sentinel";
 
-  completedItems.forEach(item => {
-    const monthYear = new Date(item.completionDate).toLocaleString("default", { month: "long", year: "numeric" });
+  function renderNextBatch() {
+    const nextItems = completedItems.slice(renderedCount, renderedCount + TIMELINE_BATCH_SIZE);
+    if (nextItems.length === 0) return;
 
-    if (monthYear !== currentMonth) {
-      currentMonth = monthYear;
-      monthGroup = document.createElement("div");
-      monthGroup.className = "timeline-month-group";
-      monthGroup.innerHTML = `
-        <div class="timeline-month-marker">
-          <span class="timeline-month-dot" style="--theme-color: ${CATEGORIES[item.category].color}"></span>
-          <span class="timeline-month-title">${currentMonth}</span>
+    nextItems.forEach(item => {
+      const monthYear = new Date(item.completionDate).toLocaleString("default", { month: "long", year: "numeric" });
+
+      if (monthYear !== currentMonth) {
+        currentMonth = monthYear;
+        monthGroup = document.createElement("div");
+        monthGroup.className = "timeline-month-group";
+        monthGroup.innerHTML = `
+          <div class="timeline-month-marker">
+            <span class="timeline-month-dot" style="--theme-color: ${CATEGORIES[item.category].color}"></span>
+            <span class="timeline-month-title">${currentMonth}</span>
+          </div>
+          <div class="timeline-month-items"></div>
+        `;
+        container.insertBefore(monthGroup, sentinel);
+      }
+
+      const tItem = document.createElement("div");
+      tItem.className = "timeline-item";
+      tItem.style.setProperty("--theme-color", CATEGORIES[item.category].color);
+      tItem.innerHTML = `
+        ${thumbnailsEnabled() && item.thumbnail ? `<img class="timeline-item-thumb" src="${item.thumbnail}" alt="" loading="lazy">` : ""}
+        <div class="timeline-item-content">
+          <span class="timeline-item-text">${item.title}</span>
+          <span class="timeline-item-meta">Completed on ${formatDate(item.completionDate)}</span>
         </div>
-        <div class="timeline-month-items"></div>
       `;
-      container.appendChild(monthGroup);
+      monthGroup.querySelector(".timeline-month-items").appendChild(tItem);
+    });
+
+    renderedCount += nextItems.length;
+    lucide.createIcons();
+
+    if (renderedCount >= completedItems.length) {
+      teardownTimelineLazyLoad();
+      sentinel.remove();
     }
+  }
 
-    const tItem = document.createElement("div");
-    tItem.className = "timeline-item";
-    tItem.style.setProperty("--theme-color", CATEGORIES[item.category].color);
-    tItem.innerHTML = `
-      ${thumbnailsEnabled() && item.thumbnail ? `<img class="timeline-item-thumb" src="${item.thumbnail}" alt="" loading="lazy">` : ""}
-      <div class="timeline-item-content">
-        <span class="timeline-item-text">${item.title}</span>
-        <span class="timeline-item-meta">Completed on ${formatDate(item.completionDate)}</span>
-      </div>
-    `;
-    monthGroup.querySelector(".timeline-month-items").appendChild(tItem);
-  });
+  container.appendChild(sentinel);
+  renderNextBatch();
 
-  lucide.createIcons();
+  if (renderedCount < completedItems.length) {
+    timelineLazyLoadObserver = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) renderNextBatch();
+    }, { root: null, rootMargin: "400px" });
+    timelineLazyLoadObserver.observe(sentinel);
+  }
 }
 
 // Render Statistics dashboard
@@ -1671,6 +1898,10 @@ function renderStats() {
   const activeEl = document.getElementById("stats-active");
   const queuedEl = document.getElementById("stats-queued");
   const rateEl = document.getElementById("stats-rate");
+  const timeLeftCard = document.getElementById("stats-time-left-card");
+  const timeLeftEl = document.getElementById("stats-time-left");
+  const timeDoneCard = document.getElementById("stats-time-done-card");
+  const timeDoneEl = document.getElementById("stats-time-done");
 
   if (!totalEl) return;
 
@@ -1698,14 +1929,46 @@ function renderStats() {
   activeEl.textContent = activeCount;
   if (queuedEl) queuedEl.textContent = queuedCount;
   rateEl.textContent = `${rate}%`;
+
+  // Time-to-complete aggregates: only shown when at least one item in the
+  // active view has enough data (runtime/reading speed) to estimate from.
+  let minutesLeft = 0;
+  let minutesDone = 0;
+  let hasEstimableItem = false;
+  activeItems.forEach(item => {
+    const time = calculateTimeToComplete(item);
+    if (!time) return;
+    hasEstimableItem = true;
+    minutesLeft += time.remaining;
+    minutesDone += (time.total - time.remaining);
+  });
+
+  if (timeLeftCard && timeLeftEl) {
+    timeLeftCard.style.display = hasEstimableItem ? "flex" : "none";
+    timeLeftEl.textContent = formatMinutesAsDuration(minutesLeft);
+  }
+  if (timeDoneCard && timeDoneEl) {
+    timeDoneCard.style.display = hasEstimableItem ? "flex" : "none";
+    timeDoneEl.textContent = formatMinutesAsDuration(minutesDone);
+  }
 }
 
 // Attach listeners to note cards (checkbox click, edits, deletion, quick increments)
+// Binds listeners only to elements not already bound (tracked via data-bound),
+// so this can be called repeatedly as batches of cards are appended incrementally
+// without stacking duplicate listeners on already-bound cards.
 function attachCardEvents() {
   const rowActions = state.preferences.dashboardRowActions || "menu";
 
+  const bindOnce = (selector, bind) => {
+    document.querySelectorAll(`${selector}:not([data-bound])`).forEach(el => {
+      el.dataset.bound = "true";
+      bind(el);
+    });
+  };
+
   // Checkbox toggle
-  document.querySelectorAll(".note-checkbox").forEach(chk => {
+  bindOnce(".note-checkbox", chk => {
     chk.addEventListener("change", (e) => {
       const id = chk.getAttribute("data-id");
       toggleCompletion(id, e.target.checked);
@@ -1714,7 +1977,7 @@ function attachCardEvents() {
   });
 
   // Edit action
-  document.querySelectorAll(".edit-btn").forEach(btn => {
+  bindOnce(".edit-btn", btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const id = btn.getAttribute("data-id");
@@ -1723,7 +1986,7 @@ function attachCardEvents() {
   });
 
   // Delete action
-  document.querySelectorAll(".delete-btn").forEach(btn => {
+  bindOnce(".delete-btn", btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       confirmDelete(btn.getAttribute("data-id"));
@@ -1731,7 +1994,7 @@ function attachCardEvents() {
   });
 
   // Menu action (3-dot)
-  document.querySelectorAll(".menu-btn").forEach(btn => {
+  bindOnce(".menu-btn", btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       openRowActionMenu(btn.getAttribute("data-id"));
@@ -1739,7 +2002,7 @@ function attachCardEvents() {
   });
 
   // Increment Episode/Chapter progress actions
-  document.querySelectorAll(".inc-btn").forEach(btn => {
+  bindOnce(".inc-btn", btn => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-id");
       const type = btn.getAttribute("data-type");
@@ -1747,7 +2010,7 @@ function attachCardEvents() {
     });
   });
 
-  document.querySelectorAll(".note-card").forEach(card => {
+  bindOnce(".note-card", card => {
     if (rowActions === "tap-hold") {
       bindTapHold(card);
     } else if (rowActions === "swipe") {
@@ -1802,7 +2065,7 @@ function bindSwipe(card) {
   const onEnd = () => {
     if (!dragging) return;
     dragging = false;
-    content.style.transition = "transform 0.2s ease";
+    content.style.transition = "transform calc(0.2s * var(--anim-speed)) ease";
     if (currentX <= -40) {
       content.style.transform = "translateX(-80px)";
     } else if (currentX >= 40) {
@@ -2071,6 +2334,8 @@ function openModal(editId = null) {
       const watchedCount = Object.values(seasonEpisodes).filter(s => s.completed).length;
       const seasonsWatchedInput = document.getElementById("field-seasons-watched");
       if (seasonsWatchedInput) seasonsWatchedInput.value = watchedCount || "";
+      const episodeRuntimeInput = document.getElementById("field-episode-runtime");
+      if (episodeRuntimeInput) episodeRuntimeInput.value = item.episodeRuntime || "";
     } else if (item.category === "manga") {
       document.getElementById("field-total-volumes").value = item.totalVolumes || "";
       document.getElementById("field-volumes-read").value = item.volumesRead || 0;
@@ -2079,6 +2344,7 @@ function openModal(editId = null) {
       document.getElementById("field-volumes-read").value = item.volumesRead || 0;
       document.getElementById("field-total-chapters").value = item.totalChapters || "";
       document.getElementById("field-chapters-read").value = item.chaptersRead || 0;
+      document.getElementById("field-minutes-per-chapter").value = item.minutesPerChapter || 15;
     } else if (item.category === "movie") {
       const totalMinutes = parseInt(item.playtime) || 0;
       document.getElementById("field-playtime").value = totalMinutes || "";
@@ -2184,6 +2450,10 @@ function renderDynamicFormFields(category) {
         <label class="season-episodes-title">Episodes per Season</label>
         <div id="season-episodes-fields" class="season-episodes-fields"></div>
       </div>
+      <div class="form-group">
+        <label for="field-episode-runtime">Avg. Episode Runtime (minutes)</label>
+        <input type="number" id="field-episode-runtime" class="form-control" min="0" placeholder="e.g. 24">
+      </div>
     `;
   } else if (category === "manga") {
     fieldsHTML += `
@@ -2219,6 +2489,10 @@ function renderDynamicFormFields(category) {
           <label for="field-chapters-read">Chapters Read</label>
           <input type="number" id="field-chapters-read" class="form-control" min="0" value="0">
         </div>
+      </div>
+      <div class="form-group">
+        <label for="field-minutes-per-chapter">Avg. Reading Time per Chapter (minutes)</label>
+        <input type="number" id="field-minutes-per-chapter" class="form-control" min="0" placeholder="e.g. 15" value="15">
       </div>
     `;
   } else if (category === "movie") {
@@ -2527,7 +2801,8 @@ function handleFormSubmit(e) {
       totalSeasons,
       episodesDone: watchedEpisodesFromSeasons,
       totalEpisodes: totalEpisodesFromSeasons,
-      seasonEpisodes
+      seasonEpisodes,
+      episodeRuntime: parseInt(document.getElementById("field-episode-runtime").value) || ""
     };
 
     // If progress shows complete, force status
@@ -2544,6 +2819,7 @@ function handleFormSubmit(e) {
     if (category === "novel") {
       extraData.totalChapters = parseInt(document.getElementById("field-total-chapters").value) || "";
       extraData.chaptersRead = parseInt(document.getElementById("field-chapters-read").value) || 0;
+      extraData.minutesPerChapter = parseInt(document.getElementById("field-minutes-per-chapter").value) || 15;
     }
 
     if (extraData.totalVolumes > 0 && extraData.volumesRead >= extraData.totalVolumes && status !== "Completed") {
@@ -2660,9 +2936,336 @@ function restoreBackupData(parsedData, includePreferences = true) {
   return true;
 }
 
-async function exportData() {
+// Turns a title/key into a filesystem-safe folder name (lowercase, underscores,
+// no characters illegal in FAT/SAF paths).
+function slugifyForFolder(raw) {
+  return String(raw || "")
+    .toLowerCase()
+    .replace(/[/\\:*?"<>|]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 80) || "untitled";
+}
+
+// Appends a short id suffix if another item already claimed this slug within the category.
+function uniqueItemSlug(item, usedSlugs) {
+  const base = slugifyForFolder(item.title);
+  if (!usedSlugs.has(base)) {
+    usedSlugs.add(base);
+    return base;
+  }
+  const suffixed = `${base}_${item.id.slice(0, 8)}`;
+  usedSlugs.add(suffixed);
+  return suffixed;
+}
+
+// Fetches a remote thumbnail URL and re-encodes it as WebP, returning base64
+// (without the data-URL prefix) ready for writeNestedBinaryFile. Returns null
+// on any failure (offline, broken URL, decode error) so sync can skip it.
+async function thumbnailUrlToWebpBase64(url) {
+  if (typeof url !== "string" || !url) return null;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+
+    const webpBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/webp", 0.9));
+    if (!webpBlob) return null;
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(webpBlob);
+    });
+
+    const match = dataUrl.match(/^data:.*;base64,(.*)$/s);
+    return match ? match[1] : null;
+  } catch (err) {
+    console.warn("Could not convert thumbnail to WebP", url, err);
+    return null;
+  }
+}
+
+// Mirrors state.items into squash-db/<category>/<item_slug>/index.json (+ .thumbnail)
+// on the chosen backup folder. Additive only: never deletes or moves existing folders,
+// so items removed/recategorized in-app leave their old folder behind.
+async function syncFolderTreeMirror() {
+  if (!backupFolderPluginAvailable()) return;
+
+  const plugin = window.Capacitor.Plugins.BackupFolder;
+  let folderUri;
+  try {
+    folderUri = await getOrPickBackupFolderUri();
+  } catch (err) {
+    console.warn("Folder tree sync skipped: no backup folder selected", err);
+    return;
+  }
+
+  const syncedHashes = JSON.parse(localStorage.getItem("squashdb_synced_item_hashes") || "{}");
+  const usedSlugsByCategory = {};
+  const syncErrors = [];
+  let syncedCount = 0;
+  let skippedUnchangedCount = 0;
+
+  for (const item of state.items) {
+    const categorySlug = slugifyForFolder(item.category);
+    if (!usedSlugsByCategory[categorySlug]) usedSlugsByCategory[categorySlug] = new Set();
+
+    const itemHash = JSON.stringify(item);
+    if (syncedHashes[item.id] === itemHash) {
+      skippedUnchangedCount++;
+      continue;
+    }
+
+    const itemSlug = uniqueItemSlug(item, usedSlugsByCategory[categorySlug]);
+    const dirPath = ["squash-db", categorySlug, itemSlug];
+
+    try {
+      await plugin.writeNestedFile({
+        uri: folderUri,
+        dirPath,
+        fileName: "index.json",
+        content: JSON.stringify(item, null, 2)
+      });
+
+      const base64Thumb = await thumbnailUrlToWebpBase64(item.thumbnail);
+      if (base64Thumb) {
+        await plugin.writeNestedBinaryFile({
+          uri: folderUri,
+          dirPath,
+          fileName: "thumbnail.webp",
+          base64Content: base64Thumb
+        });
+      }
+
+      syncedHashes[item.id] = itemHash;
+      syncedCount++;
+    } catch (err) {
+      console.error(`Folder tree sync failed for item "${item.title}" (${item.id})`, err);
+      syncErrors.push(`${item.title || item.id}: ${err?.message || err}`);
+    }
+  }
+
+  localStorage.setItem("squashdb_synced_item_hashes", JSON.stringify(syncedHashes));
+
+  console.log(`Folder tree sync: ${syncedCount} written, ${skippedUnchangedCount} unchanged/skipped, ${syncErrors.length} failed (of ${state.items.length} total items)`);
+  if (syncErrors.length > 0) {
+    console.error("Folder tree sync errors:", syncErrors);
+  }
+
+  try {
+    normalizeMetadataSources();
+    const redactedSources = {
+      ...state.preferences.metadataSources,
+      custom: state.preferences.metadataSources.custom.map(src => ({
+        ...src,
+        apiKey: src.apiKey ? "***REDACTED***" : ""
+      }))
+    };
+    await plugin.writeNestedFile({
+      uri: folderUri,
+      dirPath: ["squash-db", "settings"],
+      fileName: "metadata-sources.json",
+      content: JSON.stringify(redactedSources, null, 2)
+    });
+  } catch (err) {
+    console.warn("Failed to sync metadata source settings to folder tree", err);
+  }
+
+  return { syncedCount, skippedUnchangedCount, syncErrors, totalItems: state.items.length };
+}
+
+let folderSyncIdleTimer = null;
+function scheduleFolderTreeAutoSync() {
+  if (!backupFolderPluginAvailable()) return;
+  if (!localStorage.getItem("squashdb_backup_folder_uri")) return;
+  if (folderSyncIdleTimer) clearTimeout(folderSyncIdleTimer);
+
+  const delay = parseInt(state.preferences.folderSyncDelay, 10) || 0;
+  if (delay === 0) {
+    syncFolderTreeMirror();
+    return;
+  }
+  folderSyncIdleTimer = setTimeout(syncFolderTreeMirror, delay);
+}
+
+function backupFolderPluginAvailable() {
+  return isNativeApp() && window.Capacitor.Plugins && window.Capacitor.Plugins.BackupFolder;
+}
+
+// Silently checks the saved backup folder URI at app startup — never opens the
+// native picker. If it's missing or no longer valid (e.g. the folder was moved,
+// deleted, or its SAF grant was revoked), records that so Settings can show a
+// "Backup folder needs to be re-selected" notice without an intrusive popup.
+async function checkBackupFolderOnStartup() {
+  if (!backupFolderPluginAvailable()) return;
+
+  const savedUri = localStorage.getItem("squashdb_backup_folder_uri");
+  if (!savedUri) {
+    localStorage.setItem("squashdb_backup_folder_invalid", "true");
+    return;
+  }
+
+  let valid = false;
+  try {
+    const check = await window.Capacitor.Plugins.BackupFolder.hasPersistedFolder({ uri: savedUri });
+    valid = Boolean(check?.valid);
+    localStorage.setItem("squashdb_backup_folder_invalid", valid ? "false" : "true");
+  } catch (err) {
+    console.warn("Could not validate saved backup folder on startup", err);
+    localStorage.setItem("squashdb_backup_folder_invalid", "true");
+  }
+
+  updateBackupFolderStatusUI();
+
+  if (valid) runAutoBackupIfDue(savedUri);
+}
+
+const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const AUTO_BACKUP_KEEP_COUNT = 3;
+
+// Runs on every app launch (see checkBackupFolderOnStartup). There is no background
+// process while the app is closed, so "every 24 hours" means "on the next app open
+// that happens 24h+ after the last auto-backup" rather than a literal daily timer.
+async function runAutoBackupIfDue(folderUri) {
+  const lastRun = parseInt(localStorage.getItem("squashdb_last_auto_backup_at") || "0", 10);
+  if (Date.now() - lastRun < AUTO_BACKUP_INTERVAL_MS) return;
+  if (state.items.length === 0) return; // nothing worth backing up yet
+
+  try {
+    const dateStr = new Date().toISOString().split("T")[0];
+    await writeTarBackup(folderUri, dateStr);
+    localStorage.setItem("squashdb_last_auto_backup_at", String(Date.now()));
+    await pruneOldAutoBackups(folderUri);
+    console.log("Auto-backup completed:", dateStr);
+  } catch (err) {
+    console.warn("Auto-backup failed", err);
+  }
+}
+
+// Keeps only the newest AUTO_BACKUP_KEEP_COUNT squashdb_backup_*.tar files at the
+// folder root (plus their same-dated .json sibling, written alongside each tar),
+// deleting older ones. Only touches dated backup archives — never squash-db/
+// itself or anything else in the folder.
+async function pruneOldAutoBackups(folderUri) {
+  const plugin = window.Capacitor.Plugins.BackupFolder;
+  const { files } = await plugin.listFiles({ uri: folderUri });
+
+  const backupFileRe = /^squashdb_backup_(\d{4}-\d{2}-\d{2})\.(tar|json)$/;
+  const matched = (files || [])
+    .map(f => ({ ...f, match: f.name.match(backupFileRe) }))
+    .filter(f => f.match);
+
+  const distinctDates = [...new Set(matched.map(f => f.match[1]))].sort((a, b) => b.localeCompare(a));
+  const datesToDelete = new Set(distinctDates.slice(AUTO_BACKUP_KEEP_COUNT));
+
+  const toDelete = matched.filter(f => datesToDelete.has(f.match[1]));
+  for (const file of toDelete) {
+    try {
+      await plugin.deleteFile({ uri: file.uri });
+    } catch (err) {
+      console.warn(`Could not delete old auto-backup "${file.name}"`, err);
+    }
+  }
+}
+
+function updateBackupFolderStatusUI() {
+  const notice = document.getElementById("backup-folder-status-notice");
+  if (notice) {
+    const invalid = localStorage.getItem("squashdb_backup_folder_invalid") === "true";
+    notice.style.display = invalid ? "block" : "none";
+  }
+
+  const pathEl = document.getElementById("backup-folder-path-display");
+  if (pathEl) {
+    const uri = localStorage.getItem("squashdb_backup_folder_uri");
+    pathEl.textContent = uri ? `Current folder: ${friendlyFolderPathFromUri(uri)}` : "No backup folder selected yet.";
+  }
+}
+
+// Best-effort human-readable path from a SAF tree content:// URI, so the user can
+// visually confirm Sync/Export/Import are targeting the folder they expect —
+// e.g. "content://...tree/primary%3ADocuments%2FSquashBackups" -> "/Documents/SquashBackups".
+function friendlyFolderPathFromUri(uri) {
+  try {
+    const decoded = decodeURIComponent(uri);
+    const match = decoded.match(/\/tree\/(.+)$/);
+    if (!match) return uri;
+    return "/" + match[1].replace(/^primary:/, "").replace(/^[^:]+:/, "");
+  } catch (err) {
+    return uri;
+  }
+}
+
+// Resolves the SAF folder URI to store backups in, prompting the native folder
+// picker only if none is saved yet or the previously saved one is no longer valid.
+async function getOrPickBackupFolderUri() {
+  const plugin = window.Capacitor.Plugins.BackupFolder;
+  const savedUri = localStorage.getItem("squashdb_backup_folder_uri");
+
+  if (savedUri) {
+    try {
+      const check = await plugin.hasPersistedFolder({ uri: savedUri });
+      if (check && check.valid) return savedUri;
+    } catch (err) {
+      console.warn("Could not validate saved backup folder", err);
+    }
+  }
+
+  const picked = await plugin.pickFolder();
+  if (!picked || !picked.uri) throw new Error("No folder selected");
+  localStorage.setItem("squashdb_backup_folder_uri", picked.uri);
+  localStorage.setItem("squashdb_backup_folder_invalid", "false");
+  updateBackupFolderStatusUI();
+  await checkForExistingBackupToRestore(picked.uri);
+  return picked.uri;
+}
+
+// Writes a full tar snapshot (squash-db/ tree + the current state JSON) into
+// folderUri, named squashdb_backup_<YYYY-MM-DD>.tar / .json. Shared by the manual
+// Export button and the daily auto-backup, so both produce identical archives.
+async function writeTarBackup(folderUri, dateStr) {
   const dataStr = JSON.stringify(buildBackupPayload(true), null, 2);
-  const exportFileDefaultName = `squashdb_backup_${new Date().toISOString().split("T")[0]}.json`;
+  const jsonName = `squashdb_backup_${dateStr}.json`;
+  const tarName = `squashdb_backup_${dateStr}.tar`;
+
+  await syncFolderTreeMirror();
+  await window.Capacitor.Plugins.BackupFolder.exportTarArchive({
+    uri: folderUri,
+    sourceDirPath: ["squash-db"],
+    tarFileName: tarName,
+    extraJsonFileName: jsonName,
+    extraJsonContent: dataStr
+  });
+  return tarName;
+}
+
+async function exportData() {
+  const dateStr = new Date().toISOString().split("T")[0];
+
+  if (backupFolderPluginAvailable()) {
+    try {
+      const folderUri = await getOrPickBackupFolderUri();
+      await writeTarBackup(folderUri, dateStr);
+      alert("Backup saved successfully!");
+    } catch (err) {
+      console.warn("Backup export failed", err);
+      alert("Could not save backup. Please choose a folder and try again.");
+    }
+    return;
+  }
+
+  const dataStr = JSON.stringify(buildBackupPayload(true), null, 2);
+  const exportFileDefaultName = `squashdb_backup_${dateStr}.json`;
 
   if (window.showSaveFilePicker) {
     try {
@@ -2685,22 +3288,6 @@ async function exportData() {
     }
   }
 
-  if (navigator.share && navigator.canShare) {
-    try {
-      const file = new File([dataStr], exportFileDefaultName, { type: "application/json" });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          title: "SquashDB Backup",
-          text: "Export your SquashDB backup",
-          files: [file]
-        });
-        return;
-      }
-    } catch (err) {
-      if (err && err.name === "AbortError") return;
-    }
-  }
-
   const blob = new Blob([dataStr], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const linkElement = document.createElement("a");
@@ -2710,29 +3297,244 @@ async function exportData() {
   URL.revokeObjectURL(url);
 }
 
+// Lets the user pick (or re-pick) the folder backups are saved to on native platforms.
+async function chooseBackupFolder() {
+  if (!backupFolderPluginAvailable()) return;
+  try {
+    const picked = await window.Capacitor.Plugins.BackupFolder.pickFolder();
+    if (picked && picked.uri) {
+      localStorage.setItem("squashdb_backup_folder_uri", picked.uri);
+      localStorage.setItem("squashdb_backup_folder_invalid", "false");
+      updateBackupFolderStatusUI();
+      await checkForExistingBackupToRestore(picked.uri);
+      alert("Backup folder updated.");
+    }
+  } catch (err) {
+    console.warn("Could not change backup folder", err);
+  }
+}
+
 // Backup Import Database (JSON file upload)
+// Parses a minimal POSIX (ustar) tar buffer and returns its top-level entries
+// as { name, content: Uint8Array }[]. Mirrors the layout written natively by
+// BackupFolderPlugin.TarWriter: 512-byte header, size as octal ASCII at offset
+// 124/12 bytes, content padded to a 512-byte boundary, trailing zero blocks.
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+// If the app has no items yet (fresh install, or a chosen folder was never used
+// before) and the just-picked SAF folder already contains backup files — from a
+// previous install that used this same folder — offer to restore from the newest
+// one instead of silently starting empty. Prefers a .tar (full snapshot) over a
+// bare .json export if both exist, since the tar is the more complete source.
+async function checkForExistingBackupToRestore(folderUri) {
+  if (state.items.length > 0) return;
+  if (!backupFolderPluginAvailable()) return;
+
+  const plugin = window.Capacitor.Plugins.BackupFolder;
+  let files;
+  try {
+    const result = await plugin.listFiles({ uri: folderUri });
+    files = result?.files || [];
+  } catch (err) {
+    console.warn("Could not list backup folder contents for auto-restore check", err);
+    return;
+  }
+
+  const backupFileRe = /^squashdb_backup_(\d{4}-\d{2}-\d{2})\.(tar|json)$/;
+  const candidates = files
+    .map(f => ({ ...f, match: f.name.match(backupFileRe) }))
+    .filter(f => f.match)
+    .sort((a, b) => {
+      // Newest date first; prefer .tar over .json on the same date (fuller snapshot).
+      if (a.match[1] !== b.match[1]) return b.match[1].localeCompare(a.match[1]);
+      return a.match[2] === "tar" ? -1 : 1;
+    });
+
+  if (candidates.length > 0) {
+    const newest = candidates[0];
+
+    if (!confirm(
+      `Found an existing backup in this folder: "${newest.name}".\n\n` +
+      `Your app has no items yet — restore from this backup now?`
+    )) {
+      return;
+    }
+
+    try {
+      if (newest.match[2] === "tar") {
+        const { base64Content } = await plugin.readBinaryFile({ uri: newest.uri });
+        const entries = parseTarArchive(base64ToArrayBuffer(base64Content));
+        const jsonEntry = entries.find(entry => !entry.name.includes("/") && entry.name.endsWith(".json"));
+        if (!jsonEntry) {
+          alert("Could not find backup data inside that tar file.");
+          return;
+        }
+        applyImportedBackupJson(JSON.parse(new TextDecoder("utf-8").decode(jsonEntry.content)));
+      } else {
+        const { content } = await plugin.readFile({ uri: newest.uri });
+        applyImportedBackupJson(JSON.parse(content));
+      }
+    } catch (err) {
+      console.warn("Auto-restore from existing backup failed", err);
+      alert("Could not restore from the existing backup. You can try importing it manually from Backups & Restore.");
+    }
+    return;
+  }
+
+  // No dated backup archive at the folder root — fall back to reconstructing
+  // items directly from an existing squash-db/<category>/<item>/index.json tree
+  // (e.g. left behind by a previous install that only ever auto-synced, and
+  // never had a manual Export produce a .tar/.json file).
+  const squashDbFolder = files.find(f => f.name === "squash-db");
+  if (!squashDbFolder) return;
+
+  let reconstructedItems;
+  try {
+    reconstructedItems = await reconstructItemsFromFolderTree(squashDbFolder.uri);
+  } catch (err) {
+    console.warn("Could not read squash-db/ tree for auto-restore check", err);
+    return;
+  }
+
+  if (reconstructedItems.length === 0) return;
+
+  if (!confirm(
+    `Found ${reconstructedItems.length} item(s) synced from a previous install in this folder's squash-db/ tree.\n\n` +
+    `Your app has no items yet — restore them now?`
+  )) {
+    return;
+  }
+
+  applyImportedBackupJson({ appName: "SquashDB", items: reconstructedItems });
+}
+
+// Walks squash-db/<category>/<item>/index.json (2 levels deep under the given
+// squash-db/ folder URI) and returns every parsed Item found. Best-effort: a
+// single unreadable/corrupt index.json is skipped, not fatal to the whole scan.
+async function reconstructItemsFromFolderTree(squashDbUri) {
+  const plugin = window.Capacitor.Plugins.BackupFolder;
+  const items = [];
+
+  const { files: categoryFolders } = await plugin.listFiles({ uri: squashDbUri });
+  for (const categoryFolder of categoryFolders || []) {
+    if (categoryFolder.name === "settings") continue; // metadata-sources.json lives here, not items
+
+    let itemFolders;
+    try {
+      const result = await plugin.listFiles({ uri: categoryFolder.uri });
+      itemFolders = result?.files || [];
+    } catch (err) {
+      continue;
+    }
+
+    for (const itemFolder of itemFolders) {
+      try {
+        const { files: itemFiles } = await plugin.listFiles({ uri: itemFolder.uri });
+        const indexJsonFile = (itemFiles || []).find(f => f.name === "index.json");
+        if (!indexJsonFile) continue;
+        const { content } = await plugin.readFile({ uri: indexJsonFile.uri });
+        const item = JSON.parse(content);
+        if (item && item.id && item.title) items.push(item);
+      } catch (err) {
+        console.warn(`Skipping unreadable item folder during auto-restore: ${itemFolder.name}`, err);
+      }
+    }
+  }
+
+  return items;
+}
+
+function parseTarArchive(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const entries = [];
+  let offset = 0;
+
+  const readString = (start, length) => {
+    let end = start;
+    while (end < start + length && bytes[end] !== 0) end++;
+    return new TextDecoder("utf-8").decode(bytes.subarray(start, end));
+  };
+  const readOctal = (start, length) => {
+    const str = readString(start, length).trim();
+    return str ? parseInt(str, 8) : 0;
+  };
+
+  while (offset + 512 <= bytes.length) {
+    const header = bytes.subarray(offset, offset + 512);
+    if (header.every(b => b === 0)) break; // zero block: end of archive
+
+    const name = readString(offset, 100);
+    const size = readOctal(offset + 124, 12);
+    offset += 512;
+
+    if (name) {
+      entries.push({ name, content: bytes.slice(offset, offset + size) });
+    }
+
+    offset += Math.ceil(size / 512) * 512;
+  }
+
+  return entries;
+}
+
+function applyImportedBackupJson(parsedData) {
+  if (!parsedData || parsedData.appName !== "SquashDB" || !Array.isArray(parsedData.items)) {
+    alert("Invalid file format. Please select a valid SquashDB backup file.");
+    return;
+  }
+
+  if (confirm(`Do you want to restore ${parsedData.items.length} items? This will merge with your current watchlist.`)) {
+    const includePreferences = parsedData.preferences ? window.confirm(
+      "This backup also contains system settings.\n\nChoose OK to restore settings too.\nChoose Cancel to restore app data only."
+    ) : false;
+
+    if (restoreBackupData(parsedData, includePreferences)) {
+      alert("Backup restored successfully!");
+    }
+  }
+}
+
 function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const isTar = file.name.toLowerCase().endsWith(".tar");
+
+  if (isTar) {
+    const fileReader = new FileReader();
+    fileReader.onload = function (event) {
+      try {
+        const entries = parseTarArchive(event.target.result);
+        // The writer places the state JSON at the tar root (e.g. squashdb_backup_2026-07-09.json),
+        // separate from the squash-db/ folder tree entries.
+        const jsonEntry = entries.find(entry => !entry.name.includes("/") && entry.name.endsWith(".json"));
+        if (!jsonEntry) {
+          alert("Could not find a SquashDB backup JSON inside this tar file.");
+          return;
+        }
+        const jsonText = new TextDecoder("utf-8").decode(jsonEntry.content);
+        applyImportedBackupJson(JSON.parse(jsonText));
+      } catch (err) {
+        console.warn("Failed to read tar backup", err);
+        alert("Error reading tar file. Make sure it's not corrupted.");
+      }
+    };
+    fileReader.readAsArrayBuffer(file);
+    return;
+  }
+
   const fileReader = new FileReader();
   fileReader.onload = function (event) {
     try {
-      const parsedData = JSON.parse(event.target.result);
-      if (!parsedData || parsedData.appName !== "SquashDB" || !Array.isArray(parsedData.items)) {
-        alert("Invalid file format. Please select a valid SquashDB JSON backup file.");
-        return;
-      }
-
-      if (confirm(`Do you want to restore ${parsedData.items.length} items? This will merge with your current watchlist.`)) {
-        const includePreferences = parsedData.preferences ? window.confirm(
-          "This backup also contains system settings.\n\nChoose OK to restore settings too.\nChoose Cancel to restore app data only."
-        ) : false;
-
-        if (restoreBackupData(parsedData, includePreferences)) {
-          alert("Backup restored successfully!");
-        }
-      }
+      applyImportedBackupJson(JSON.parse(event.target.result));
     } catch (err) {
       alert("Error reading JSON file. Make sure it's not corrupted.");
     }
   };
-  fileReader.readAsText(e.target.files[0]);
+  fileReader.readAsText(file);
 }
