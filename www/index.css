@@ -1486,6 +1486,12 @@ main {
   color: var(--primary);
 }
 
+.timeline-filter-icon-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
 .timeline-filter-body {
   display: flex;
   flex-direction: column;

@@ -170,6 +170,7 @@ let state = {
   theme: "dark",
   currentTab: "tab-dashboard",
   activeCategoryChip: null,
+  statusFilter: "all",
   currentSort: "alphabetical-asc",
   lastEntryCategory: "game",
   searchQuery: "",
@@ -628,6 +629,13 @@ function setupEventListeners() {
       state.searchQuery = e.target.value.toLowerCase().trim();
       renderDashboard();
     });
+  }
+
+  // Status filter button next to the search box
+  const filterBtn = document.getElementById("dashboard-filter-btn");
+  if (filterBtn) {
+    filterBtn.addEventListener("click", openDashboardStatusFilter);
+    updateDashboardFilterButton();
   }
 
   // Bottom Navigation tabs
@@ -1591,10 +1599,53 @@ function formatMinutesAsDuration(minutes) {
 }
 
 // Render Dashboard Note Cards
+// True when the status filter actually applies to the active category —
+// a leftover filter from another category's status set is treated as off.
+function dashboardStatusFilterActive() {
+  return Boolean(state.statusFilter && state.statusFilter !== "all"
+    && (CATEGORIES[state.activeCategoryChip]?.statuses || []).includes(state.statusFilter));
+}
+
+function updateDashboardFilterButton() {
+  const btn = document.getElementById("dashboard-filter-btn");
+  if (!btn) return;
+  btn.classList.toggle("active", dashboardStatusFilterActive());
+}
+
+function openDashboardStatusFilter() {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list) return;
+
+  if (titleEl) titleEl.textContent = "Filter by Status";
+  const statuses = CATEGORIES[state.activeCategoryChip]?.statuses || [];
+  const current = dashboardStatusFilterActive() ? state.statusFilter : "all";
+
+  list.innerHTML = "";
+  ["all", ...statuses].forEach(value => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `picker-option${current === value ? " active" : ""}`;
+    btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${value === "all" ? "All statuses" : value}</span>`;
+    btn.addEventListener("click", () => {
+      state.statusFilter = value;
+      closeSettingsPicker();
+      updateDashboardFilterButton();
+      renderDashboard();
+    });
+    list.appendChild(btn);
+  });
+
+  modal.classList.add("active");
+  lucide.createIcons();
+}
+
 function renderDashboard() {
   const container = document.getElementById("notes-container");
   const emptyState = document.getElementById("dashboard-empty");
   if (!container) return;
+  updateDashboardFilterButton();
 
   container.innerHTML = "";
 
@@ -1624,7 +1675,13 @@ function renderDashboard() {
       const notesMatch = item.notes.toLowerCase().includes(state.searchQuery);
       if (!titleMatch && !notesMatch) return false;
     }
-    
+
+    // Status filter from the search-bar funnel button. A filter carried over
+    // from another category's status set is ignored rather than hiding everything.
+    if (state.statusFilter && state.statusFilter !== "all"
+      && (CATEGORIES[state.activeCategoryChip]?.statuses || []).includes(state.statusFilter)
+      && item.status !== state.statusFilter) return false;
+
     return true;
   });
 
