@@ -1591,6 +1591,10 @@ main {
   margin-top: 4px;
 }
 
+.show-detail-title-row .discover-result-source {
+  margin-top: 6px;
+}
+
 .show-detail-production-badge-running {
   background: rgba(34, 197, 94, 0.15);
   color: #22c55e;
@@ -1789,6 +1793,23 @@ main {
 .discover-result-rating i {
   width: 12px;
   height: 12px;
+}
+
+.discover-result-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discover-result-source {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--border-radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* Statistics View */

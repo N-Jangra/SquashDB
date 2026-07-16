@@ -646,7 +646,10 @@ function renderDiscoverResults() {
       <div class="discover-result-body">
         <span class="discover-result-title">${r.title}</span>
         <span class="discover-result-subtitle">${r.subtitle || ""}</span>
-        ${r.rating ? `<span class="discover-result-rating"><i data-lucide="star"></i> ${r.rating}</span>` : ""}
+        <span class="discover-result-badges">
+          ${r.rating ? `<span class="discover-result-rating"><i data-lucide="star"></i> ${r.rating}</span>` : ""}
+          <span class="discover-result-source">${BUILTIN_METADATA_SOURCES[r.source]?.name || r.source}</span>
+        </span>
       </div>
     </button>
   `).join("");

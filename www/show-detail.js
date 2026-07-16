@@ -52,6 +52,7 @@ async function initShowDetail() {
     showDetailState.mode = "local";
     showDetailState.category = item.category;
     showDetailState.itemId = item.id;
+    showDetailState.provider = item.metadataSource || (item.tvmazeShowId ? "tvmaze" : "");
     showDetailState.watchedEpisodeIds = item.watchedEpisodeIds || [];
 
     if (EPISODE_TRACKED_CATEGORIES.includes(item.category) && item.tvmazeShowId) {
@@ -93,6 +94,7 @@ async function initShowDetail() {
   const providerId = params.get("providerId");
   const title = params.get("title") || "";
   showDetailState.category = category;
+  showDetailState.provider = provider;
 
   if (!showDetailIsOnline()) {
     renderShowDetailHeader({ title, thumbnail: "", meta: "Offline — can't load details for a new title." });
@@ -451,6 +453,19 @@ function renderShowDetailHeader(show) {
     }
   }
 
+  const sourceBadgeEl = document.getElementById("show-detail-source-badge");
+  if (sourceBadgeEl) {
+    const key = showDetailState.provider;
+    const sourceName = key ? ((typeof BUILTIN_METADATA_SOURCES !== "undefined" && BUILTIN_METADATA_SOURCES[key]?.name) || key) : "";
+    if (sourceName) {
+      sourceBadgeEl.textContent = sourceName;
+      sourceBadgeEl.style.display = "inline-block";
+    } else {
+      sourceBadgeEl.textContent = "";
+      sourceBadgeEl.style.display = "none";
+    }
+  }
+
   if (window.lucide) lucide.createIcons();
 }
 
@@ -768,6 +783,7 @@ function ensureLocalItem(extraFields) {
     summary: show.summary || "",
     network: show.network || "",
     genres: show.genres || [],
+    metadataSource: showDetailState.provider || "",
     productionStatus: show.productionStatus || "",
     tvmazeShowId: show.tvmazeShowId || null,
     episodeRuntime: show.episodeRuntime || "",

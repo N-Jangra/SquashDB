@@ -192,6 +192,14 @@ function thumbnailOrPlaceholder(thumbnailUrl, className) {
   return `<span class="${className} thumb-placeholder" title="No thumbnail found"><i data-lucide="image-off"></i></span>`;
 }
 
+// Display name of the metadata source an item was tracked from. Items saved
+// before the metadataSource field existed only leave a TVmaze id as a clue.
+function itemSourceName(item) {
+  const key = item.metadataSource || (item.tvmazeShowId ? "tvmaze" : "");
+  if (!key) return "";
+  return (typeof BUILTIN_METADATA_SOURCES !== "undefined" && BUILTIN_METADATA_SOURCES[key]?.name) || key;
+}
+
 // Initialize Application
 document.addEventListener("DOMContentLoaded", () => {
   loadData();
@@ -1664,6 +1672,16 @@ function buildNoteCard(item) {
     subtitleParts.push(`${formatMinutesAsDuration(timeToComplete.remaining)} left`);
   }
 
+  // Second meta line from captured online metadata; hidden when the item
+  // predates metadata capture and has none of these fields.
+  const metaParts = [];
+  if (Array.isArray(item.genres) && item.genres.length) metaParts.push(item.genres.slice(0, 2).join(", "));
+  if (item.network) metaParts.push(item.network);
+  if (item.productionStatus) metaParts.push(item.productionStatus);
+  const sourceName = itemSourceName(item);
+  if (sourceName) metaParts.push(sourceName);
+  const metaLineHTML = metaParts.length ? `<span class="note-meta-line">${metaParts.join(" · ")}</span>` : "";
+
   const actionsHTML = rowActions === "menu"
     ? `<button class="note-action-btn menu-btn" data-id="${item.id}" title="More"><i data-lucide="more-vertical"></i></button>`
     : "";
@@ -1683,6 +1701,7 @@ function buildNoteCard(item) {
       <div class="note-row-body">
         <span class="note-title">${item.title}</span>
         <span class="note-subtitle">${subtitleParts.join(" · ")}</span>
+        ${metaLineHTML}
       </div>
       <span class="note-tag" style="--theme-color: ${CATEGORIES[item.category].color}">${CATEGORIES[item.category].label}</span>
       ${actionsHTML}
