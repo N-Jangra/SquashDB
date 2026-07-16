@@ -1456,8 +1456,59 @@ function calculateProgress(item) {
   if (status === "Playing" || status === "In Progress" || status === "Reading") {
     return 50;
   }
-  
+
   return 0;
+}
+
+// Estimated time to finish an item, in minutes. Returns { total, remaining } or
+// null if the category/item doesn't have enough data to estimate (e.g. no runtime
+// set). "remaining" accounts for progress already made; "total" ignores it.
+function calculateTimeToComplete(item) {
+  const { category } = item;
+
+  if (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime") {
+    const runtime = parseInt(item.episodeRuntime) || 0;
+    if (runtime <= 0) return null;
+    const totalEp = parseInt(item.totalEpisodes) || getSeasonTotalEpisodes(item) || 0;
+    if (totalEp <= 0) return null;
+    const doneEp = Math.min(totalEp, parseInt(item.episodesDone) || 0);
+    return {
+      total: runtime * totalEp,
+      remaining: item.status === "Completed" ? 0 : runtime * (totalEp - doneEp)
+    };
+  }
+
+  if (category === "novel") {
+    const minutesPerChapter = parseInt(item.minutesPerChapter) || 0;
+    const totalCh = parseInt(item.totalChapters) || 0;
+    if (minutesPerChapter <= 0 || totalCh <= 0) return null;
+    const doneCh = Math.min(totalCh, parseInt(item.chaptersRead) || 0);
+    return {
+      total: minutesPerChapter * totalCh,
+      remaining: item.status === "Completed" ? 0 : minutesPerChapter * (totalCh - doneCh)
+    };
+  }
+
+  if (category === "movie") {
+    const runtime = parseInt(item.playtime) || 0;
+    if (runtime <= 0) return null;
+    return {
+      total: runtime,
+      remaining: item.status === "Completed" ? 0 : runtime
+    };
+  }
+
+  return null;
+}
+
+// Formats a minute count as e.g. "2h 15m", "45m", or "3h" for display.
+function formatMinutesAsDuration(minutes) {
+  const total = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (hours <= 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
 }
 
 // Render Dashboard Note Cards
@@ -1546,6 +1597,10 @@ function buildNoteCard(item) {
   const showProgressPercent = !isCompleted && progress > 0 && (item.category === "series" || item.category === "kdrama" || item.category === "cdrama" || item.category === "anime" || item.category === "manga" || item.category === "novel");
   if (showProgressPercent) subtitleParts.push(`${progress}%`);
   if (item.rating) subtitleParts.push(formatRatingValue(item.rating));
+  const timeToComplete = calculateTimeToComplete(item);
+  if (timeToComplete && !isCompleted && timeToComplete.remaining > 0) {
+    subtitleParts.push(`${formatMinutesAsDuration(timeToComplete.remaining)} left`);
+  }
 
   const actionsHTML = rowActions === "menu"
     ? `<button class="note-action-btn menu-btn" data-id="${item.id}" title="More"><i data-lucide="more-vertical"></i></button>`
@@ -1843,6 +1898,10 @@ function renderStats() {
   const activeEl = document.getElementById("stats-active");
   const queuedEl = document.getElementById("stats-queued");
   const rateEl = document.getElementById("stats-rate");
+  const timeLeftCard = document.getElementById("stats-time-left-card");
+  const timeLeftEl = document.getElementById("stats-time-left");
+  const timeDoneCard = document.getElementById("stats-time-done-card");
+  const timeDoneEl = document.getElementById("stats-time-done");
 
   if (!totalEl) return;
 
@@ -1870,6 +1929,28 @@ function renderStats() {
   activeEl.textContent = activeCount;
   if (queuedEl) queuedEl.textContent = queuedCount;
   rateEl.textContent = `${rate}%`;
+
+  // Time-to-complete aggregates: only shown when at least one item in the
+  // active view has enough data (runtime/reading speed) to estimate from.
+  let minutesLeft = 0;
+  let minutesDone = 0;
+  let hasEstimableItem = false;
+  activeItems.forEach(item => {
+    const time = calculateTimeToComplete(item);
+    if (!time) return;
+    hasEstimableItem = true;
+    minutesLeft += time.remaining;
+    minutesDone += (time.total - time.remaining);
+  });
+
+  if (timeLeftCard && timeLeftEl) {
+    timeLeftCard.style.display = hasEstimableItem ? "flex" : "none";
+    timeLeftEl.textContent = formatMinutesAsDuration(minutesLeft);
+  }
+  if (timeDoneCard && timeDoneEl) {
+    timeDoneCard.style.display = hasEstimableItem ? "flex" : "none";
+    timeDoneEl.textContent = formatMinutesAsDuration(minutesDone);
+  }
 }
 
 // Attach listeners to note cards (checkbox click, edits, deletion, quick increments)
@@ -2253,6 +2334,8 @@ function openModal(editId = null) {
       const watchedCount = Object.values(seasonEpisodes).filter(s => s.completed).length;
       const seasonsWatchedInput = document.getElementById("field-seasons-watched");
       if (seasonsWatchedInput) seasonsWatchedInput.value = watchedCount || "";
+      const episodeRuntimeInput = document.getElementById("field-episode-runtime");
+      if (episodeRuntimeInput) episodeRuntimeInput.value = item.episodeRuntime || "";
     } else if (item.category === "manga") {
       document.getElementById("field-total-volumes").value = item.totalVolumes || "";
       document.getElementById("field-volumes-read").value = item.volumesRead || 0;
@@ -2261,6 +2344,7 @@ function openModal(editId = null) {
       document.getElementById("field-volumes-read").value = item.volumesRead || 0;
       document.getElementById("field-total-chapters").value = item.totalChapters || "";
       document.getElementById("field-chapters-read").value = item.chaptersRead || 0;
+      document.getElementById("field-minutes-per-chapter").value = item.minutesPerChapter || 15;
     } else if (item.category === "movie") {
       const totalMinutes = parseInt(item.playtime) || 0;
       document.getElementById("field-playtime").value = totalMinutes || "";
@@ -2366,6 +2450,10 @@ function renderDynamicFormFields(category) {
         <label class="season-episodes-title">Episodes per Season</label>
         <div id="season-episodes-fields" class="season-episodes-fields"></div>
       </div>
+      <div class="form-group">
+        <label for="field-episode-runtime">Avg. Episode Runtime (minutes)</label>
+        <input type="number" id="field-episode-runtime" class="form-control" min="0" placeholder="e.g. 24">
+      </div>
     `;
   } else if (category === "manga") {
     fieldsHTML += `
@@ -2401,6 +2489,10 @@ function renderDynamicFormFields(category) {
           <label for="field-chapters-read">Chapters Read</label>
           <input type="number" id="field-chapters-read" class="form-control" min="0" value="0">
         </div>
+      </div>
+      <div class="form-group">
+        <label for="field-minutes-per-chapter">Avg. Reading Time per Chapter (minutes)</label>
+        <input type="number" id="field-minutes-per-chapter" class="form-control" min="0" placeholder="e.g. 15" value="15">
       </div>
     `;
   } else if (category === "movie") {
@@ -2709,7 +2801,8 @@ function handleFormSubmit(e) {
       totalSeasons,
       episodesDone: watchedEpisodesFromSeasons,
       totalEpisodes: totalEpisodesFromSeasons,
-      seasonEpisodes
+      seasonEpisodes,
+      episodeRuntime: parseInt(document.getElementById("field-episode-runtime").value) || ""
     };
 
     // If progress shows complete, force status
@@ -2726,6 +2819,7 @@ function handleFormSubmit(e) {
     if (category === "novel") {
       extraData.totalChapters = parseInt(document.getElementById("field-total-chapters").value) || "";
       extraData.chaptersRead = parseInt(document.getElementById("field-chapters-read").value) || 0;
+      extraData.minutesPerChapter = parseInt(document.getElementById("field-minutes-per-chapter").value) || 15;
     }
 
     if (extraData.totalVolumes > 0 && extraData.volumesRead >= extraData.totalVolumes && status !== "Completed") {

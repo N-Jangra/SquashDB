@@ -795,13 +795,19 @@ async function applySelectedSeriesMetadata(showId, title, fallbackThumbnail = ""
   const totalSeasons = sortedSeasons.length;
   const totalEpisodes = sortedSeasons.reduce((sum, [, season]) => sum + season.total, 0);
   const thumbnail = data.image?.medium || data.image?.original || fallbackThumbnail || "";
+  const runtime = Math.round(data.averageRuntime || data.runtime || 0);
   applyMetadataPreview({
     title: data.name || title,
-    meta: `${totalSeasons} seasons, ${totalEpisodes} episodes`,
+    meta: [`${totalSeasons} seasons, ${totalEpisodes} episodes`, runtime ? `~${runtime} min/ep` : ""].filter(Boolean).join(" · "),
     image: thumbnailsEnabled() ? thumbnail : ""
   });
   fetchedMetadataDraft = { thumbnail: thumbnailsEnabled() ? (data.image?.original || data.image?.medium || fallbackThumbnail || "") : "" };
   applySeriesMetadata({ totalSeasons, totalEpisodes, seasons: sortedSeasons.map(([, season]) => season.total) });
+
+  const episodeRuntimeInput = document.getElementById("field-episode-runtime");
+  if (episodeRuntimeInput && !episodeRuntimeInput.value && runtime) {
+    episodeRuntimeInput.value = runtime;
+  }
 }
 
 async function applySelectedMovieMetadata(entityId, title, fallbackThumbnail = "") {

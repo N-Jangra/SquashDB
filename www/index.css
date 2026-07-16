@@ -1591,6 +1591,8 @@ main {
 .stats-card-queued .stats-value { color: #f59e0b; }
 .stats-card-completed .stats-value { color: #34d399; }
 .stats-card-total .stats-value { color: #fb7185; }
+.stats-card-time-left .stats-value { color: #f472b6; }
+.stats-card-time-done .stats-value { color: #2dd4bf; }
 
 .stats-label {
   font-size: 12px;
