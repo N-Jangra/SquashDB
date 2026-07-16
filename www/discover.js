@@ -175,9 +175,13 @@ function renderDiscoverCategoryChips() {
     <div class="chip${nextCategory === cat ? " active" : ""}" data-category="${cat}" style="--theme-color:${CATEGORIES[cat].color}">
       <i data-lucide="${CATEGORIES[cat].icon}"></i> ${CATEGORIES[cat].label}
     </div>
-  `).join("");
+  `).join("") + `
+    <a class="chip" href="sources.html" title="Browse individual metadata sources">
+      <i data-lucide="database"></i> Sources
+    </a>
+  `;
 
-  chipsEl.querySelectorAll(".chip").forEach(chip => {
+  chipsEl.querySelectorAll(".chip[data-category]").forEach(chip => {
     chip.addEventListener("click", () => setDiscoverCategory(chip.dataset.category));
   });
 

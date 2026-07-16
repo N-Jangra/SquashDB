@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Source Search</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<body><div id="app-container">
+<main><section class="tab-content active">
+
+<div class="show-detail-topbar">
+  <button class="page-back-btn show-detail-topbar-back" type="button" data-back-fallback="sources.html"><i data-lucide="arrow-left"></i></button>
+</div>
+
+<div class="show-detail-title-row">
+  <h2 id="source-search-title" class="show-detail-topbar-title"></h2>
+</div>
+
+<div class="chips-container" id="source-category-chips"></div>
+
+<div class="search-container" id="source-search-container" style="display:flex;">
+  <i data-lucide="search"></i>
+  <input type="text" id="source-search-input" class="search-input" placeholder="Search...">
+</div>
+
+<p class="settings-row-note" id="source-search-notice" style="display:none;"></p>
+
+<div id="source-search-results" class="discover-results-grid"></div>
+<div id="source-search-empty" class="empty-state">
+  <i data-lucide="search"></i>
+  <h3>Search This Source</h3>
+  <p>Type a title to search only this metadata source.</p>
+</div>
+
+<div class="page-back-actions">
+  <button class="page-back-btn" type="button" data-back-fallback="sources.html"><i data-lucide="arrow-left"></i> Back</button>
+</div>
+
+</section></main>
+</div>
+<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="discover.js"></script><script src="sources.js"></script>
+</body></html>

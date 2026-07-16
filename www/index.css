@@ -290,6 +290,15 @@ h1 i {
   gap: 6px;
 }
 
+a.chip {
+  text-decoration: none;
+  color: var(--text-secondary);
+}
+
+.source-row-unavailable {
+  opacity: 0.55;
+}
+
 .chip.active {
   background: var(--primary);
   color: white;

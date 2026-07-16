@@ -153,6 +153,8 @@ let state = {
     navIcons: {
       dashboard: "layout-grid",
       timeline: "calendar",
+      discover: "search",
+      sources: "database",
       stats: "pie-chart",
       settings: "settings"
     },
@@ -291,11 +293,13 @@ function loadData() {
   normalizeMetadataSources();
   normalizeAppLock();
   if (!state.preferences.navIcons || typeof state.preferences.navIcons !== "object") {
-    state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", stats: "pie-chart", settings: "settings" };
+    state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", discover: "search", sources: "database", stats: "pie-chart", settings: "settings" };
   }
   state.preferences.navIcons = {
     dashboard: state.preferences.navIcons.dashboard || "layout-grid",
     timeline: state.preferences.navIcons.timeline || "calendar",
+    discover: state.preferences.navIcons.discover || "search",
+    sources: state.preferences.navIcons.sources || "database",
     stats: state.preferences.navIcons.stats || "pie-chart",
     settings: state.preferences.navIcons.settings || "settings"
   };
@@ -373,6 +377,7 @@ function getCurrentPageTab() {
   return document.getElementById("tab-dashboard") ? "tab-dashboard" :
     document.getElementById("tab-timeline") ? "tab-timeline" :
     document.getElementById("tab-discover") ? "tab-discover" :
+    document.getElementById("tab-sources") ? "tab-sources" :
     document.getElementById("tab-stats") ? "tab-stats" :
     document.getElementById("tab-settings") ? "tab-settings" :
     null;
@@ -871,6 +876,8 @@ function updateAppLockSettingsSummary() {
 const NAV_ICON_CHOICES = {
   dashboard: ["layout-grid", "home", "grid2x2", "layout-dashboard", "square-library", "book-marked", "library", "layout-list", "list-tree", "boxes", "compass", "rows", "menu", "folder-open", "box", "archive"],
   timeline: ["calendar", "clock", "history", "calendar-days", "calendar-clock", "hourglass", "timer", "calendar-heart", "calendar-check", "calendar-range", "alarm-clock", "clock4", "clock9", "calendar-plus", "sunrise", "moon"],
+  discover: ["search", "compass", "globe", "telescope", "binoculars", "sparkles", "eye", "map", "navigation", "radar", "zap", "star", "search-check", "scan-search", "earth", "satellite-dish"],
+  sources: ["database", "server", "layers", "package", "plug", "cloud", "hard-drive", "library-big", "antenna", "rss", "combine", "blocks", "cable", "boxes", "network", "warehouse"],
   stats: ["pie-chart", "bar-chart2", "bar-chart3", "trending-up", "activity", "line-chart", "gauge", "chart-bar", "chart-pie", "bar-chart-horizontal", "flame", "sigma", "chart-column", "area-chart", "radar", "target"],
   settings: ["settings", "sliders-horizontal", "cog", "wrench", "settings2", "sliders", "toggle-left", "circle-user", "sparkles", "square-menu", "list-checks", "user-cog", "sliders-vertical", "user-round-cog", "shield-check", "key"]
 };
@@ -1001,6 +1008,8 @@ function applyNavIcons() {
   const map = {
     "tab-dashboard": "dashboard",
     "tab-timeline": "timeline",
+    "tab-discover": "discover",
+    "tab-sources": "sources",
     "tab-stats": "stats",
     "tab-settings": "settings"
   };
