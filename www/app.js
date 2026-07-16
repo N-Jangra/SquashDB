@@ -152,8 +152,7 @@ let state = {
       stats: "pie-chart",
       settings: "settings"
     },
-    appIconVariant: "turquoise",
-    appNameIndex: 10,
+    appLook: "default",
     appLock: {
       method: "none",           // "none" | "pin" | "pattern" | "alphanumeric"
       passwordHash: "",         // hex PBKDF2 hash of the PIN/pattern/password
@@ -209,7 +208,6 @@ function runAppInit() {
   checkBackupFolderOnStartup();
   renderNavIconPickers();
   renderAppIconPicker();
-  renderAppNamePicker();
   lucide.createIcons();
 }
 
@@ -875,42 +873,30 @@ function renderNavIconPickers() {
   if (needsIcons && window.lucide) lucide.createIcons();
 }
 
-// App icon + name (Android home screen look, switched via native activity-alias).
-// Icon and name are chosen independently, but Android only allows enabling one
-// pre-baked alias at a time, so every icon x name pair must exist as its own alias
-// (see AndroidManifest.xml: Look_<icon>_<nameIndex>). Picking one preserves the other.
-const APP_ICON_CHOICES = [
-  { value: "classic", label: "Classic", preview: "icons/previews/ic_launcher.png" },
-  { value: "turquoise", label: "Turquoise", preview: "icons/previews/ic_launcher_turquoise.png" },
-  { value: "orange", label: "Orange", preview: "icons/previews/ic_launcher_orange.png" },
-  { value: "pink", label: "Pink", preview: "icons/previews/ic_launcher_pink.png" },
-  { value: "bentogrid", label: "Bento Grid", preview: "icons/previews/ic_launcher_bentogrid.png" },
-  { value: "glassimpact", label: "Glass Impact", preview: "icons/previews/ic_launcher_glassimpact.png" },
-  { value: "playstack", label: "Play Stack", preview: "icons/previews/ic_launcher_playstack.png" },
-  { value: "progressring", label: "Progress Ring", preview: "icons/previews/ic_launcher_progressring.png" },
+// App icon+name (Android home screen look, switched via native activity-alias).
+// Each look bakes in both an icon and a matching name as a single pre-declared
+// alias (see AndroidManifest.xml: Look_<key>), so there's one flat list to pick from.
+const APP_LOOK_CHOICES = [
+  { value: "default", label: "SquashDB", preview: "icons/previews/ic_launcher.png" },
+  { value: "fire", label: "SquashDB", preview: "icons/previews/ic_launcher_fire.png" },
+  { value: "pinklogo", label: "SquashDB", preview: "icons/previews/ic_launcher_pinklogo.png" },
+  { value: "purple", label: "SquashDB", preview: "icons/previews/ic_launcher_purple.png" },
+  { value: "backlog", label: "Backlog", preview: "icons/previews/ic_launcher_backlog.png" },
+  { value: "bingelog", label: "Binge Log", preview: "icons/previews/ic_launcher_bingelog.png" },
+  { value: "checklist", label: "Checklist", preview: "icons/previews/ic_launcher_checklist.png" },
+  { value: "listkeeper", label: "ListKeeper", preview: "icons/previews/ic_launcher_listkeeper.png" },
+  { value: "myfiles", label: "My Files", preview: "icons/previews/ic_launcher_myfiles.png" },
+  { value: "mylists", label: "My Lists", preview: "icons/previews/ic_launcher_mylists.png" },
+  { value: "mywatchlist", label: "My Watchlist", preview: "icons/previews/ic_launcher_mywatchlist.png" },
+  { value: "notes", label: "Notes", preview: "icons/previews/ic_launcher_notes.png" },
+  { value: "reminders", label: "Reminders", preview: "icons/previews/ic_launcher_reminders.png" },
+  { value: "splash", label: "Splash", preview: "icons/previews/ic_launcher_splash.png" },
+  { value: "squid", label: "Squid", preview: "icons/previews/ic_launcher_squid.png" },
+  { value: "towatch", label: "ToWatch", preview: "icons/previews/ic_launcher_towatch.png" },
+  { value: "tracker", label: "Tracker", preview: "icons/previews/ic_launcher_tracker.png" },
   { value: "vault", label: "Vault", preview: "icons/previews/ic_launcher_vault.png" },
-  { value: "orbithub", label: "Orbit Hub", preview: "icons/previews/ic_launcher_orbithub.png" },
-  { value: "progressvault", label: "Progress Vault", preview: "icons/previews/ic_launcher_progressvault.png" },
-  { value: "timelinepulse", label: "Timeline Pulse", preview: "icons/previews/ic_launcher_timelinepulse.png" }
-];
-
-const APP_NAME_CHOICES = [
-  "Backlog",
-  "Binge Log",
-  "Checklist",
-  "ListKeeper",
-  "My Files",
-  "My Lists",
-  "My Watchlist",
-  "Notes",
-  "Reminders",
-  "Splash",
-  "SquashDB",
-  "Squid",
-  "ToWatch",
-  "Tracker",
-  "Vault",
-  "Watchlist"
+  { value: "watchlist", label: "Watchlist", preview: "icons/previews/ic_launcher_watchlist.png" },
+  { value: "capacitor", label: "Capacitor", preview: "icons/previews/ic_launcher_capacitor.png" }
 ];
 
 function isNativeApp() {
@@ -922,32 +908,27 @@ function appIconPluginAvailable() {
 }
 
 async function getCurrentAppLook() {
-  let icon = state.preferences.appIconVariant || "classic";
-  let nameIndex = typeof state.preferences.appNameIndex === "number" ? state.preferences.appNameIndex : 0;
+  let look = state.preferences.appLook || "default";
 
   if (appIconPluginAvailable()) {
     try {
       const result = await window.Capacitor.Plugins.AppIcon.getLook();
-      if (result) {
-        if (result.icon) icon = result.icon;
-        if (typeof result.nameIndex === "number") nameIndex = result.nameIndex;
-      }
+      if (result && result.look) look = result.look;
     } catch (err) {
       console.warn("Could not read current app look", err);
     }
   }
-  return { icon, nameIndex };
+  return look;
 }
 
-async function applyAppLook(icon, nameIndex) {
-  state.preferences.appIconVariant = icon;
-  state.preferences.appNameIndex = nameIndex;
+async function applyAppLook(look) {
+  state.preferences.appLook = look;
   saveData();
 
   if (!appIconPluginAvailable()) return;
 
   try {
-    await window.Capacitor.Plugins.AppIcon.setLook({ icon, nameIndex });
+    await window.Capacitor.Plugins.AppIcon.setLook({ look });
   } catch (err) {
     console.warn("Failed to switch app look", err);
     alert("Could not update the app icon/name. Please try again.");
@@ -961,10 +942,10 @@ async function renderAppIconPicker() {
   const note = document.getElementById("app-icon-native-note");
   if (note) note.style.display = appIconPluginAvailable() ? "none" : "block";
 
-  const { icon: current } = await getCurrentAppLook();
+  const current = await getCurrentAppLook();
 
   grid.innerHTML = "";
-  APP_ICON_CHOICES.forEach(choice => {
+  APP_LOOK_CHOICES.forEach(choice => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `app-icon-option${choice.value === current ? " active" : ""}`;
@@ -972,43 +953,14 @@ async function renderAppIconPicker() {
       <img src="${choice.preview}" alt="${choice.label} icon">
       <span>${choice.label}</span>
     `;
-    btn.addEventListener("click", () => selectAppIcon(choice.value));
+    btn.addEventListener("click", () => selectAppLook(choice.value));
     grid.appendChild(btn);
   });
 }
 
-async function selectAppIcon(icon) {
-  const { nameIndex } = await getCurrentAppLook();
-  await applyAppLook(icon, nameIndex);
+async function selectAppLook(look) {
+  await applyAppLook(look);
   renderAppIconPicker();
-  renderAppNamePicker();
-}
-
-async function renderAppNamePicker() {
-  const list = document.getElementById("app-name-picker");
-  if (!list) return;
-
-  const note = document.getElementById("app-name-native-note");
-  if (note) note.style.display = appIconPluginAvailable() ? "none" : "block";
-
-  const { nameIndex: current } = await getCurrentAppLook();
-
-  list.innerHTML = "";
-  APP_NAME_CHOICES.forEach((name, index) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `picker-option${index === current ? " active" : ""}`;
-    btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${name}</span>`;
-    btn.addEventListener("click", () => selectAppName(index));
-    list.appendChild(btn);
-  });
-  if (window.lucide) lucide.createIcons();
-}
-
-async function selectAppName(nameIndex) {
-  const { icon } = await getCurrentAppLook();
-  await applyAppLook(icon, nameIndex);
-  renderAppNamePicker();
 }
 
 // Apply the saved nav icons to whichever bottom-nav is present on this page
