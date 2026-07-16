@@ -84,6 +84,7 @@ async function initShowDetail() {
     renderBookProgressSection(item);
     renderRatingWidget(item);
     renderNotesField(item);
+    updateShowDetailMenu();
     return;
   }
 
@@ -396,12 +397,60 @@ function applyEpisodesToState(episodes, existingItem) {
   showDetailState.episodes = episodes;
   const seasonSet = new Set(episodes.map(ep => parseInt(ep.season) || 0).filter(Boolean));
   showDetailState.seasons = Array.from(seasonSet).sort((a, b) => a - b);
-  if (showDetailState.activeSeason === null || !showDetailState.seasons.includes(showDetailState.activeSeason)) {
-    showDetailState.activeSeason = showDetailState.seasons[0] || null;
-  }
   if (existingItem) {
     showDetailState.watchedEpisodeIds = existingItem.watchedEpisodeIds || [];
   }
+  if (showDetailState.activeSeason === null || !showDetailState.seasons.includes(showDetailState.activeSeason)) {
+    // Open on the first season that still has something unwatched, so a show
+    // with 7 finished seasons lands on season 8 instead of season 1. Fully
+    // watched shows fall back to the last season.
+    const watched = new Set(showDetailState.watchedEpisodeIds);
+    const firstUnfinished = showDetailState.seasons.find(s =>
+      episodes.some(ep => (parseInt(ep.season) || 0) === s && !watched.has(ep.id))
+    );
+    showDetailState.activeSeason = firstUnfinished ?? showDetailState.seasons[showDetailState.seasons.length - 1] ?? null;
+  }
+}
+
+// Topbar 3-dot menu — only shown once the item exists locally, since its
+// actions (delete) only make sense for a tracked entry.
+function updateShowDetailMenu() {
+  const btn = document.getElementById("show-detail-menu-btn");
+  if (!btn) return;
+  btn.style.display = showDetailState.itemId ? "flex" : "none";
+  if (!btn.dataset.bound) {
+    btn.dataset.bound = "true";
+    btn.addEventListener("click", openShowDetailMenu);
+  }
+}
+
+function openShowDetailMenu() {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list) return;
+
+  if (titleEl) titleEl.textContent = "Options";
+  list.innerHTML = "";
+
+  const delBtn = document.createElement("button");
+  delBtn.type = "button";
+  delBtn.className = "picker-option";
+  delBtn.innerHTML = `<i data-lucide="trash-2" class="picker-option-check" style="visibility:visible;"></i><span>Delete from list</span>`;
+  delBtn.addEventListener("click", () => {
+    closeSettingsPicker();
+    const item = state.items.find(i => i.id === showDetailState.itemId);
+    if (!item) return;
+    if (!confirm(`Delete "${item.title}" from your list? This cannot be undone.`)) return;
+    state.items = state.items.filter(i => i.id !== showDetailState.itemId);
+    saveData();
+    flushPendingSave();
+    navigateBackWithinApp("dashboard.html");
+  });
+  list.appendChild(delBtn);
+
+  modal.classList.add("active");
+  lucide.createIcons();
 }
 
 // Shared render for providers with no episode/season feed — just header +
@@ -729,12 +778,30 @@ function toggleEpisodeWatched(episodeId, watched) {
     logEpisodeWatches(newlyWatchedIds);
   }
 
-  ensureLocalItem({
+  const updates = {
     watchedEpisodeIds: showDetailState.watchedEpisodeIds,
     episodesDone,
     totalEpisodes,
     totalSeasons
-  });
+  };
+
+  // Keep status in sync with progress: ticking the final episode completes
+  // the show; unticking below full (or starting from the watchlist) moves it
+  // to In Progress.
+  const currentItem = state.items.find(i => i.id === showDetailState.itemId);
+  if (totalEpisodes > 0 && episodesDone >= totalEpisodes) {
+    updates.status = "Completed";
+    updates.completionDate = currentItem?.completionDate || new Date().toISOString().split("T")[0];
+  } else if (episodesDone > 0 && (!currentItem || currentItem.status === "Completed" || currentItem.status === "Watchlist")) {
+    updates.status = "In Progress";
+    if (currentItem?.status === "Completed") updates.completionDate = "";
+  }
+
+  ensureLocalItem(updates);
+
+  if (updates.status) {
+    renderStatusPicker(state.items.find(i => i.id === showDetailState.itemId));
+  }
 }
 
 // Appends a watch-event entry per newly-ticked episode so Statistics can build
@@ -796,6 +863,7 @@ function ensureLocalItem(extraFields) {
 
   showDetailState.mode = "local";
   showDetailState.itemId = newItem.id;
+  updateShowDetailMenu();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

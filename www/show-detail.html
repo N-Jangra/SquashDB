@@ -6,6 +6,7 @@
 
 <div class="show-detail-topbar">
   <button class="page-back-btn show-detail-topbar-back" type="button" id="show-detail-back-btn-top" data-back-fallback="dashboard.html"><i data-lucide="arrow-left"></i></button>
+  <button class="show-detail-icon-btn" type="button" id="show-detail-menu-btn" title="More options" style="display:none;"><i data-lucide="more-vertical"></i></button>
 </div>
 
 <div class="show-detail-title-row">
@@ -90,6 +91,15 @@
 </div>
 
 </section></main>
+<div id="picker-modal" class="modal-overlay">
+  <div class="modal-content picker-sheet">
+    <div class="modal-header">
+      <h3 id="picker-modal-title" class="modal-title">Options</h3>
+      <button class="modal-close" id="picker-modal-close">&times;</button>
+    </div>
+    <div id="picker-options-list" class="picker-options-list"></div>
+  </div>
+</div>
 </div>
 <script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="show-detail.js"></script>
 </body></html>

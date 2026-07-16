@@ -492,6 +492,23 @@ function setupHardwareBackButton() {
         navigateBackWithinApp("dashboard.html");
       }
     });
+
+    // Capacitor fires the Android back button AND the system back-swipe
+    // gesture through its App plugin, not the legacy Cordova "backbutton"
+    // DOM event — without this listener the OS default closes the app.
+    const capApp = window.Capacitor?.Plugins?.App;
+    if (capApp?.addListener) {
+      capApp.addListener("backButton", () => {
+        const current = getCurrentPagePath();
+        const stack = getAppPageStack();
+        const atRoot = current === "dashboard.html" && stack.length <= 1;
+        if (atRoot) {
+          if (capApp.exitApp) capApp.exitApp();
+        } else {
+          navigateBackWithinApp("dashboard.html");
+        }
+      });
+    }
   }
 }
 

@@ -1621,12 +1621,49 @@ main {
 .show-detail-topbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 10px;
 }
 
-.show-detail-topbar-back {
+/* Compact circular icon button — overrides the wide pill used for
+   bottom-of-page back buttons (doubled class beats .page-back-btn's
+   later-declared min-width). */
+.page-back-btn.show-detail-topbar-back {
   flex: 0 0 auto;
-  padding: 8px;
+  min-width: 0;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+/* Standalone circular icon button (3-dot menu) — same look as the topbar
+   back, but without the .page-back-btn class whose global click handler
+   navigates away. */
+.show-detail-icon-btn {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--card-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color calc(0.14s * var(--anim-speed)) ease;
+}
+
+.show-detail-icon-btn:hover {
+  border-color: var(--primary);
+}
+
+.show-detail-icon-btn i {
+  width: 18px;
+  height: 18px;
 }
 
 .show-detail-title-row {
