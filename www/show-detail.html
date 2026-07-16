@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Show Details</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<body><div id="app-container">
+<main><section class="tab-content active">
+
+<div class="show-detail-topbar">
+  <button class="page-back-btn show-detail-topbar-back" type="button" id="show-detail-back-btn-top" data-back-fallback="dashboard.html"><i data-lucide="arrow-left"></i></button>
+  <button class="show-detail-icon-btn" type="button" id="show-detail-menu-btn" title="More options" style="display:none;"><i data-lucide="more-vertical"></i></button>
+</div>
+
+<div class="show-detail-title-row">
+  <h2 id="show-detail-topbar-title" class="show-detail-topbar-title"></h2>
+  <span id="show-detail-production-badge" class="show-detail-production-badge" style="display:none;"></span>
+  <span id="show-detail-source-badge" class="discover-result-source" style="display:none;"></span>
+</div>
+
+<div id="show-detail-header" class="show-detail-header">
+  <div id="show-detail-thumb-wrap"></div>
+  <div class="show-detail-header-body">
+    <p id="show-detail-meta" class="show-detail-meta"></p>
+    <p class="show-detail-summary" id="show-detail-summary" style="display:none;"></p>
+  </div>
+</div>
+
+<div class="form-group" id="show-detail-addlist-group" style="display:none;">
+  <label for="show-detail-addlist">Add to list</label>
+  <select id="show-detail-addlist" class="form-control">
+    <option value="">Select a list…</option>
+  </select>
+</div>
+<div class="form-group" id="show-detail-status-group" style="display:none;">
+  <label for="show-detail-status">Status</label>
+  <select id="show-detail-status" class="form-control"></select>
+</div>
+
+<div class="form-group" id="show-detail-compdate-group" style="display:none;">
+  <label for="show-detail-compdate">Completion Date</label>
+  <input type="date" id="show-detail-compdate" class="form-control">
+</div>
+
+<p class="settings-row-note" id="show-detail-offline-notice" style="display:none;">You're offline — showing the last saved details for this title. Episode list may be incomplete until you're back online.</p>
+
+<div class="settings-section" id="show-detail-book-progress-section" style="display:none;">
+  <div class="form-row">
+    <div class="form-group">
+      <label for="show-detail-total-volumes">Total Volumes</label>
+      <input type="number" id="show-detail-total-volumes" class="form-control" min="0" placeholder="e.g. 12">
+    </div>
+    <div class="form-group">
+      <label for="show-detail-volumes-read">Volumes Read</label>
+      <input type="number" id="show-detail-volumes-read" class="form-control" min="0" value="0">
+    </div>
+  </div>
+  <div class="form-row" id="show-detail-chapters-row" style="display:none;">
+    <div class="form-group">
+      <label for="show-detail-total-chapters">Total Chapters</label>
+      <input type="number" id="show-detail-total-chapters" class="form-control" min="0" placeholder="e.g. 150">
+    </div>
+    <div class="form-group">
+      <label for="show-detail-chapters-read">Chapters Read</label>
+      <input type="number" id="show-detail-chapters-read" class="form-control" min="0" value="0">
+    </div>
+  </div>
+  <div class="form-group" id="show-detail-min-per-chapter-group" style="display:none;">
+    <label for="show-detail-min-per-chapter">Avg. Reading Time per Chapter (minutes)</label>
+    <input type="number" id="show-detail-min-per-chapter" class="form-control" min="0" placeholder="e.g. 15" value="15">
+  </div>
+</div>
+
+<div class="settings-section" id="show-detail-season-section" style="display:none;">
+  <div class="form-group">
+    <label for="show-detail-season-select">Season</label>
+    <select id="show-detail-season-select" class="form-control"></select>
+  </div>
+  <div id="show-detail-episode-list" class="show-detail-episode-list"></div>
+</div>
+
+<div class="form-group" id="show-detail-rating-group" style="display:none;">
+  <label>Rating</label>
+  <div id="show-detail-rating-widget"></div>
+</div>
+
+<div class="form-group" id="show-detail-notes-group" style="display:none;">
+  <label for="show-detail-notes">Notes / Thoughts</label>
+  <textarea id="show-detail-notes" class="form-control" rows="3" placeholder="Add optional details, links, or comments..."></textarea>
+</div>
+
+<div class="page-back-actions">
+  <button class="page-back-btn" type="button" id="show-detail-back-btn" data-back-fallback="dashboard.html"><i data-lucide="arrow-left"></i> Back</button>
+</div>
+
+</section></main>
+<div id="picker-modal" class="modal-overlay">
+  <div class="modal-content picker-sheet">
+    <div class="modal-header">
+      <h3 id="picker-modal-title" class="modal-title">Options</h3>
+      <button class="modal-close" id="picker-modal-close">&times;</button>
+    </div>
+    <div id="picker-options-list" class="picker-options-list"></div>
+  </div>
+</div>
+</div>
+<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="show-detail.js"></script>
+</body></html>

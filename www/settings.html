@@ -9,6 +9,14 @@
 <div class="settings-section">
   <h4 class="settings-section-title">Appearance</h4>
   <div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" id="dashboard-view-picker" data-pref="dashboardView">
+      <div class="settings-row-icon"><i data-lucide="layout-grid"></i></div>
+      <div class="settings-row-body">
+        <label>Dashboard View</label>
+        <span>Show items as a list or a poster grid.</span>
+      </div>
+      <div class="settings-row-value"><span id="dashboard-view-picker-value">List</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
     <button type="button" class="settings-row settings-row-picker" id="dashboard-row-actions-picker" data-pref="dashboardRowActions">
       <div class="settings-row-icon"><i data-lucide="mouse-pointer-click"></i></div>
       <div class="settings-row-body">
@@ -69,6 +77,14 @@
       <div class="settings-row-body">
         <label>Bottom Menu Icons</label>
         <span>Customize the navigation bar icons.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="manage-nav-bar.html">
+      <div class="settings-row-icon"><i data-lucide="layout-panel-left"></i></div>
+      <div class="settings-row-body">
+        <label>Bottom Bar Layout</label>
+        <span>Reorder tabs and choose which ones appear.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -167,7 +183,7 @@
   </div>
 </div>
 </section></main>
-<nav class="bottom-nav"><a class="nav-item" data-tab="tab-dashboard" href="dashboard.html" aria-label="Dashboard"><i data-lucide="layout-grid"></i></a><a class="nav-item" data-tab="tab-timeline" href="timeline.html" aria-label="Timeline"><i data-lucide="calendar"></i></a><a class="nav-item" data-tab="tab-stats" href="statistics.html" aria-label="Statistics"><i data-lucide="pie-chart"></i></a><a class="nav-item active" data-tab="tab-settings" href="settings.html" aria-label="Settings"><i data-lucide="settings"></i></a></nav>
+<nav class="bottom-nav"><a class="nav-item" data-tab="tab-dashboard" href="dashboard.html" aria-label="Dashboard"><i data-lucide="layout-grid"></i></a><a class="nav-item" data-tab="tab-timeline" href="timeline.html" aria-label="Timeline"><i data-lucide="calendar"></i></a><a class="nav-item" data-tab="tab-discover" href="discover.html" aria-label="Discover"><i data-lucide="search"></i></a><a class="nav-item" data-tab="tab-sources" href="sources.html" aria-label="Sources"><i data-lucide="database"></i></a><a class="nav-item" data-tab="tab-explore" href="explore.html" aria-label="Explore"><i data-lucide="compass"></i></a><a class="nav-item" data-tab="tab-stats" href="statistics.html" aria-label="Statistics"><i data-lucide="pie-chart"></i></a><a class="nav-item active" data-tab="tab-settings" href="settings.html" aria-label="Settings"><i data-lucide="settings"></i></a></nav>
 <div id="picker-modal" class="modal-overlay">
   <div class="modal-content picker-sheet">
     <div class="modal-header">

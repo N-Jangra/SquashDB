@@ -10,6 +10,9 @@ const CATEGORY_ICON_CHOICES = [
 // Default status set used for custom categories
 const DEFAULT_CUSTOM_STATUSES = ["Backlog", "In Progress", "On Hold", "Dropped", "Completed"];
 
+// Categories tracked by season/episode (TVmaze-backed) rather than volumes/chapters/playtime
+const EPISODE_TRACKED_CATEGORIES = ["series", "kdrama", "cdrama", "anime"];
+
 // Built-in category configuration
 const BUILTIN_CATEGORIES = {
   game: {
@@ -121,6 +124,7 @@ function deleteCustomCategory(key) {
 // Application State
 let state = {
   items: [],
+  watchLog: [],
   preferences: {
     game: false,
     movie: true,
@@ -137,6 +141,7 @@ let state = {
     uiTheme: "dark",
     mainColor: "normal",
     dashboardRowActions: "menu",
+    dashboardView: "list",
     metadataMode: "offline",
     metadataThumbnails: true,
     folderSyncDelay: "30000",
@@ -149,8 +154,15 @@ let state = {
     navIcons: {
       dashboard: "layout-grid",
       timeline: "calendar",
+      discover: "search",
+      sources: "database",
+      explore: "compass",
       stats: "pie-chart",
       settings: "settings"
+    },
+    navBar: {
+      order: ["dashboard", "timeline", "discover", "sources", "explore", "stats", "settings"],
+      visible: { dashboard: true, timeline: false, discover: true, sources: false, explore: true, stats: false, settings: true }
     },
     appLook: "default",
     appLock: {
@@ -163,6 +175,7 @@ let state = {
   theme: "dark",
   currentTab: "tab-dashboard",
   activeCategoryChip: null,
+  statusFilter: "all",
   currentSort: "alphabetical-asc",
   lastEntryCategory: "game",
   searchQuery: "",
@@ -175,6 +188,23 @@ let state = {
 
 function thumbnailsEnabled() {
   return Boolean(state.preferences.metadataThumbnails);
+}
+
+// Every thumbnail slot is compulsory: real image if we have one and thumbnails
+// are enabled, otherwise a "not found" placeholder icon — never an empty slot.
+function thumbnailOrPlaceholder(thumbnailUrl, className) {
+  if (thumbnailsEnabled() && thumbnailUrl) {
+    return `<img class="${className}" src="${thumbnailUrl}" alt="" loading="lazy">`;
+  }
+  return `<span class="${className} thumb-placeholder" title="No thumbnail found"><i data-lucide="image-off"></i></span>`;
+}
+
+// Display name of the metadata source an item was tracked from. Items saved
+// before the metadataSource field existed only leave a TVmaze id as a clue.
+function itemSourceName(item) {
+  const key = item.metadataSource || (item.tvmazeShowId ? "tvmaze" : "");
+  if (!key) return "";
+  return (typeof BUILTIN_METADATA_SOURCES !== "undefined" && BUILTIN_METADATA_SOURCES[key]?.name) || key;
 }
 
 // Initialize Application
@@ -197,6 +227,7 @@ function runAppInit() {
   setupAppNavigation();
   setupPageBackButtons();
   setupHardwareBackButton();
+  applyNavBarConfig();
   setupPickerModal();
   updateLayoutToggleButtons();
   initializePage();
@@ -225,6 +256,16 @@ function loadData() {
     } catch (e) {
       console.error("Error parsing items from local storage", e);
       state.items = [];
+    }
+  }
+
+  const savedWatchLog = localStorage.getItem("squashdb_watch_log");
+  if (savedWatchLog) {
+    try {
+      state.watchLog = JSON.parse(savedWatchLog);
+    } catch (e) {
+      console.error("Error parsing watch log from local storage", e);
+      state.watchLog = [];
     }
   }
 
@@ -257,6 +298,7 @@ function loadData() {
   if (!state.preferences.uiTheme) state.preferences.uiTheme = "dark";
   if (!state.preferences.mainColor) state.preferences.mainColor = "normal";
   if (!state.preferences.dashboardRowActions) state.preferences.dashboardRowActions = "menu";
+  if (!["list", "grid"].includes(state.preferences.dashboardView)) state.preferences.dashboardView = "list";
   if (!state.preferences.metadataMode) state.preferences.metadataMode = "offline";
   if (typeof state.preferences.metadataThumbnails !== "boolean") state.preferences.metadataThumbnails = true;
   if (!["0", "5000", "10000", "30000", "60000"].includes(String(state.preferences.folderSyncDelay))) {
@@ -268,14 +310,49 @@ function loadData() {
   normalizeMetadataSources();
   normalizeAppLock();
   if (!state.preferences.navIcons || typeof state.preferences.navIcons !== "object") {
-    state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", stats: "pie-chart", settings: "settings" };
+    state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", discover: "search", sources: "database", explore: "compass", stats: "pie-chart", settings: "settings" };
   }
   state.preferences.navIcons = {
     dashboard: state.preferences.navIcons.dashboard || "layout-grid",
     timeline: state.preferences.navIcons.timeline || "calendar",
+    discover: state.preferences.navIcons.discover || "search",
+    sources: state.preferences.navIcons.sources || "database",
+    explore: state.preferences.navIcons.explore || "compass",
     stats: state.preferences.navIcons.stats || "pie-chart",
     settings: state.preferences.navIcons.settings || "settings"
   };
+
+  // Bottom bar arrangement: which tabs show and in what order. Explore stands
+  // in for Timeline/Sources/Statistics by default (it links to all of them);
+  // Settings can never be hidden so the config page always stays reachable.
+  const navBarDefaults = { dashboard: true, timeline: false, discover: true, sources: false, explore: true, stats: false, settings: true };
+  if (!state.preferences.navBar || typeof state.preferences.navBar !== "object") {
+    state.preferences.navBar = { order: [...NAV_BAR_KEYS], visible: { ...navBarDefaults } };
+  }
+  if (!Array.isArray(state.preferences.navBar.order)) state.preferences.navBar.order = [...NAV_BAR_KEYS];
+  state.preferences.navBar.order = state.preferences.navBar.order.filter(key => NAV_BAR_KEYS.includes(key));
+  NAV_BAR_KEYS.forEach(key => {
+    if (!state.preferences.navBar.order.includes(key)) state.preferences.navBar.order.push(key);
+  });
+  if (!state.preferences.navBar.visible || typeof state.preferences.navBar.visible !== "object") {
+    state.preferences.navBar.visible = { ...navBarDefaults };
+  }
+  NAV_BAR_KEYS.forEach(key => {
+    if (typeof state.preferences.navBar.visible[key] !== "boolean") {
+      state.preferences.navBar.visible[key] = navBarDefaults[key];
+    }
+  });
+  state.preferences.navBar.visible.settings = true;
+  // Explore replaces Timeline/Sources/Statistics in the bar when enabled
+  // (its page links to all three); otherwise Timeline and Statistics still
+  // share a single slot between themselves.
+  if (state.preferences.navBar.visible.explore) {
+    state.preferences.navBar.visible.timeline = false;
+    state.preferences.navBar.visible.sources = false;
+    state.preferences.navBar.visible.stats = false;
+  } else if (state.preferences.navBar.visible.timeline && state.preferences.navBar.visible.stats) {
+    state.preferences.navBar.visible.stats = false;
+  }
 
   const savedTheme = localStorage.getItem("squashdb_theme");
   if (savedTheme) {
@@ -340,6 +417,7 @@ function initializePage() {
   renderTrackingChoicesSettings();
   renderCategoryOrderSettings();
   renderMetadataSourcesSettings();
+  renderNavBarSettings();
   renderCategorySelectOptions();
   updateSettingsUI();
   updateBackupFolderStatusUI();
@@ -349,6 +427,9 @@ function initializePage() {
 function getCurrentPageTab() {
   return document.getElementById("tab-dashboard") ? "tab-dashboard" :
     document.getElementById("tab-timeline") ? "tab-timeline" :
+    document.getElementById("tab-discover") ? "tab-discover" :
+    document.getElementById("tab-sources") ? "tab-sources" :
+    document.getElementById("tab-explore") ? "tab-explore" :
     document.getElementById("tab-stats") ? "tab-stats" :
     document.getElementById("tab-settings") ? "tab-settings" :
     null;
@@ -356,6 +437,10 @@ function getCurrentPageTab() {
 
 function getCurrentPagePath() {
   return window.location.pathname.split("/").pop() || "index.html";
+}
+
+function getCurrentPagePathWithQuery() {
+  return getCurrentPagePath() + window.location.search;
 }
 
 function getAppPageStack() {
@@ -374,13 +459,14 @@ function setAppPageStack(stack) {
 
 function recordCurrentPage() {
   const current = getCurrentPagePath();
+  const currentWithQuery = getCurrentPagePathWithQuery();
   const stack = getAppPageStack();
   if (stack[stack.length - 1] !== current) {
     stack.push(current);
     setAppPageStack(stack);
   }
-  if (history.state?.squashdbPage !== current) {
-    history.replaceState({ squashdbPage: current }, "", current);
+  if (history.state?.squashdbPage !== currentWithQuery) {
+    history.replaceState({ squashdbPage: currentWithQuery }, "", currentWithQuery);
   }
 }
 
@@ -447,6 +533,23 @@ function setupHardwareBackButton() {
         navigateBackWithinApp("dashboard.html");
       }
     });
+
+    // Capacitor fires the Android back button AND the system back-swipe
+    // gesture through its App plugin, not the legacy Cordova "backbutton"
+    // DOM event — without this listener the OS default closes the app.
+    const capApp = window.Capacitor?.Plugins?.App;
+    if (capApp?.addListener) {
+      capApp.addListener("backButton", () => {
+        const current = getCurrentPagePath();
+        const stack = getAppPageStack();
+        const atRoot = current === "dashboard.html" && stack.length <= 1;
+        if (atRoot) {
+          if (capApp.exitApp) capApp.exitApp();
+        } else {
+          navigateBackWithinApp("dashboard.html");
+        }
+      });
+    }
   }
 }
 
@@ -462,6 +565,7 @@ function flushPendingSave() {
     saveTimer = null;
   }
   localStorage.setItem("squashdb_items", JSON.stringify(state.items));
+  localStorage.setItem("squashdb_watch_log", JSON.stringify(state.watchLog || []));
   localStorage.setItem("squashdb_prefs", JSON.stringify(state.preferences));
   localStorage.setItem("squashdb_theme", state.theme);
   localStorage.setItem("squashdb_sort", state.currentSort);
@@ -582,6 +686,30 @@ function setupEventListeners() {
     globalSearch.addEventListener("input", (e) => {
       state.searchQuery = e.target.value.toLowerCase().trim();
       renderDashboard();
+    });
+  }
+
+  // Status filter button next to the search box
+  const filterBtn = document.getElementById("dashboard-filter-btn");
+  if (filterBtn) {
+    filterBtn.addEventListener("click", openDashboardStatusFilter);
+    updateDashboardFilterButton();
+  }
+
+  // Floating cross-links between Timeline and Statistics (each page carries
+  // a FAB to the other, since only one of the two sits in the bottom bar)
+  const statsFab = document.getElementById("stats-fab");
+  if (statsFab) {
+    statsFab.addEventListener("click", () => {
+      recordCurrentPage();
+      window.location.href = "statistics.html";
+    });
+  }
+  const timelineFab = document.getElementById("timeline-fab");
+  if (timelineFab) {
+    timelineFab.addEventListener("click", () => {
+      recordCurrentPage();
+      window.location.href = "timeline.html";
     });
   }
 
@@ -838,9 +966,123 @@ function updateAppLockSettingsSummary() {
   summaryEl.textContent = labels[state.preferences.appLock.method] || "Off";
 }
 
+const NAV_BAR_KEYS = ["dashboard", "timeline", "discover", "sources", "explore", "stats", "settings"];
+const NAV_BAR_LABELS = { dashboard: "Dashboard", timeline: "Timeline", discover: "Discover", sources: "Sources", explore: "Explore", stats: "Statistics", settings: "Settings" };
+const NAV_KEY_BY_TAB = {
+  "tab-dashboard": "dashboard",
+  "tab-timeline": "timeline",
+  "tab-discover": "discover",
+  "tab-sources": "sources",
+  "tab-explore": "explore",
+  "tab-stats": "stats",
+  "tab-settings": "settings"
+};
+
+// Reorders and hides the static bottom-nav items to match the user's
+// arrangement preference (see manage-nav-bar.html).
+function applyNavBarConfig() {
+  const nav = document.querySelector(".bottom-nav");
+  if (!nav) return;
+  const cfg = state.preferences.navBar;
+  if (!cfg) return;
+
+  const itemsByKey = {};
+  nav.querySelectorAll(".nav-item").forEach(item => {
+    const key = NAV_KEY_BY_TAB[item.dataset.tab];
+    if (key) itemsByKey[key] = item;
+  });
+
+  cfg.order.forEach(key => {
+    const item = itemsByKey[key];
+    if (!item) return;
+    item.style.display = cfg.visible[key] === false ? "none" : "";
+    nav.appendChild(item);
+  });
+}
+
+// Settings page: drag-to-reorder rows with show/hide toggles for each tab.
+function renderNavBarSettings() {
+  const list = document.getElementById("nav-bar-arrangement-list");
+  if (!list) return;
+
+  list.innerHTML = "";
+  state.preferences.navBar.order.forEach(key => {
+    const row = document.createElement("div");
+    row.className = "sortable-item metadata-source-row";
+    row.draggable = true;
+    row.dataset.navKey = key;
+    const locked = key === "settings";
+    row.innerHTML = `
+      <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+      <span class="sortable-label">
+        ${NAV_BAR_LABELS[key]}
+        ${locked ? `<span class="setting-desc">Always shown</span>` : ""}
+      </span>
+      <label class="switch">
+        <input type="checkbox" data-nav-visible="${key}" ${state.preferences.navBar.visible[key] ? "checked" : ""} ${locked ? "disabled" : ""}>
+        <span class="slider"></span>
+      </label>
+    `;
+    list.appendChild(row);
+  });
+
+  let dragged = null;
+  list.querySelectorAll(".sortable-item").forEach(item => {
+    item.addEventListener("dragstart", () => {
+      dragged = item;
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      dragged = null;
+      state.preferences.navBar.order = Array.from(list.querySelectorAll(".sortable-item")).map(el => el.dataset.navKey);
+      saveData();
+      applyNavBarConfig();
+    });
+    item.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (!dragged || dragged === item) return;
+      const rect = item.getBoundingClientRect();
+      const after = e.clientY > rect.top + rect.height / 2;
+      list.insertBefore(dragged, after ? item.nextSibling : item);
+    });
+  });
+
+  list.querySelectorAll("input[data-nav-visible]").forEach(checkbox => {
+    checkbox.addEventListener("change", (e) => {
+      const key = e.target.dataset.navVisible;
+      const vis = state.preferences.navBar.visible;
+      vis[key] = e.target.checked;
+      if (e.target.checked) {
+        // Explore stands in for Timeline/Sources/Statistics; outside of it,
+        // Timeline and Statistics still share a single slot.
+        if (key === "explore") {
+          vis.timeline = false;
+          vis.sources = false;
+          vis.stats = false;
+        } else if (key === "timeline") {
+          vis.stats = false;
+          vis.explore = false;
+        } else if (key === "stats") {
+          vis.timeline = false;
+          vis.explore = false;
+        } else if (key === "sources") {
+          vis.explore = false;
+        }
+      }
+      saveData();
+      renderNavBarSettings();
+      applyNavBarConfig();
+    });
+  });
+}
+
 const NAV_ICON_CHOICES = {
   dashboard: ["layout-grid", "home", "grid2x2", "layout-dashboard", "square-library", "book-marked", "library", "layout-list", "list-tree", "boxes", "compass", "rows", "menu", "folder-open", "box", "archive"],
   timeline: ["calendar", "clock", "history", "calendar-days", "calendar-clock", "hourglass", "timer", "calendar-heart", "calendar-check", "calendar-range", "alarm-clock", "clock4", "clock9", "calendar-plus", "sunrise", "moon"],
+  discover: ["search", "compass", "globe", "telescope", "binoculars", "sparkles", "eye", "map", "navigation", "radar", "zap", "star", "search-check", "scan-search", "earth", "satellite-dish"],
+  sources: ["database", "server", "layers", "package", "plug", "cloud", "hard-drive", "library-big", "antenna", "rss", "combine", "blocks", "cable", "boxes", "network", "warehouse"],
+  explore: ["compass", "map", "globe", "telescope", "rocket", "sparkles", "mountain", "ship", "milestone", "signpost", "footprints", "trees", "sailboat", "plane", "map-pinned", "orbit"],
   stats: ["pie-chart", "bar-chart2", "bar-chart3", "trending-up", "activity", "line-chart", "gauge", "chart-bar", "chart-pie", "bar-chart-horizontal", "flame", "sigma", "chart-column", "area-chart", "radar", "target"],
   settings: ["settings", "sliders-horizontal", "cog", "wrench", "settings2", "sliders", "toggle-left", "circle-user", "sparkles", "square-menu", "list-checks", "user-cog", "sliders-vertical", "user-round-cog", "shield-check", "key"]
 };
@@ -971,6 +1213,9 @@ function applyNavIcons() {
   const map = {
     "tab-dashboard": "dashboard",
     "tab-timeline": "timeline",
+    "tab-discover": "discover",
+    "tab-sources": "sources",
+    "tab-explore": "explore",
     "tab-stats": "stats",
     "tab-settings": "settings"
   };
@@ -1037,6 +1282,13 @@ const SETTINGS_PICKERS = {
       { value: "menu", label: "3-dot menu" },
       { value: "tap-hold", label: "Tap to edit, long-press to delete" },
       { value: "swipe", label: "Swipe to edit/delete" }
+    ]
+  },
+  dashboardView: {
+    default: "list",
+    options: [
+      { value: "list", label: "List" },
+      { value: "grid", label: "Grid" }
     ]
   },
   metadataMode: {
@@ -1503,19 +1755,85 @@ function calculateTimeToComplete(item) {
 
 // Formats a minute count as e.g. "2h 15m", "45m", or "3h" for display.
 function formatMinutesAsDuration(minutes) {
-  const total = Math.max(0, Math.round(minutes));
-  const hours = Math.floor(total / 60);
-  const mins = total % 60;
-  if (hours <= 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}h ${mins}m`;
+  const totalMinutes = Math.max(0, Math.round(minutes));
+  const mins = totalMinutes % 60;
+  let totalHours = Math.floor(totalMinutes / 60);
+  if (totalHours < 24) {
+    return mins === 0 ? `${totalHours}h` : `${totalHours}h ${mins}m`;
+  }
+
+  const hours = totalHours % 24;
+  let totalDays = Math.floor(totalHours / 24);
+  if (totalDays < 30) {
+    return hours === 0 ? `${totalDays}d` : `${totalDays}d ${hours}h`;
+  }
+
+  const days = totalDays % 30;
+  let totalMonths = Math.floor(totalDays / 30);
+  if (totalMonths < 12) {
+    const parts = [`${totalMonths}mo`];
+    if (days) parts.push(`${days}d`);
+    if (hours) parts.push(`${hours}h`);
+    return parts.join(" ");
+  }
+
+  const months = totalMonths % 12;
+  const years = Math.floor(totalMonths / 12);
+  const parts = [`${years}y`];
+  if (months) parts.push(`${months}mo`);
+  if (days) parts.push(`${days}d`);
+  if (hours) parts.push(`${hours}h`);
+  return parts.join(" ");
 }
 
 // Render Dashboard Note Cards
+// True when the status filter actually applies to the active category —
+// a leftover filter from another category's status set is treated as off.
+function dashboardStatusFilterActive() {
+  return Boolean(state.statusFilter && state.statusFilter !== "all"
+    && (CATEGORIES[state.activeCategoryChip]?.statuses || []).includes(state.statusFilter));
+}
+
+function updateDashboardFilterButton() {
+  const btn = document.getElementById("dashboard-filter-btn");
+  if (!btn) return;
+  btn.classList.toggle("active", dashboardStatusFilterActive());
+}
+
+function openDashboardStatusFilter() {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list) return;
+
+  if (titleEl) titleEl.textContent = "Filter by Status";
+  const statuses = CATEGORIES[state.activeCategoryChip]?.statuses || [];
+  const current = dashboardStatusFilterActive() ? state.statusFilter : "all";
+
+  list.innerHTML = "";
+  ["all", ...statuses].forEach(value => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `picker-option${current === value ? " active" : ""}`;
+    btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${value === "all" ? "All statuses" : value}</span>`;
+    btn.addEventListener("click", () => {
+      state.statusFilter = value;
+      closeSettingsPicker();
+      updateDashboardFilterButton();
+      renderDashboard();
+    });
+    list.appendChild(btn);
+  });
+
+  modal.classList.add("active");
+  lucide.createIcons();
+}
+
 function renderDashboard() {
   const container = document.getElementById("notes-container");
   const emptyState = document.getElementById("dashboard-empty");
   if (!container) return;
+  updateDashboardFilterButton();
 
   container.innerHTML = "";
 
@@ -1545,7 +1863,13 @@ function renderDashboard() {
       const notesMatch = item.notes.toLowerCase().includes(state.searchQuery);
       if (!titleMatch && !notesMatch) return false;
     }
-    
+
+    // Status filter from the search-bar funnel button. A filter carried over
+    // from another category's status set is ignored rather than hiding everything.
+    if (state.statusFilter && state.statusFilter !== "all"
+      && (CATEGORIES[state.activeCategoryChip]?.statuses || []).includes(state.statusFilter)
+      && item.status !== state.statusFilter) return false;
+
     return true;
   });
 
@@ -1575,7 +1899,9 @@ function renderDashboard() {
     teardownDashboardLazyLoad();
   } else {
     emptyState.style.display = "none";
-    container.style.display = "flex";
+    const isGrid = state.preferences.dashboardView === "grid";
+    container.style.display = isGrid ? "grid" : "flex";
+    container.classList.toggle("notes-grid-view", isGrid);
     container.dataset.rowActions = state.preferences.dashboardRowActions || "menu";
     setupDashboardLazyLoad(container, filtered);
   }
@@ -1583,6 +1909,34 @@ function renderDashboard() {
 
 const DASHBOARD_BATCH_SIZE = 30;
 let dashboardLazyLoadObserver = null;
+
+// Grid view: poster-only card with a progress strip along the bottom edge —
+// full purple bar for completed items, green partial bar for anything the
+// user has started or is actively on, no bar for untouched queue entries.
+function buildGridCard(item) {
+  const card = document.createElement("div");
+  card.className = "grid-card";
+  card.dataset.id = item.id;
+
+  const progress = calculateProgress(item);
+  const isCompleted = item.status === "Completed";
+  const activeStatuses = new Set(["In Progress", "Playing", "Reading", "On Hold"]);
+  const started = progress > 0 || activeStatuses.has(item.status);
+
+  let barHTML = "";
+  if (isCompleted) {
+    barHTML = `<div class="grid-card-bar grid-card-bar-complete"></div>`;
+  } else if (started) {
+    barHTML = `<div class="grid-card-bar grid-card-bar-progress" style="width:${Math.max(progress, 6)}%"></div>`;
+  }
+
+  card.innerHTML = `
+    ${thumbnailOrPlaceholder(item.thumbnail, "grid-card-thumb")}
+    ${barHTML ? `<div class="grid-card-bar-track">${barHTML}</div>` : ""}
+  `;
+  card.addEventListener("click", () => openItemForCategory(item.id));
+  return card;
+}
 
 function buildNoteCard(item) {
   const rowActions = state.preferences.dashboardRowActions || "menu";
@@ -1602,6 +1956,16 @@ function buildNoteCard(item) {
     subtitleParts.push(`${formatMinutesAsDuration(timeToComplete.remaining)} left`);
   }
 
+  // Second meta line from captured online metadata; hidden when the item
+  // predates metadata capture and has none of these fields.
+  const metaParts = [];
+  if (Array.isArray(item.genres) && item.genres.length) metaParts.push(item.genres.slice(0, 2).join(", "));
+  if (item.network) metaParts.push(item.network);
+  if (item.productionStatus) metaParts.push(item.productionStatus);
+  const sourceName = itemSourceName(item);
+  if (sourceName) metaParts.push(sourceName);
+  const metaLineHTML = metaParts.length ? `<span class="note-meta-line">${metaParts.join(" · ")}</span>` : "";
+
   const actionsHTML = rowActions === "menu"
     ? `<button class="note-action-btn menu-btn" data-id="${item.id}" title="More"><i data-lucide="more-vertical"></i></button>`
     : "";
@@ -1617,10 +1981,11 @@ function buildNoteCard(item) {
     ${swipeActionsHTML}
     <div class="note-row-content">
       <input type="checkbox" class="note-checkbox" ${isCompleted ? "checked" : ""} data-id="${item.id}" title="Toggle Completion">
-      ${thumbnailsEnabled() && item.thumbnail ? `<img class="note-thumb" src="${item.thumbnail}" alt="" loading="lazy">` : ""}
+      ${thumbnailOrPlaceholder(item.thumbnail, "note-thumb")}
       <div class="note-row-body">
         <span class="note-title">${item.title}</span>
         <span class="note-subtitle">${subtitleParts.join(" · ")}</span>
+        ${metaLineHTML}
       </div>
       <span class="note-tag" style="--theme-color: ${CATEGORIES[item.category].color}">${CATEGORIES[item.category].label}</span>
       ${actionsHTML}
@@ -1652,7 +2017,8 @@ function setupDashboardLazyLoad(container, filtered) {
     if (nextItems.length === 0) return;
 
     const fragment = document.createDocumentFragment();
-    nextItems.forEach(item => fragment.appendChild(buildNoteCard(item)));
+    const isGrid = state.preferences.dashboardView === "grid";
+    nextItems.forEach(item => fragment.appendChild(isGrid ? buildGridCard(item) : buildNoteCard(item)));
     container.insertBefore(fragment, sentinel);
     renderedCount += nextItems.length;
 
@@ -1862,7 +2228,7 @@ function setupTimelineLazyLoad(container, completedItems) {
       tItem.className = "timeline-item";
       tItem.style.setProperty("--theme-color", CATEGORIES[item.category].color);
       tItem.innerHTML = `
-        ${thumbnailsEnabled() && item.thumbnail ? `<img class="timeline-item-thumb" src="${item.thumbnail}" alt="" loading="lazy">` : ""}
+        ${thumbnailOrPlaceholder(item.thumbnail, "timeline-item-thumb")}
         <div class="timeline-item-content">
           <span class="timeline-item-text">${item.title}</span>
           <span class="timeline-item-meta">Completed on ${formatDate(item.completionDate)}</span>
@@ -1951,6 +2317,177 @@ function renderStats() {
     timeDoneCard.style.display = hasEstimableItem ? "flex" : "none";
     timeDoneEl.textContent = formatMinutesAsDuration(minutesDone);
   }
+
+  const activeItemIds = new Set(activeItems.map(item => item.id));
+  renderStatsGenres(activeItems);
+  renderStatsNetworks(activeItems);
+  renderStatsRatings(activeItems);
+  renderStatsWatchCharts(activeItemIds);
+}
+
+// Top genres leaderboard, scoped to whatever category chip is active. Genres
+// are only captured going forward (see show-detail.js), so older tracked
+// items may simply have no genres array yet.
+function renderStatsGenres(activeItems) {
+  const card = document.getElementById("stats-genres-card");
+  const chart = document.getElementById("stats-genres-chart");
+  if (!card || !chart) return;
+
+  const counts = {};
+  activeItems.forEach(item => {
+    (item.genres || []).forEach(g => {
+      counts[g] = (counts[g] || 0) + 1;
+    });
+  });
+
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (entries.length === 0) {
+    card.style.display = "none";
+    return;
+  }
+
+  card.style.display = "flex";
+  const max = entries[0][1];
+  chart.innerHTML = entries.map(([genre, count]) => `
+    <div class="bar-item">
+      <div class="bar-labels"><span>${genre}</span><span>${count}</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((count / max) * 100)}%; background: var(--primary);"></div></div>
+    </div>
+  `).join("");
+}
+
+function renderStatsNetworks(activeItems) {
+  const card = document.getElementById("stats-networks-card");
+  const chart = document.getElementById("stats-networks-chart");
+  if (!card || !chart) return;
+
+  const counts = {};
+  activeItems.forEach(item => {
+    if (item.network) counts[item.network] = (counts[item.network] || 0) + 1;
+  });
+
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (entries.length === 0) {
+    card.style.display = "none";
+    return;
+  }
+
+  card.style.display = "flex";
+  const max = entries[0][1];
+  chart.innerHTML = entries.map(([network, count]) => `
+    <div class="bar-item">
+      <div class="bar-labels"><span>${network}</span><span>${count}</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((count / max) * 100)}%; background: var(--primary);"></div></div>
+    </div>
+  `).join("");
+}
+
+// Local single-user equivalent of a "voted ratings" card: your own average
+// rating and a top-rated leaderboard, scoped to the active category.
+function renderStatsRatings(activeItems) {
+  const card = document.getElementById("stats-ratings-card");
+  const avgEl = document.getElementById("stats-avg-rating");
+  const countEl = document.getElementById("stats-rated-count");
+  const listEl = document.getElementById("stats-top-rated-list");
+  if (!card || !avgEl || !countEl || !listEl) return;
+
+  const ratedItems = activeItems.filter(item => item.rating > 0);
+  if (ratedItems.length === 0) {
+    card.style.display = "none";
+    return;
+  }
+
+  card.style.display = "flex";
+  const avg = ratedItems.reduce((sum, item) => sum + item.rating, 0) / ratedItems.length;
+  avgEl.textContent = formatRatingValue(avg);
+  countEl.textContent = ratedItems.length;
+
+  const topRated = [...ratedItems].sort((a, b) => b.rating - a.rating).slice(0, 5);
+  listEl.innerHTML = topRated.map(item => `
+    <div class="leaderboard-row">
+      <span class="leaderboard-row-title">${item.title}</span>
+      <span class="leaderboard-row-meta">${formatRatingValue(item.rating)}</span>
+    </div>
+  `).join("");
+}
+
+// Weekly time-series (hours + episode count) built from state.watchLog, plus
+// a "biggest marathons" leaderboard (most episodes of one show in a single
+// day). Only reflects episodes ticked after watch-logging shipped.
+function renderStatsWatchCharts(activeItemIds) {
+  const timeCard = document.getElementById("stats-weekly-time-card");
+  const timeChart = document.getElementById("stats-weekly-time-chart");
+  const epCard = document.getElementById("stats-weekly-episodes-card");
+  const epChart = document.getElementById("stats-weekly-episodes-chart");
+  const marathonsCard = document.getElementById("stats-marathons-card");
+  const marathonsList = document.getElementById("stats-marathons-list");
+  if (!timeCard || !timeChart || !epCard || !epChart || !marathonsCard || !marathonsList) return;
+
+  const log = (state.watchLog || []).filter(entry => activeItemIds.has(entry.itemId));
+  if (log.length === 0) {
+    timeCard.style.display = "none";
+    epCard.style.display = "none";
+    marathonsCard.style.display = "none";
+    return;
+  }
+
+  // Bucket into the last 8 ISO weeks (Mon-Sun), oldest first.
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Monday
+  const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek).getTime();
+
+  const weekBuckets = Array.from({ length: 8 }, (_, i) => {
+    const weekStart = startOfThisWeek - (7 - i) * msPerWeek;
+    return { weekStart, weekEnd: weekStart + msPerWeek, minutes: 0, episodes: 0 };
+  });
+
+  const dayTotals = {}; // "itemId|YYYY-MM-DD" -> { title, count }
+  log.forEach(entry => {
+    const bucket = weekBuckets.find(w => entry.watchedAt >= w.weekStart && entry.watchedAt < w.weekEnd);
+    if (bucket) {
+      bucket.minutes += entry.runtime || 0;
+      bucket.episodes += 1;
+    }
+    const dayKey = `${entry.itemId}|${new Date(entry.watchedAt).toISOString().slice(0, 10)}`;
+    if (!dayTotals[dayKey]) dayTotals[dayKey] = { title: entry.title, count: 0, minutes: 0 };
+    dayTotals[dayKey].count += 1;
+    dayTotals[dayKey].minutes += entry.runtime || 0;
+  });
+
+  timeCard.style.display = "flex";
+  epCard.style.display = "flex";
+  const maxMinutes = Math.max(...weekBuckets.map(w => w.minutes), 1);
+  const maxEpisodes = Math.max(...weekBuckets.map(w => w.episodes), 1);
+
+  timeChart.innerHTML = weekBuckets.map(w => `
+    <div class="column-chart-col">
+      <span class="column-chart-value">${w.minutes ? formatMinutesAsDuration(w.minutes) : ""}</span>
+      <div class="column-chart-bar" style="height:${Math.round((w.minutes / maxMinutes) * 100)}%"></div>
+      <span class="column-chart-label">${new Date(w.weekStart).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+    </div>
+  `).join("");
+
+  epChart.innerHTML = weekBuckets.map(w => `
+    <div class="column-chart-col">
+      <span class="column-chart-value">${w.episodes || ""}</span>
+      <div class="column-chart-bar" style="height:${Math.round((w.episodes / maxEpisodes) * 100)}%"></div>
+      <span class="column-chart-label">${new Date(w.weekStart).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+    </div>
+  `).join("");
+
+  const marathons = Object.values(dayTotals).sort((a, b) => b.count - a.count).slice(0, 5);
+  if (marathons.length === 0) {
+    marathonsCard.style.display = "none";
+  } else {
+    marathonsCard.style.display = "flex";
+    marathonsList.innerHTML = marathons.map(m => `
+      <div class="leaderboard-row">
+        <span class="leaderboard-row-title">${m.title}</span>
+        <span class="leaderboard-row-meta"><span>${m.count} ep</span><span>${formatMinutesAsDuration(m.minutes)}</span></span>
+      </div>
+    `).join("");
+  }
 }
 
 // Attach listeners to note cards (checkbox click, edits, deletion, quick increments)
@@ -1981,7 +2518,7 @@ function attachCardEvents() {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const id = btn.getAttribute("data-id");
-      openModal(id);
+      openItemForCategory(id);
     });
   });
 
@@ -2041,7 +2578,7 @@ function bindTapHold(card) {
   card.addEventListener("touchend", cancel);
   card.addEventListener("touchmove", cancel);
   card.addEventListener("click", () => {
-    if (!longPressed) openModal(card.dataset.id);
+    if (!longPressed) openItemForCategory(card.dataset.id);
   });
 }
 
@@ -2086,7 +2623,7 @@ function bindSwipe(card) {
 
   content.addEventListener("click", () => {
     if (Math.abs(currentX) < 5) {
-      openModal(card.dataset.id);
+      openItemForCategory(card.dataset.id);
     }
   });
 }
@@ -2107,7 +2644,7 @@ function openRowActionMenu(id) {
   editBtn.innerHTML = `<i data-lucide="edit-2" class="picker-option-check" style="visibility:visible;"></i><span>Edit</span>`;
   editBtn.addEventListener("click", () => {
     closeSettingsPicker();
-    openModal(id);
+    openItemForCategory(id);
   });
   list.appendChild(editBtn);
 
@@ -2243,6 +2780,20 @@ function deleteEntry(id) {
   renderDashboard();
   renderTimeline();
   renderStats();
+}
+
+// Opens the right editor for an existing item: the full season/episode detail
+// page for episode-tracked categories (series/kdrama/cdrama/anime), or the
+// classic edit modal for everything else (movie/game/manga/novel).
+const SHOW_DETAIL_PAGE_CATEGORIES = [...EPISODE_TRACKED_CATEGORIES, "movie", "manga", "novel"];
+
+function openItemForCategory(id) {
+  const item = state.items.find(i => i.id === id);
+  if (item && SHOW_DETAIL_PAGE_CATEGORIES.includes(item.category)) {
+    window.location.href = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    return;
+  }
+  openModal(id);
 }
 
 // Open Form Modal (Add / Edit)

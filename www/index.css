@@ -290,6 +290,108 @@ h1 i {
   gap: 6px;
 }
 
+a.chip {
+  text-decoration: none;
+  color: var(--text-secondary);
+}
+
+.source-row-unavailable {
+  opacity: 0.55;
+}
+
+/* Sources grid (sources.html + explore.html): icon tiles */
+.sources-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.source-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-md);
+  text-decoration: none;
+  color: var(--text-primary);
+  text-align: center;
+  transition: border-color calc(0.14s * var(--anim-speed)) ease;
+}
+
+.source-tile:hover {
+  border-color: var(--primary);
+}
+
+.source-tile-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary);
+}
+
+.source-tile-icon i {
+  width: 24px;
+  height: 24px;
+}
+
+.source-tile-name {
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-tile-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Explore page quick links to Timeline / Statistics */
+.explore-quick-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.explore-quick-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--border-radius-full);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  transition: border-color calc(0.14s * var(--anim-speed)) ease;
+}
+
+.explore-quick-link:hover {
+  border-color: var(--primary);
+}
+
+.explore-quick-link i {
+  width: 18px;
+  height: 18px;
+}
+
 .chip.active {
   background: var(--primary);
   color: white;
@@ -695,6 +797,20 @@ main {
   transform: scale(1);
 }
 
+/* Compulsory placeholder shown wherever a thumbnail slot has no real image */
+.thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.thumb-placeholder i {
+  width: 55%;
+  height: 55%;
+}
+
 .note-thumb {
   width: 34px;
   height: 48px;
@@ -716,6 +832,65 @@ main {
 .note-subtitle {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* Dashboard grid view: poster tiles with a progress strip on the bottom edge */
+.notes-grid-view {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.grid-card {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+}
+
+.grid-card .grid-card-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.grid-card .grid-card-thumb.thumb-placeholder {
+  display: flex;
+}
+
+.grid-card-bar-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.grid-card-bar {
+  height: 100%;
+}
+
+.grid-card-bar-complete {
+  width: 100%;
+  background: #8b5cf6;
+}
+
+.grid-card-bar-progress {
+  background: #22c55e;
+}
+
+.note-meta-line {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .note-title {
@@ -1404,6 +1579,12 @@ main {
   color: var(--primary);
 }
 
+.timeline-filter-icon-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
 .timeline-filter-body {
   display: flex;
   flex-direction: column;
@@ -1529,6 +1710,303 @@ main {
   margin-top: 2px;
 }
 
+/* Show Detail View */
+.show-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+/* Compact circular icon button — overrides the wide pill used for
+   bottom-of-page back buttons (doubled class beats .page-back-btn's
+   later-declared min-width). */
+.page-back-btn.show-detail-topbar-back {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+/* Standalone circular icon button (3-dot menu) — same look as the topbar
+   back, but without the .page-back-btn class whose global click handler
+   navigates away. */
+.show-detail-icon-btn {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--card-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    var(--card-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color calc(0.14s * var(--anim-speed)) ease;
+}
+
+.show-detail-icon-btn:hover {
+  border-color: var(--primary);
+}
+
+.show-detail-icon-btn i {
+  width: 18px;
+  height: 18px;
+}
+
+.show-detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.show-detail-topbar-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.show-detail-production-badge {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--border-radius-full);
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+.show-detail-title-row .discover-result-source {
+  margin-top: 6px;
+}
+
+.show-detail-production-badge-running {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.show-detail-production-badge-ended {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+}
+
+.show-detail-production-badge-development {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.show-detail-production-badge-unknown {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+}
+
+.show-detail-header {
+  margin-bottom: 16px;
+  overflow: hidden; /* clearfix for the floated thumbnail */
+}
+
+.show-detail-thumb {
+  width: 96px;
+  height: 136px;
+  float: left;
+  margin: 0 14px 8px 0;
+  border-radius: var(--border-radius-md);
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+}
+
+.show-detail-header-body {
+  min-width: 0;
+}
+
+.show-detail-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.show-detail-summary {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.show-detail-episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.show-detail-episode-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-md);
+}
+
+.show-detail-episode-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.show-detail-episode-summary {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.show-detail-episode-thumb {
+  width: 60px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+}
+
+.show-detail-episode-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.show-detail-episode-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.show-detail-episode-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.show-detail-episode-meta span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.show-detail-episode-meta i {
+  width: 11px;
+  height: 11px;
+}
+
+.show-detail-episode-checkbox {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+/* Discover View */
+.discover-results-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.discover-result-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-md);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color calc(0.14s * var(--anim-speed)) ease, transform calc(0.14s * var(--anim-speed)) ease;
+}
+
+.discover-result-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.discover-result-thumb {
+  width: 46px;
+  height: 64px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+}
+
+.discover-result-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.discover-result-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.discover-result-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.discover-result-rating {
+  font-size: 11px;
+  color: var(--color-manga);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.discover-result-rating i {
+  width: 12px;
+  height: 12px;
+}
+
+.discover-result-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discover-result-source {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--border-radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* Statistics View */
 .stats-grid {
   display: grid;
@@ -1600,6 +2078,12 @@ main {
   font-weight: 600;
 }
 
+/* Space out the stat blocks — the section itself has no flex gap */
+#tab-stats .stats-grid,
+#tab-stats .stats-chart-card {
+  margin-bottom: 14px;
+}
+
 .stats-chart-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -1649,6 +2133,75 @@ main {
   border-radius: var(--border-radius-full);
   transition: width calc(0.5s * var(--anim-speed)) ease-out;
   width: 0%;
+}
+
+.column-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+  padding-top: 20px;
+}
+
+.column-chart-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.column-chart-value {
+  font-size: 10px;
+  color: var(--text-muted);
+  min-height: 12px;
+}
+
+.column-chart-bar {
+  width: 100%;
+  max-width: 22px;
+  background: var(--primary);
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+}
+
+.column-chart-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.leaderboard-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.leaderboard-row-meta {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  display: flex;
+  gap: 10px;
 }
 
 /* Settings View */
@@ -1834,6 +2387,18 @@ main {
 
 .metadata-source-row {
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Label fills the row so the enable toggle sits flush right */
+.metadata-source-row .sortable-label {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.metadata-source-apikey-row {
+  flex: 1 1 100%;
+  margin-top: 4px;
 }
 
 .metadata-path-summary {

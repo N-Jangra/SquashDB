@@ -10,17 +10,28 @@ let metadataSearchState = {
 };
 
 const BUILTIN_METADATA_SOURCES = {
-  tvmaze: { name: "TVmaze", categories: ["series", "kdrama", "cdrama", "anime"] },
-  wikidata: { name: "Wikidata", categories: ["movie", "game"] },
-  openlibrary: { name: "Open Library", categories: ["manga", "novel"] }
+  tvmaze: { name: "TVmaze", icon: "tv", categories: ["series", "kdrama", "cdrama", "anime"] },
+  wikidata: { name: "Wikidata", icon: "globe", categories: ["movie", "game"] },
+  openlibrary: { name: "Open Library", icon: "book-open", categories: ["manga", "novel"] },
+  rawg: { name: "RAWG", icon: "gamepad-2", categories: ["game"], needsApiKey: true, apiKeyUrl: "https://rawg.io/apidocs" },
+  anilist: { name: "AniList", icon: "clapperboard", categories: ["anime", "manga", "series", "kdrama", "cdrama"] },
+  jikan: { name: "MyAnimeList (Jikan)", icon: "list-video", categories: ["anime", "manga"] },
+  kitsu: { name: "Kitsu", icon: "cat", categories: ["anime", "manga"] },
+  googlebooks: { name: "Google Books", icon: "book", categories: ["novel", "manga"] },
+  omdb: { name: "OMDb", icon: "film", categories: ["movie", "series", "kdrama", "cdrama", "anime"], needsApiKey: true, apiKeyUrl: "https://www.omdbapi.com/apikey.aspx" },
+  tmdb: { name: "TMDB", icon: "video", categories: ["movie", "series", "kdrama", "cdrama", "anime"], needsApiKey: true, apiKeyUrl: "https://www.themoviedb.org/settings/api" }
 };
 
 // Ensures state.preferences.metadataSources has the expected shape, filling in
 // defaults for fields missing from an older saved prefs blob.
 function normalizeMetadataSources() {
   const defaults = {
-    builtinOrder: ["tvmaze", "wikidata", "openlibrary"],
-    builtinEnabled: { tvmaze: true, wikidata: true, openlibrary: true },
+    builtinOrder: ["tvmaze", "wikidata", "openlibrary", "rawg", "anilist", "jikan", "kitsu", "googlebooks", "omdb", "tmdb"],
+    builtinEnabled: {
+      tvmaze: true, wikidata: true, openlibrary: true, rawg: false,
+      anilist: true, jikan: true, kitsu: true, googlebooks: true, omdb: false, tmdb: false
+    },
+    builtinApiKeys: {},
     custom: []
   };
 
@@ -42,7 +53,16 @@ function normalizeMetadataSources() {
     current.builtinEnabled = { ...defaults.builtinEnabled };
   }
   Object.keys(BUILTIN_METADATA_SOURCES).forEach(key => {
-    if (typeof current.builtinEnabled[key] !== "boolean") current.builtinEnabled[key] = true;
+    if (typeof current.builtinEnabled[key] !== "boolean") {
+      current.builtinEnabled[key] = !BUILTIN_METADATA_SOURCES[key].needsApiKey;
+    }
+  });
+
+  if (!current.builtinApiKeys || typeof current.builtinApiKeys !== "object") {
+    current.builtinApiKeys = {};
+  }
+  Object.keys(BUILTIN_METADATA_SOURCES).forEach(key => {
+    if (typeof current.builtinApiKeys[key] !== "string") current.builtinApiKeys[key] = "";
   });
 
   if (!Array.isArray(current.custom)) current.custom = [];
@@ -120,6 +140,13 @@ function renderBuiltinMetadataSourcesList() {
     item.className = "sortable-item metadata-source-row";
     item.draggable = true;
     item.dataset.source = key;
+    const apiKeyRowHTML = info.needsApiKey ? `
+      <div class="form-group metadata-source-apikey-row">
+        <label for="builtin-apikey-${key}">${info.name} API Key</label>
+        <input type="text" id="builtin-apikey-${key}" class="form-control" placeholder="Paste your API key" value="${state.preferences.metadataSources.builtinApiKeys[key] || ""}">
+        <span class="setting-desc">Get a free key at <a href="${info.apiKeyUrl}" target="_blank" rel="noopener">${info.apiKeyUrl}</a></span>
+      </div>
+    ` : "";
     item.innerHTML = `
       <span class="drag-handle" aria-hidden="true">⋮⋮</span>
       <span class="sortable-label">
@@ -130,6 +157,7 @@ function renderBuiltinMetadataSourcesList() {
         <input type="checkbox" data-builtin-source="${key}" ${state.preferences.metadataSources.builtinEnabled[key] ? "checked" : ""}>
         <span class="slider"></span>
       </label>
+      ${apiKeyRowHTML}
     `;
     list.appendChild(item);
   });
@@ -160,6 +188,15 @@ function renderBuiltinMetadataSourcesList() {
     checkbox.addEventListener("change", (e) => {
       const key = e.target.dataset.builtinSource;
       state.preferences.metadataSources.builtinEnabled[key] = e.target.checked;
+      saveData();
+    });
+  });
+
+  Object.keys(BUILTIN_METADATA_SOURCES).forEach(key => {
+    const input = document.getElementById(`builtin-apikey-${key}`);
+    if (!input) return;
+    input.addEventListener("change", () => {
+      state.preferences.metadataSources.builtinApiKeys[key] = input.value.trim();
       saveData();
     });
   });
@@ -595,7 +632,26 @@ async function fetchAndApplyMetadataFromTitle() {
 
     if (category === "game") {
       let items = [];
-      if (builtinSourceEnabled("wikidata")) {
+      const rawgKey = state.preferences.metadataSources.builtinApiKeys?.rawg;
+      if (builtinSourceEnabled("rawg") && rawgKey) {
+        try {
+          const searchRes = await fetch(`https://api.rawg.io/api/games?key=${encodeURIComponent(rawgKey)}&search=${normalized}&page_size=8`);
+          if (searchRes.ok) {
+            const data = await searchRes.json();
+            items = (Array.isArray(data.results) ? data.results : []).map(entry => ({
+              id: entry.id,
+              title: entry.name || title,
+              subtitle: [entry.released ? entry.released.slice(0, 4) : "", entry.rating ? `★ ${entry.rating}` : ""].filter(Boolean).join(" · "),
+              thumbnail: entry.background_image || "",
+              kind: "game",
+              rawg: true
+            }));
+          }
+        } catch (err) {
+          console.warn("RAWG search failed", err);
+        }
+      }
+      if (items.length === 0 && builtinSourceEnabled("wikidata")) {
         const searchRes = await fetch(`https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${normalized}&language=en&type=item&limit=8&format=json&origin=*`);
         if (searchRes.ok) {
           const data = await searchRes.json();
@@ -616,6 +672,13 @@ async function fetchAndApplyMetadataFromTitle() {
       if (!items[0]) return;
       if (items[0].customSourceId) {
         applyCustomMetadataResult(items[0]);
+      } else if (items[0].rawg) {
+        applyMetadataPreview({
+          title: items[0].title,
+          meta: items[0].subtitle,
+          image: thumbnailsEnabled() ? items[0].thumbnail : ""
+        });
+        fetchedMetadataDraft = { thumbnail: thumbnailsEnabled() ? items[0].thumbnail : "" };
       } else {
         await applySelectedGameMetadata(items[0].id, items[0].title);
       }
@@ -755,6 +818,13 @@ async function selectMetadataResult(index) {
     await applySelectedMovieMetadata(result.id, result.title, selectedThumbnail);
   } else if (kind === "series" || kind === "kdrama" || kind === "cdrama" || kind === "anime") {
     await applySelectedSeriesMetadata(result.id, result.title, selectedThumbnail);
+  } else if (kind === "game" && result.rawg) {
+    applyMetadataPreview({
+      title: result.title,
+      meta: result.subtitle || "",
+      image: thumbnailsEnabled() ? selectedThumbnail : ""
+    });
+    fetchedMetadataDraft = { thumbnail: thumbnailsEnabled() ? selectedThumbnail : "" };
   } else if (kind === "game") {
     await applySelectedGameMetadata(result.id, result.title);
   } else if (category === "manga" || category === "novel") {

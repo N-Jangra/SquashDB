@@ -2,6 +2,48 @@
 
 All notable changes to SquashDB are documented in this file.
 
+## [0.0.3]
+
+### Discover (new search experience)
+- New category-first Discover tab: pick a tracking category chip (same set as the Dashboard), see up to 15 top-rated suggestions immediately, then search scoped to just that category across every enabled metadata source in parallel — results merged and deduped by title.
+- Each result card shows a badge naming the metadata source it came from.
+- The selected category and typed query survive opening a result and coming back, instead of resetting to the first tab.
+- Manga, novels, and games are now searchable online (previously only reachable through the old edit-modal's fetch button).
+
+### Metadata sources (3 → 10 built-in)
+- Added AniList, Jikan (MyAnimeList), and Kitsu for anime/manga, Google Books for novels/manga, OMDb and TMDB for movies/series, and RAWG for games — alongside the existing TVmaze, Wikidata, and Open Library.
+- Sources that need a free API key (RAWG, OMDb, TMDB) ship disabled with a key field and sign-up link in Settings → Metadata Sources.
+- Wikidata movie/game results now backfill poster images in one batched request (its search API returns no images).
+
+### Show detail page (new)
+- Full-page detail view for search results and tracked items: cover with wrap-around summary, release year/genres/runtime, network (Netflix, HBO...), a production-status badge (Running/Ended), and the item's metadata source.
+- Season dropdown with a per-episode list (thumbnail, air date, runtime, rating, per-episode synopsis) — ticking an episode auto-marks all earlier ones watched, and the page opens on the first season that still has unwatched episodes.
+- Status follows progress: ticking the final episode marks the item Completed with today's date; unticking below full (or starting from the watchlist) moves it to In Progress.
+- "Add to list" picker (choose or correct the category), status, completion date, rating in your chosen format, and notes — all editable in place; volume/chapter progress fields for manga/novels.
+- 3-dot menu with a delete action; opening a tracked TVmaze item online re-syncs its episodes and show metadata from the source.
+- Movies, manga, and novels open this page from the Dashboard too (games keep the classic modal).
+
+### Dashboard
+- New **Dashboard View** setting: keep the list, or switch to a 3-column poster grid where each tile carries a progress strip — full purple for completed, green sized to progress for started items, none for untouched queue entries.
+- List cards show a second meta line: genres, network, production status, and source.
+- New status filter button in the search bar (filter by Watchlist / In Progress / Dropped / Completed etc. for the active category).
+
+### Statistics
+- Top Genres and Top Networks leaderboards, a local ratings summary with a top-rated list, weekly Time-Spent-Watching and Episodes-Watched column charts, and a Biggest Marathons board (most episodes of one show in a day) — powered by a new watch-event log recorded as you tick episodes.
+- Durations escalate past hours into days, months, and years (e.g. "1d 4h", "2mo 15d").
+
+### Navigation
+- New **Explore** tab: quick links to Timeline and Statistics up top, then every metadata source as an icon tile grid; the standalone Sources page uses the same grid, and each source page offers search plus top-rated picks scoped to that source alone.
+- New Settings → **Bottom Bar Layout** page: drag to reorder the bottom tabs and toggle which ones show. Explore stands in for Timeline/Sources/Statistics by default (bar becomes Dashboard · Discover · Explore · Settings); Timeline and Statistics share one slot outside Explore; Settings can never be hidden.
+- Timeline and Statistics cross-link via floating buttons on each other's pages; Discover, Sources, and Explore all join the bottom-menu icon customization.
+- Every settings subpage gets a compact circular back button at the top, matching the detail pages.
+
+### Fixes
+- Fixed in-app navigation silently stripping URL query strings (history.replaceState), which broke any page that relied on query parameters after the first render.
+- Fixed the Android hardware back button and back-swipe gesture closing the app instead of navigating back (Capacitor never fires the legacy Cordova event the app was listening for).
+- Fixed the metadata picker always showing a blank thumbnail for Wikidata game/movie matches even when an image existed.
+- Fixed star-rating clicks being silently lost after the episode list rendered (icon re-processing detached the click handlers).
+
 ## [0.0.2]
 
 ### File-based backups (Android)
