@@ -24,4 +24,7 @@
     <string name="look_name_vault">Vault</string>
     <string name="look_name_watchlist">Watchlist</string>
     <string name="look_name_capacitor">Capacitor</string>
+    <string name="look_name_calculator">Calculator</string>
+    <string name="look_name_freeotp">FreeOTP</string>
+    <string name="look_name_termux">Termux</string>
 </resources>

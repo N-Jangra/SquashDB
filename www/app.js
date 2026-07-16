@@ -896,7 +896,10 @@ const APP_LOOK_CHOICES = [
   { value: "tracker", label: "Tracker", preview: "icons/previews/ic_launcher_tracker.png" },
   { value: "vault", label: "Vault", preview: "icons/previews/ic_launcher_vault.png" },
   { value: "watchlist", label: "Watchlist", preview: "icons/previews/ic_launcher_watchlist.png" },
-  { value: "capacitor", label: "Capacitor", preview: "icons/previews/ic_launcher_capacitor.png" }
+  { value: "capacitor", label: "Capacitor", preview: "icons/previews/ic_launcher_capacitor.png" },
+  { value: "calculator", label: "Calculator", preview: "icons/previews/ic_launcher_calculator.png" },
+  { value: "freeotp", label: "FreeOTP", preview: "icons/previews/ic_launcher_freeotp.png" },
+  { value: "termux", label: "Termux", preview: "icons/previews/ic_launcher_termux.png" }
 ];
 
 function isNativeApp() {

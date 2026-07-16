@@ -297,6 +297,45 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity-alias
+            android:name=".Look_calculator"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_calculator"
+            android:roundIcon="@mipmap/ic_launcher_round_calculator"
+            android:label="@string/look_name_calculator"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".Look_freeotp"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_freeotp"
+            android:roundIcon="@mipmap/ic_launcher_round_freeotp"
+            android:label="@string/look_name_freeotp"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".Look_termux"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_termux"
+            android:roundIcon="@mipmap/ic_launcher_round_termux"
+            android:label="@string/look_name_termux"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -38,7 +38,10 @@ public class AppIconPlugin extends Plugin {
         "tracker",
         "vault",
         "watchlist",
-        "capacitor"
+        "capacitor",
+        "calculator",
+        "freeotp",
+        "termux"
     };
 
     // Must match the key of the alias with android:enabled="true" in AndroidManifest.xml
