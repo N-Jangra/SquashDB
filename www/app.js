@@ -124,6 +124,7 @@ function deleteCustomCategory(key) {
 // Application State
 let state = {
   items: [],
+  watchLog: [],
   preferences: {
     game: false,
     movie: true,
@@ -237,6 +238,16 @@ function loadData() {
     } catch (e) {
       console.error("Error parsing items from local storage", e);
       state.items = [];
+    }
+  }
+
+  const savedWatchLog = localStorage.getItem("squashdb_watch_log");
+  if (savedWatchLog) {
+    try {
+      state.watchLog = JSON.parse(savedWatchLog);
+    } catch (e) {
+      console.error("Error parsing watch log from local storage", e);
+      state.watchLog = [];
     }
   }
 
@@ -480,6 +491,7 @@ function flushPendingSave() {
     saveTimer = null;
   }
   localStorage.setItem("squashdb_items", JSON.stringify(state.items));
+  localStorage.setItem("squashdb_watch_log", JSON.stringify(state.watchLog || []));
   localStorage.setItem("squashdb_prefs", JSON.stringify(state.preferences));
   localStorage.setItem("squashdb_theme", state.theme);
   localStorage.setItem("squashdb_sort", state.currentSort);
@@ -1521,12 +1533,35 @@ function calculateTimeToComplete(item) {
 
 // Formats a minute count as e.g. "2h 15m", "45m", or "3h" for display.
 function formatMinutesAsDuration(minutes) {
-  const total = Math.max(0, Math.round(minutes));
-  const hours = Math.floor(total / 60);
-  const mins = total % 60;
-  if (hours <= 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}h ${mins}m`;
+  const totalMinutes = Math.max(0, Math.round(minutes));
+  const mins = totalMinutes % 60;
+  let totalHours = Math.floor(totalMinutes / 60);
+  if (totalHours < 24) {
+    return mins === 0 ? `${totalHours}h` : `${totalHours}h ${mins}m`;
+  }
+
+  const hours = totalHours % 24;
+  let totalDays = Math.floor(totalHours / 24);
+  if (totalDays < 30) {
+    return hours === 0 ? `${totalDays}d` : `${totalDays}d ${hours}h`;
+  }
+
+  const days = totalDays % 30;
+  let totalMonths = Math.floor(totalDays / 30);
+  if (totalMonths < 12) {
+    const parts = [`${totalMonths}mo`];
+    if (days) parts.push(`${days}d`);
+    if (hours) parts.push(`${hours}h`);
+    return parts.join(" ");
+  }
+
+  const months = totalMonths % 12;
+  const years = Math.floor(totalMonths / 12);
+  const parts = [`${years}y`];
+  if (months) parts.push(`${months}mo`);
+  if (days) parts.push(`${days}d`);
+  if (hours) parts.push(`${hours}h`);
+  return parts.join(" ");
 }
 
 // Render Dashboard Note Cards
@@ -1968,6 +2003,177 @@ function renderStats() {
   if (timeDoneCard && timeDoneEl) {
     timeDoneCard.style.display = hasEstimableItem ? "flex" : "none";
     timeDoneEl.textContent = formatMinutesAsDuration(minutesDone);
+  }
+
+  const activeItemIds = new Set(activeItems.map(item => item.id));
+  renderStatsGenres(activeItems);
+  renderStatsNetworks(activeItems);
+  renderStatsRatings(activeItems);
+  renderStatsWatchCharts(activeItemIds);
+}
+
+// Top genres leaderboard, scoped to whatever category chip is active. Genres
+// are only captured going forward (see show-detail.js), so older tracked
+// items may simply have no genres array yet.
+function renderStatsGenres(activeItems) {
+  const card = document.getElementById("stats-genres-card");
+  const chart = document.getElementById("stats-genres-chart");
+  if (!card || !chart) return;
+
+  const counts = {};
+  activeItems.forEach(item => {
+    (item.genres || []).forEach(g => {
+      counts[g] = (counts[g] || 0) + 1;
+    });
+  });
+
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (entries.length === 0) {
+    card.style.display = "none";
+    return;
+  }
+
+  card.style.display = "flex";
+  const max = entries[0][1];
+  chart.innerHTML = entries.map(([genre, count]) => `
+    <div class="bar-item">
+      <div class="bar-labels"><span>${genre}</span><span>${count}</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((count / max) * 100)}%; background: var(--primary);"></div></div>
+    </div>
+  `).join("");
+}
+
+function renderStatsNetworks(activeItems) {
+  const card = document.getElementById("stats-networks-card");
+  const chart = document.getElementById("stats-networks-chart");
+  if (!card || !chart) return;
+
+  const counts = {};
+  activeItems.forEach(item => {
+    if (item.network) counts[item.network] = (counts[item.network] || 0) + 1;
+  });
+
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (entries.length === 0) {
+    card.style.display = "none";
+    return;
+  }
+
+  card.style.display = "flex";
+  const max = entries[0][1];
+  chart.innerHTML = entries.map(([network, count]) => `
+    <div class="bar-item">
+      <div class="bar-labels"><span>${network}</span><span>${count}</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((count / max) * 100)}%; background: var(--primary);"></div></div>
+    </div>
+  `).join("");
+}
+
+// Local single-user equivalent of a "voted ratings" card: your own average
+// rating and a top-rated leaderboard, scoped to the active category.
+function renderStatsRatings(activeItems) {
+  const card = document.getElementById("stats-ratings-card");
+  const avgEl = document.getElementById("stats-avg-rating");
+  const countEl = document.getElementById("stats-rated-count");
+  const listEl = document.getElementById("stats-top-rated-list");
+  if (!card || !avgEl || !countEl || !listEl) return;
+
+  const ratedItems = activeItems.filter(item => item.rating > 0);
+  if (ratedItems.length === 0) {
+    card.style.display = "none";
+    return;
+  }
+
+  card.style.display = "flex";
+  const avg = ratedItems.reduce((sum, item) => sum + item.rating, 0) / ratedItems.length;
+  avgEl.textContent = formatRatingValue(avg);
+  countEl.textContent = ratedItems.length;
+
+  const topRated = [...ratedItems].sort((a, b) => b.rating - a.rating).slice(0, 5);
+  listEl.innerHTML = topRated.map(item => `
+    <div class="leaderboard-row">
+      <span class="leaderboard-row-title">${item.title}</span>
+      <span class="leaderboard-row-meta">${formatRatingValue(item.rating)}</span>
+    </div>
+  `).join("");
+}
+
+// Weekly time-series (hours + episode count) built from state.watchLog, plus
+// a "biggest marathons" leaderboard (most episodes of one show in a single
+// day). Only reflects episodes ticked after watch-logging shipped.
+function renderStatsWatchCharts(activeItemIds) {
+  const timeCard = document.getElementById("stats-weekly-time-card");
+  const timeChart = document.getElementById("stats-weekly-time-chart");
+  const epCard = document.getElementById("stats-weekly-episodes-card");
+  const epChart = document.getElementById("stats-weekly-episodes-chart");
+  const marathonsCard = document.getElementById("stats-marathons-card");
+  const marathonsList = document.getElementById("stats-marathons-list");
+  if (!timeCard || !timeChart || !epCard || !epChart || !marathonsCard || !marathonsList) return;
+
+  const log = (state.watchLog || []).filter(entry => activeItemIds.has(entry.itemId));
+  if (log.length === 0) {
+    timeCard.style.display = "none";
+    epCard.style.display = "none";
+    marathonsCard.style.display = "none";
+    return;
+  }
+
+  // Bucket into the last 8 ISO weeks (Mon-Sun), oldest first.
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Monday
+  const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek).getTime();
+
+  const weekBuckets = Array.from({ length: 8 }, (_, i) => {
+    const weekStart = startOfThisWeek - (7 - i) * msPerWeek;
+    return { weekStart, weekEnd: weekStart + msPerWeek, minutes: 0, episodes: 0 };
+  });
+
+  const dayTotals = {}; // "itemId|YYYY-MM-DD" -> { title, count }
+  log.forEach(entry => {
+    const bucket = weekBuckets.find(w => entry.watchedAt >= w.weekStart && entry.watchedAt < w.weekEnd);
+    if (bucket) {
+      bucket.minutes += entry.runtime || 0;
+      bucket.episodes += 1;
+    }
+    const dayKey = `${entry.itemId}|${new Date(entry.watchedAt).toISOString().slice(0, 10)}`;
+    if (!dayTotals[dayKey]) dayTotals[dayKey] = { title: entry.title, count: 0, minutes: 0 };
+    dayTotals[dayKey].count += 1;
+    dayTotals[dayKey].minutes += entry.runtime || 0;
+  });
+
+  timeCard.style.display = "flex";
+  epCard.style.display = "flex";
+  const maxMinutes = Math.max(...weekBuckets.map(w => w.minutes), 1);
+  const maxEpisodes = Math.max(...weekBuckets.map(w => w.episodes), 1);
+
+  timeChart.innerHTML = weekBuckets.map(w => `
+    <div class="column-chart-col">
+      <span class="column-chart-value">${w.minutes ? formatMinutesAsDuration(w.minutes) : ""}</span>
+      <div class="column-chart-bar" style="height:${Math.round((w.minutes / maxMinutes) * 100)}%"></div>
+      <span class="column-chart-label">${new Date(w.weekStart).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+    </div>
+  `).join("");
+
+  epChart.innerHTML = weekBuckets.map(w => `
+    <div class="column-chart-col">
+      <span class="column-chart-value">${w.episodes || ""}</span>
+      <div class="column-chart-bar" style="height:${Math.round((w.episodes / maxEpisodes) * 100)}%"></div>
+      <span class="column-chart-label">${new Date(w.weekStart).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+    </div>
+  `).join("");
+
+  const marathons = Object.values(dayTotals).sort((a, b) => b.count - a.count).slice(0, 5);
+  if (marathons.length === 0) {
+    marathonsCard.style.display = "none";
+  } else {
+    marathonsCard.style.display = "flex";
+    marathonsList.innerHTML = marathons.map(m => `
+      <div class="leaderboard-row">
+        <span class="leaderboard-row-title">${m.title}</span>
+        <span class="leaderboard-row-meta"><span>${m.count} ep</span><span>${formatMinutesAsDuration(m.minutes)}</span></span>
+      </div>
+    `).join("");
   }
 }
 

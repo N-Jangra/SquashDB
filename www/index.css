@@ -1904,6 +1904,75 @@ main {
   width: 0%;
 }
 
+.column-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+  padding-top: 20px;
+}
+
+.column-chart-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+
+.column-chart-value {
+  font-size: 10px;
+  color: var(--text-muted);
+  min-height: 12px;
+}
+
+.column-chart-bar {
+  width: 100%;
+  max-width: 22px;
+  background: var(--primary);
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+}
+
+.column-chart-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.leaderboard-row-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.leaderboard-row-meta {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  display: flex;
+  gap: 10px;
+}
+
 /* Settings View */
 .settings-section {
   display: flex;
