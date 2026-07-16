@@ -141,6 +141,7 @@ let state = {
     uiTheme: "dark",
     mainColor: "normal",
     dashboardRowActions: "menu",
+    dashboardView: "list",
     metadataMode: "offline",
     metadataThumbnails: true,
     folderSyncDelay: "30000",
@@ -290,6 +291,7 @@ function loadData() {
   if (!state.preferences.uiTheme) state.preferences.uiTheme = "dark";
   if (!state.preferences.mainColor) state.preferences.mainColor = "normal";
   if (!state.preferences.dashboardRowActions) state.preferences.dashboardRowActions = "menu";
+  if (!["list", "grid"].includes(state.preferences.dashboardView)) state.preferences.dashboardView = "list";
   if (!state.preferences.metadataMode) state.preferences.metadataMode = "offline";
   if (typeof state.preferences.metadataThumbnails !== "boolean") state.preferences.metadataThumbnails = true;
   if (!["0", "5000", "10000", "30000", "60000"].includes(String(state.preferences.folderSyncDelay))) {
@@ -1086,6 +1088,13 @@ const SETTINGS_PICKERS = {
       { value: "swipe", label: "Swipe to edit/delete" }
     ]
   },
+  dashboardView: {
+    default: "list",
+    options: [
+      { value: "list", label: "List" },
+      { value: "grid", label: "Grid" }
+    ]
+  },
   metadataMode: {
     default: "offline",
     options: [
@@ -1645,7 +1654,9 @@ function renderDashboard() {
     teardownDashboardLazyLoad();
   } else {
     emptyState.style.display = "none";
-    container.style.display = "flex";
+    const isGrid = state.preferences.dashboardView === "grid";
+    container.style.display = isGrid ? "grid" : "flex";
+    container.classList.toggle("notes-grid-view", isGrid);
     container.dataset.rowActions = state.preferences.dashboardRowActions || "menu";
     setupDashboardLazyLoad(container, filtered);
   }
@@ -1653,6 +1664,34 @@ function renderDashboard() {
 
 const DASHBOARD_BATCH_SIZE = 30;
 let dashboardLazyLoadObserver = null;
+
+// Grid view: poster-only card with a progress strip along the bottom edge —
+// full purple bar for completed items, green partial bar for anything the
+// user has started or is actively on, no bar for untouched queue entries.
+function buildGridCard(item) {
+  const card = document.createElement("div");
+  card.className = "grid-card";
+  card.dataset.id = item.id;
+
+  const progress = calculateProgress(item);
+  const isCompleted = item.status === "Completed";
+  const activeStatuses = new Set(["In Progress", "Playing", "Reading", "On Hold"]);
+  const started = progress > 0 || activeStatuses.has(item.status);
+
+  let barHTML = "";
+  if (isCompleted) {
+    barHTML = `<div class="grid-card-bar grid-card-bar-complete"></div>`;
+  } else if (started) {
+    barHTML = `<div class="grid-card-bar grid-card-bar-progress" style="width:${Math.max(progress, 6)}%"></div>`;
+  }
+
+  card.innerHTML = `
+    ${thumbnailOrPlaceholder(item.thumbnail, "grid-card-thumb")}
+    ${barHTML ? `<div class="grid-card-bar-track">${barHTML}</div>` : ""}
+  `;
+  card.addEventListener("click", () => openItemForCategory(item.id));
+  return card;
+}
 
 function buildNoteCard(item) {
   const rowActions = state.preferences.dashboardRowActions || "menu";
@@ -1733,7 +1772,8 @@ function setupDashboardLazyLoad(container, filtered) {
     if (nextItems.length === 0) return;
 
     const fragment = document.createDocumentFragment();
-    nextItems.forEach(item => fragment.appendChild(buildNoteCard(item)));
+    const isGrid = state.preferences.dashboardView === "grid";
+    nextItems.forEach(item => fragment.appendChild(isGrid ? buildGridCard(item) : buildNoteCard(item)));
     container.insertBefore(fragment, sentinel);
     renderedCount += nextItems.length;
 
