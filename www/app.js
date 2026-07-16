@@ -361,6 +361,7 @@ function initializePage() {
 function getCurrentPageTab() {
   return document.getElementById("tab-dashboard") ? "tab-dashboard" :
     document.getElementById("tab-timeline") ? "tab-timeline" :
+    document.getElementById("tab-discover") ? "tab-discover" :
     document.getElementById("tab-stats") ? "tab-stats" :
     document.getElementById("tab-settings") ? "tab-settings" :
     null;
