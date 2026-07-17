@@ -2,6 +2,33 @@
 
 All notable changes to SquashDB are documented in this file.
 
+## [0.0.4]
+
+### Show detail page (redesign)
+- New native-app-style layout: poster/title header, a grouped "Tracking" card (Add to list, Status, Completion Date) reusing the app's bottom-sheet picker, and a pill-style season selector opening the same sheet.
+- Episode rows now show a circular checkmark toggle, expand in place to reveal the synopsis when one exists, and open a full-image popup when the thumbnail is tapped — the show poster is tappable the same way.
+- Star rating widget enlarged with a gold glow to match the active state.
+- Topbar simplified to flat text links (`‹ Back` / category label); a delete icon replaces the old 3-dot menu, shown only while a title is still in Watchlist or In Progress.
+- Fixed a bug where re-opening an already-tracked show from Discover created a duplicate entry instead of reusing the existing one — every metadata provider now carries a `providerId` used to detect this.
+
+### Discover
+- Added a per-category source filter (sliders icon next to the search bar): pick exactly which enabled sources a search should run against, down to just one. The choice is saved per category and persists across app restarts.
+- Removed the separate Kdrama/Cdrama category chips — TVmaze has no first-class distinction for them, so searching "Series" now also surfaces Korean/Chinese dramas (still tagged with their real category once opened).
+
+### Explore
+- Now lists only currently-enabled metadata sources (previously showed every source, dimmed if disabled).
+- Added a toolbox icon linking straight to Settings → Metadata Sources; Timeline/Statistics quick links moved below the sources grid, separated by a divider.
+
+### Settings
+- New **App Data** section: App Info (what the app does and how), Usage Guide (a walkthrough of every tab and setting, including a full per-page breakdown of Settings itself), Logcat (captured console/error logs with All/Info/Warnings/Errors filters and a clear button), Changelog (renders this file in-app), and a GitHub link.
+- New **Font** setting: change the whole app's font. Six system stacks work fully offline; six Google Fonts download once, cache on-device via the Cache Storage API, and mirror to the backup folder (if one's configured) so they keep working offline afterward.
+- Reordered the Appearance section: Theme, Font, Main Color, and Animation Speed (visual theming) now precede Dashboard View, Dashboard Row Actions, and Rating Format (dashboard-specific behavior).
+- Icon pickers with long option lists (Bottom Menu Icons, Create New List) now scroll as a snapping horizontal carousel instead of wrapping into a tall grid.
+- Every settings subpage's back button restyled to match the flat text-link topbar introduced on the show detail page.
+
+### Backups
+- Poster thumbnails synced to a backup folder are now accompanied by a `.nomedia` marker in `squash-db/`, so Android's media scanner stops surfacing them in the device photo gallery.
+
 ## [0.0.3]
 
 ### Discover (new search experience)

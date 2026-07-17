@@ -4,7 +4,7 @@
   "description": "SquashDB - Watchlist & Media Progress Tracker",
   "main": "app.js",
   "scripts": {
-    "build": "echo \"Building static web assets...\"",
+    "build": "cp CHANGELOG.md www/CHANGELOG.md && echo \"Building static web assets...\"",
     "cap:sync": "cap sync",
     "cap:add": "cap add android",
     "cap:open": "cap open android"
