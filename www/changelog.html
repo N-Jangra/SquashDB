@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SquashDB - Changelog</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="index.css">
+  <script src="logcat.js"></script>
+  <script src="lucide.min.js"></script>
+</head>
+<body>
+  <div id="app-container">
+    <main>
+      <section class="tab-content active">
+        <div class="show-detail-topbar">
+          <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
+        </div>
+
+        <div class="settings-page-header">
+          <h2>Changelog</h2>
+          <p>What's new in each version of SquashDB.</p>
+        </div>
+
+        <div class="settings-section">
+          <div id="changelog-content" class="changelog-content">
+            <p class="settings-row-note">Loading changelog…</p>
+          </div>
+        </div>
+
+        <div class="page-back-actions">
+          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script>
+  <script>
+    // Minimal Markdown → HTML for CHANGELOG.md's own simple structure only:
+    // "# " / "## " / "### " headers, "- " bullet lists, blank-line-separated
+    // paragraphs. Not a general Markdown parser — deliberately narrow so it
+    // has no injection surface beyond escaping raw text.
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function renderChangelogMarkdown(markdown) {
+      const lines = markdown.split("\n");
+      let html = "";
+      let inList = false;
+
+      const closeList = () => {
+        if (inList) {
+          html += "</ul>";
+          inList = false;
+        }
+      };
+
+      lines.forEach(rawLine => {
+        const line = rawLine.trimEnd();
+        if (/^###\s+/.test(line)) {
+          closeList();
+          html += `<h3>${escapeHtml(line.replace(/^###\s+/, ""))}</h3>`;
+        } else if (/^##\s+/.test(line)) {
+          closeList();
+          html += `<h2>${escapeHtml(line.replace(/^##\s+/, ""))}</h2>`;
+        } else if (/^#\s+/.test(line)) {
+          closeList();
+          html += `<h2>${escapeHtml(line.replace(/^#\s+/, ""))}</h2>`;
+        } else if (/^[-*]\s+/.test(line)) {
+          if (!inList) {
+            html += "<ul>";
+            inList = true;
+          }
+          html += `<li>${escapeHtml(line.replace(/^[-*]\s+/, ""))}</li>`;
+        } else if (line.trim() === "") {
+          closeList();
+        } else {
+          closeList();
+          html += `<p>${escapeHtml(line)}</p>`;
+        }
+      });
+      closeList();
+      return html;
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const contentEl = document.getElementById("changelog-content");
+      if (!contentEl) return;
+      try {
+        const res = await fetch("CHANGELOG.md");
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        const text = await res.text();
+        contentEl.innerHTML = renderChangelogMarkdown(text);
+      } catch (err) {
+        console.warn("Could not load changelog", err);
+        contentEl.innerHTML = `<p class="settings-row-note">Couldn't load the changelog file.</p>`;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SquashDB - Usage Guide</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="index.css">
+  <script src="logcat.js"></script>
+  <script src="lucide.min.js"></script>
+</head>
+<body>
+  <div id="app-container">
+    <main>
+      <section class="tab-content active">
+        <div class="show-detail-topbar">
+          <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
+        </div>
+
+        <div class="settings-page-header">
+          <h2>Usage Guide</h2>
+          <p>How to use each tab and setting.</p>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Jump to a section</h4>
+          <div class="settings-list">
+            <a class="settings-row settings-row-link" href="javascript:void(0)" data-jump="guide-dashboard">
+              <div class="settings-row-icon"><i data-lucide="layout-grid"></i></div>
+              <div class="settings-row-body"><label>Dashboard</label></div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+            <a class="settings-row settings-row-link" href="javascript:void(0)" data-jump="guide-discover">
+              <div class="settings-row-icon"><i data-lucide="search"></i></div>
+              <div class="settings-row-body"><label>Discover</label></div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+            <a class="settings-row settings-row-link" href="javascript:void(0)" data-jump="guide-sources">
+              <div class="settings-row-icon"><i data-lucide="database"></i></div>
+              <div class="settings-row-body"><label>Sources &amp; Explore</label></div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+            <a class="settings-row settings-row-link" href="javascript:void(0)" data-jump="guide-detail-page">
+              <div class="settings-row-icon"><i data-lucide="file-text"></i></div>
+              <div class="settings-row-body"><label>Show/Movie Detail Page</label></div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+            <a class="settings-row settings-row-link" href="javascript:void(0)" data-jump="guide-timeline-stats">
+              <div class="settings-row-icon"><i data-lucide="calendar"></i></div>
+              <div class="settings-row-body"><label>Timeline &amp; Statistics</label></div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+            <a class="settings-row settings-row-link" href="javascript:void(0)" data-jump="guide-settings">
+              <div class="settings-row-icon"><i data-lucide="settings"></i></div>
+              <div class="settings-row-body"><label>Settings</label></div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+          </div>
+        </div>
+
+        <div class="settings-section" id="guide-dashboard">
+          <h4 class="settings-section-title">Dashboard</h4>
+          <p class="settings-note">
+            Your tracked titles, grouped by category (TV Series, Movies, Anime, Manga, Games, etc — whichever
+            you've enabled in Settings → Tracking Choices). Switch between a list view and a poster grid in
+            Settings → Appearance. Tap a card to open its detail page; use the search bar and status filter to
+            narrow a long list.
+          </p>
+        </div>
+
+        <div class="settings-section" id="guide-discover">
+          <h4 class="settings-section-title">Discover</h4>
+          <p class="settings-note">
+            Pick a category chip, then search — results merge across every enabled metadata source for that
+            category. Tap the filter (sliders) icon next to the search bar to limit a search to specific sources
+            only; that choice is saved per category. Tapping a result opens its detail page; nothing is saved to
+            your list until you change something there.
+          </p>
+        </div>
+
+        <div class="settings-section" id="guide-sources">
+          <h4 class="settings-section-title">Sources &amp; Explore</h4>
+          <p class="settings-note">
+            <strong>Sources</strong> lists every built-in metadata source, so you can search just one directly.
+            <strong>Explore</strong> is a shortcut hub: only your currently enabled sources, plus quick links to
+            Timeline and Statistics, and a toolbox icon to Settings → Metadata Sources to enable more.
+          </p>
+        </div>
+
+        <div class="settings-section" id="guide-detail-page">
+          <h4 class="settings-section-title">Show/Movie Detail Page</h4>
+          <p class="settings-note">
+            Shows poster, summary, and metadata at the top. The Tracking group lets you set which list it belongs
+            to, its status, and a completion date. Series/anime/dramas get a season picker and episode list —
+            tapping an episode's checkmark marks it (and everything before it) watched, which also updates status
+            automatically. Rating and Notes sections are always available. A delete option appears in the topbar
+            only while a title is still in Watchlist or In Progress.
+          </p>
+        </div>
+
+        <div class="settings-section" id="guide-timeline-stats">
+          <h4 class="settings-section-title">Timeline &amp; Statistics</h4>
+          <p class="settings-note">
+            <strong>Timeline</strong> shows a chronological feed of completions and episode-watch activity.
+            <strong>Statistics</strong> summarizes genres, networks, ratings, and time spent watching, including a
+            weekly chart and your biggest single-day marathons.
+          </p>
+        </div>
+
+        <div class="settings-section" id="guide-settings">
+          <h4 class="settings-section-title">Settings</h4>
+          <p class="settings-note">Every group and page in Settings, in order, with what each one does.</p>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Appearance</h4>
+          <ul class="guide-def-list">
+            <li><strong>Theme</strong> — switch between dark, light, and other built-in themes.</li>
+            <li><strong>Font</strong> — change the font used across the whole app. System fonts (System Default, Inter, Outfit, Serif, Monospace, Rounded) work fully offline; the "(online)" options are downloaded once from Google Fonts on first use, then cached on-device — and mirrored to your backup folder if one is set — so they keep working offline afterward.</li>
+            <li><strong>Main Color</strong> — change the app's accent color.</li>
+            <li><strong>Animation Speed</strong> — control how fast transitions and animations play throughout the app.</li>
+            <li><strong>Dashboard View</strong> — show tracked items as a list or a poster grid.</li>
+            <li><strong>Dashboard Row Actions</strong> — choose whether edit/delete on a row use a 3-dot menu or swipe.</li>
+            <li><strong>Rating Format</strong> — display ratings as 5 stars, a 10-point score, a 10-point decimal, or 100 points.</li>
+          </ul>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">App Identity</h4>
+          <ul class="guide-def-list">
+            <li><strong>App Icons and Names</strong> — change the icon and display name shown on your home screen.</li>
+            <li><strong>Bottom Menu Icons</strong> — customize which icon represents each tab in the bottom navigation.</li>
+            <li><strong>Bottom Bar Layout</strong> — reorder tabs and choose which ones appear (Settings can never be hidden).</li>
+          </ul>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Tracking</h4>
+          <ul class="guide-def-list">
+            <li><strong>Tracking Choices</strong> — turn tracking categories (TV Series, Movies, Anime, etc.) on or off, or add custom ones.</li>
+            <li><strong>Category Order</strong> — drag to reorder your enabled categories as they appear across the app.</li>
+          </ul>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Metadata</h4>
+          <ul class="guide-def-list">
+            <li><strong>Metadata Mode</strong> — Offline keeps everything manual; Online enables looking up metadata and thumbnails.</li>
+            <li><strong>Metadata Thumbnails</strong> — turn thumbnail fetching and display on or off.</li>
+            <li><strong>Metadata Sources</strong> — enable/disable, reorder, add API keys for, or create custom lookup sources (used by Discover and Sources).</li>
+          </ul>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Backup &amp; Sync</h4>
+          <ul class="guide-def-list">
+            <li><strong>Folder Sync Delay</strong> — how long to wait after a change before syncing to your chosen backup folder.</li>
+            <li><strong>Backups &amp; Restore</strong> — export your data as a file, restore from a backup, or sync to a folder as a mirrored file tree.</li>
+          </ul>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Security</h4>
+          <ul class="guide-def-list">
+            <li><strong>App Password</strong> — require a password (with security questions for recovery) to open the app.</li>
+          </ul>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">App Data</h4>
+          <ul class="guide-def-list">
+            <li><strong>App Info</strong> — what SquashDB is and how it works.</li>
+            <li><strong>Usage Guide</strong> — this page: how to use each tab and setting.</li>
+            <li><strong>Logcat</strong> — view captured app logs, filterable by All/Info/Warnings/Errors.</li>
+            <li><strong>Changelog</strong> — what's new in each released version.</li>
+            <li><strong>GitHub</strong> — opens the project's source code and issue tracker in your browser.</li>
+          </ul>
+        </div>
+
+        <div class="page-back-actions">
+          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script>
+  <script>
+    // Plain in-page scroll — not a real #hash navigation, since this app's
+    // back-stack/hardware-back handling in app.js treats any history entry
+    // change (including the one a hash link creates) as "go back a page".
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll("a[data-jump]").forEach(link => {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          const target = document.getElementById(link.dataset.jump);
+          if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    });
+  </script>
+</body>
+</html>

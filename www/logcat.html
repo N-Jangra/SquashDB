@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SquashDB - Logcat</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="index.css">
+  <script src="logcat.js"></script>
+  <script src="lucide.min.js"></script>
+</head>
+<body>
+  <div id="app-container">
+    <main>
+      <section class="tab-content active">
+        <div class="show-detail-topbar">
+          <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
+          <span class="show-detail-topbar-category">Logcat</span>
+          <button type="button" class="show-detail-topbar-delete" id="logcat-clear-btn" title="Clear logs"><i data-lucide="trash-2"></i></button>
+        </div>
+
+        <div class="chips-container" id="logcat-filter-chips">
+          <div class="chip active" data-level="all">All</div>
+          <div class="chip" data-level="info">Info</div>
+          <div class="chip" data-level="warn">Warnings</div>
+          <div class="chip" data-level="error">Errors</div>
+        </div>
+
+        <div id="logcat-list" class="logcat-list"></div>
+        <div id="logcat-empty" class="empty-state">
+          <i data-lucide="terminal"></i>
+          <h3>No Logs Yet</h3>
+          <p>Nothing has been logged for this filter since the log buffer started.</p>
+        </div>
+
+        <div class="page-back-actions">
+          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script>
+  <script>
+    let logcatFilter = "all";
+
+    function formatLogcatTime(ms) {
+      const d = new Date(ms);
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function renderLogcat() {
+      const list = document.getElementById("logcat-list");
+      const emptyEl = document.getElementById("logcat-empty");
+      if (!list || !emptyEl) return;
+
+      const entries = (window.squashdbLogcat ? window.squashdbLogcat.getEntries() : [])
+        .filter(e => logcatFilter === "all" || e.level === logcatFilter)
+        .slice()
+        .reverse();
+
+      if (entries.length === 0) {
+        list.innerHTML = "";
+        emptyEl.style.display = "flex";
+        return;
+      }
+      emptyEl.style.display = "none";
+
+      list.innerHTML = entries.map(e => `
+        <div class="logcat-row logcat-row-${e.level}">
+          <span class="logcat-row-level">${e.level}</span>
+          <span class="logcat-row-time">${formatLogcatTime(e.time)} · ${e.page}</span>
+          <pre class="logcat-row-message"></pre>
+        </div>
+      `).join("");
+
+      // Set message text via textContent (not innerHTML) so logged values with
+      // HTML-like content (URLs, JSON, stack traces) can't inject markup.
+      list.querySelectorAll(".logcat-row-message").forEach((el, i) => {
+        el.textContent = entries[i].message;
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll("#logcat-filter-chips .chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          logcatFilter = chip.dataset.level;
+          document.querySelectorAll("#logcat-filter-chips .chip").forEach(c => c.classList.toggle("active", c === chip));
+          renderLogcat();
+        });
+      });
+
+      const clearBtn = document.getElementById("logcat-clear-btn");
+      if (clearBtn) {
+        // No confirm() dialog here — some WebViews render it unreliably or
+        // suppress it outright, which made the button look broken. Logs are
+        // low-stakes debug data, so clearing immediately is fine; the entries
+        // are gone from localStorage the moment this runs (see clear() in
+        // logcat.js), not just hidden from the current render.
+        clearBtn.addEventListener("click", () => {
+          if (window.squashdbLogcat) window.squashdbLogcat.clear();
+          logcatFilter = "all";
+          document.querySelectorAll("#logcat-filter-chips .chip").forEach(c => c.classList.toggle("active", c.dataset.level === "all"));
+          renderLogcat();
+        });
+      }
+
+      renderLogcat();
+    });
+  </script>
+</body>
+</html>
