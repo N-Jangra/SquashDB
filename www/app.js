@@ -2812,10 +2812,10 @@ function deleteEntry(id) {
   renderStats();
 }
 
-// Opens the right editor for an existing item: the full season/episode detail
-// page for episode-tracked categories (series/kdrama/cdrama/anime), or the
-// classic edit modal for everything else (movie/game/manga/novel).
-const SHOW_DETAIL_PAGE_CATEGORIES = [...EPISODE_TRACKED_CATEGORIES, "movie", "manga", "novel"];
+// Opens the right editor for an existing item: the shared detail page for all
+// media types that have richer metadata, or the classic edit modal only for
+// simple legacy entries.
+const SHOW_DETAIL_PAGE_CATEGORIES = [...EPISODE_TRACKED_CATEGORIES, "movie", "game", "manga", "novel"];
 
 function openItemForCategory(id) {
   const item = state.items.find(i => i.id === id);

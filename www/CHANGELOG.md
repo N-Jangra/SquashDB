@@ -10,10 +10,13 @@ All notable changes to SquashDB are documented in this file.
 - Star rating widget enlarged with a gold glow to match the active state.
 - Topbar simplified to flat text links (`‹ Back` / category label); a delete icon replaces the old 3-dot menu, shown only while a title is still in Watchlist or In Progress.
 - Fixed a bug where re-opening an already-tracked show from Discover created a duplicate entry instead of reusing the existing one — every metadata provider now carries a `providerId` used to detect this.
+- Saved games now open the shared detail page too, instead of the legacy dashboard edit modal.
 
 ### Discover
 - Added a per-category source filter (sliders icon next to the search bar): pick exactly which enabled sources a search should run against, down to just one. The choice is saved per category and persists across app restarts.
 - Removed the separate Kdrama/Cdrama category chips — TVmaze has no first-class distinction for them, so searching "Series" now also surfaces Korean/Chinese dramas (still tagged with their real category once opened).
+- Added browser-safe metadata fetching through the built-in local proxy/server so CORS-blocked sources can still load in desktop browser mode and in APK/WebView builds.
+- Added or improved anime episode metadata handling across AniList, Jikan, and Kitsu, including runtime and synopsis fallbacks where the source does not provide full episode data.
 
 ### Explore
 - Now lists only currently-enabled metadata sources (previously showed every source, dimmed if disabled).
@@ -25,6 +28,7 @@ All notable changes to SquashDB are documented in this file.
 - Reordered the Appearance section: Theme, Font, Main Color, and Animation Speed (visual theming) now precede Dashboard View, Dashboard Row Actions, and Rating Format (dashboard-specific behavior).
 - Icon pickers with long option lists (Bottom Menu Icons, Create New List) now scroll as a snapping horizontal carousel instead of wrapping into a tall grid.
 - Every settings subpage's back button restyled to match the flat text-link topbar introduced on the show detail page.
+- Saved manga/game entries now keep the delete action visible when they are in a removable status.
 
 ### Backups
 - Poster thumbnails synced to a backup folder are now accompanied by a `.nomedia` marker in `squash-db/`, so Android's media scanner stops surfacing them in the device photo gallery.

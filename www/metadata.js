@@ -14,9 +14,12 @@ const BUILTIN_METADATA_SOURCES = {
   wikidata: { name: "Wikidata", icon: "globe", categories: ["movie", "game"] },
   openlibrary: { name: "Open Library", icon: "book-open", categories: ["manga", "novel"] },
   rawg: { name: "RAWG", icon: "gamepad-2", categories: ["game"], needsApiKey: true, apiKeyUrl: "https://rawg.io/apidocs" },
+  freetogame: { name: "FreeToGame", icon: "swords", categories: ["game"] },
   anilist: { name: "AniList", icon: "clapperboard", categories: ["anime", "manga", "series", "kdrama", "cdrama"] },
   jikan: { name: "MyAnimeList (Jikan)", icon: "list-video", categories: ["anime", "manga"] },
   kitsu: { name: "Kitsu", icon: "cat", categories: ["anime", "manga"] },
+  mangadex: { name: "MangaDex", icon: "book-open-check", categories: ["manga"] },
+  shikimori: { name: "Shikimori", icon: "sparkles", categories: ["anime", "manga"] },
   googlebooks: { name: "Google Books", icon: "book", categories: ["novel", "manga"] },
   omdb: { name: "OMDb", icon: "film", categories: ["movie", "series", "kdrama", "cdrama", "anime"], needsApiKey: true, apiKeyUrl: "https://www.omdbapi.com/apikey.aspx" },
   tmdb: { name: "TMDB", icon: "video", categories: ["movie", "series", "kdrama", "cdrama", "anime"], needsApiKey: true, apiKeyUrl: "https://www.themoviedb.org/settings/api" }
@@ -26,10 +29,10 @@ const BUILTIN_METADATA_SOURCES = {
 // defaults for fields missing from an older saved prefs blob.
 function normalizeMetadataSources() {
   const defaults = {
-    builtinOrder: ["tvmaze", "wikidata", "openlibrary", "rawg", "anilist", "jikan", "kitsu", "googlebooks", "omdb", "tmdb"],
+    builtinOrder: ["tvmaze", "wikidata", "openlibrary", "rawg", "freetogame", "anilist", "jikan", "kitsu", "mangadex", "shikimori", "googlebooks", "omdb", "tmdb"],
     builtinEnabled: {
       tvmaze: true, wikidata: true, openlibrary: true, rawg: false,
-      anilist: true, jikan: true, kitsu: true, googlebooks: true, omdb: false, tmdb: false
+      freetogame: true, anilist: true, jikan: true, kitsu: true, mangadex: true, shikimori: true, googlebooks: true, omdb: false, tmdb: false
     },
     builtinApiKeys: {},
     custom: [],
@@ -821,8 +824,10 @@ async function selectMetadataResult(index) {
     applyCustomMetadataResult(result);
   } else if (kind === "movie") {
     await applySelectedMovieMetadata(result.id, result.title, selectedThumbnail);
-  } else if (kind === "series" || kind === "kdrama" || kind === "cdrama" || kind === "anime") {
+  } else if (kind === "series" || kind === "kdrama" || kind === "cdrama") {
     await applySelectedSeriesMetadata(result.id, result.title, selectedThumbnail);
+  } else if (kind === "anime") {
+    await applySelectedAnimeMetadata(result, selectedThumbnail);
   } else if (kind === "game" && result.rawg) {
     applyMetadataPreview({
       title: result.title,
@@ -838,6 +843,83 @@ async function selectMetadataResult(index) {
     const totalVolumesInput = document.getElementById("field-total-volumes");
     if (totalVolumesInput && !totalVolumesInput.value && result.editionCount) {
       totalVolumesInput.value = result.editionCount;
+    }
+  }
+}
+
+async function applySelectedAnimeMetadata(result, fallbackThumbnail = "") {
+  if (!result) return;
+
+  if (result.source === "tvmaze") {
+    await applySelectedSeriesMetadata(result.id, result.title, fallbackThumbnail);
+    return;
+  }
+
+  if (result.source === "anilist") {
+    const query = `query($id:Int){Media(id:$id,type:ANIME){title{romaji english} coverImage{large medium} episodes duration startDate{year}}}`;
+    const data = await anilistQuery(query, { id: result.id });
+    const media = data?.data?.Media;
+    if (!media) return;
+    const totalEpisodes = parseInt(media.episodes) || 0;
+    const runtime = Math.round(media.duration || 0);
+    const thumbnail = media.coverImage?.large || media.coverImage?.medium || fallbackThumbnail || "";
+    applyMetadataPreview({
+      title: media.title?.english || media.title?.romaji || result.title,
+      meta: [media.startDate?.year || "", totalEpisodes ? `${totalEpisodes} episodes` : "", runtime ? `~${runtime} min/ep` : ""].filter(Boolean).join(" · "),
+      image: thumbnailsEnabled() ? thumbnail : ""
+    });
+    fetchedMetadataDraft = { thumbnail: thumbnailsEnabled() ? thumbnail : "" };
+    applySeriesMetadata({ totalSeasons: totalEpisodes > 0 ? 1 : 0, totalEpisodes, seasons: totalEpisodes > 0 ? [totalEpisodes] : [] });
+    const episodeRuntimeInput = document.getElementById("field-episode-runtime");
+    if (episodeRuntimeInput && !episodeRuntimeInput.value && runtime) {
+      episodeRuntimeInput.value = runtime;
+    }
+    return;
+  }
+
+  if (result.source === "jikan") {
+    const res = await fetch(`https://api.jikan.moe/v4/anime/${result.id}/full`);
+    if (!res.ok) return;
+    const json = await res.json();
+    const entry = json?.data;
+    if (!entry) return;
+    const totalEpisodes = parseInt(entry.episodes) || 0;
+    const runtime = parseInt(String(entry.duration || "").match(/\d+/)?.[0] || "") || 0;
+    const thumbnail = entry.images?.jpg?.large_image_url || entry.images?.jpg?.image_url || fallbackThumbnail || "";
+    applyMetadataPreview({
+      title: entry.title || result.title,
+      meta: [entry.aired?.from ? String(entry.aired.from).slice(0, 4) : "", totalEpisodes ? `${totalEpisodes} episodes` : "", runtime ? `~${runtime} min/ep` : ""].filter(Boolean).join(" · "),
+      image: thumbnailsEnabled() ? thumbnail : ""
+    });
+    fetchedMetadataDraft = { thumbnail: thumbnailsEnabled() ? thumbnail : "" };
+    applySeriesMetadata({ totalSeasons: totalEpisodes > 0 ? 1 : 0, totalEpisodes, seasons: totalEpisodes > 0 ? [totalEpisodes] : [] });
+    const episodeRuntimeInput = document.getElementById("field-episode-runtime");
+    if (episodeRuntimeInput && !episodeRuntimeInput.value && runtime) {
+      episodeRuntimeInput.value = runtime;
+    }
+    return;
+  }
+
+  if (result.source === "kitsu") {
+    const res = await fetch(`https://kitsu.io/api/edge/anime/${result.id}`, { headers: { Accept: "application/vnd.api+json" } });
+    if (!res.ok) return;
+    const json = await res.json();
+    const entry = json?.data;
+    const attrs = entry?.attributes || {};
+    if (!entry) return;
+    const totalEpisodes = parseInt(attrs.episodeCount) || 0;
+    const runtime = parseInt(attrs.episodeLength) || 0;
+    const thumbnail = attrs.posterImage?.large || attrs.posterImage?.medium || attrs.posterImage?.small || fallbackThumbnail || "";
+    applyMetadataPreview({
+      title: attrs.canonicalTitle || attrs.titles?.en || result.title,
+      meta: [attrs.startDate ? attrs.startDate.slice(0, 4) : "", totalEpisodes ? `${totalEpisodes} episodes` : "", runtime ? `~${runtime} min/ep` : ""].filter(Boolean).join(" · "),
+      image: thumbnailsEnabled() ? thumbnail : ""
+    });
+    fetchedMetadataDraft = { thumbnail: thumbnailsEnabled() ? thumbnail : "" };
+    applySeriesMetadata({ totalSeasons: totalEpisodes > 0 ? 1 : 0, totalEpisodes, seasons: totalEpisodes > 0 ? [totalEpisodes] : [] });
+    const episodeRuntimeInput = document.getElementById("field-episode-runtime");
+    if (episodeRuntimeInput && !episodeRuntimeInput.value && runtime) {
+      episodeRuntimeInput.value = runtime;
     }
   }
 }

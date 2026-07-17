@@ -77,6 +77,7 @@ let sourceSearchState = {
 // has only subject search) fall back to a subject query or nothing.
 function suggestSingleSource(key, category) {
   switch (key) {
+    case "freetogame": return fetchFreeToGameTopRated();
     case "tvmaze": return fetchTvmazeTopRated(category);
     case "anilist": return fetchAnilistTopRated(category === "manga" ? "MANGA" : "ANIME");
     case "jikan": return fetchJikanTopRated(category === "manga" ? "manga" : "anime");
@@ -95,10 +96,13 @@ function suggestSingleSource(key, category) {
 // that mapping lives.
 function searchSingleSource(key, category, query) {
   switch (key) {
+    case "freetogame": return searchFreeToGame(query);
+    case "shikimori": return searchShikimori(query, category);
     case "tvmaze": return searchTvmaze(query, category);
     case "anilist": return searchAnilist(query, category === "manga" ? "MANGA" : "ANIME", category);
     case "jikan": return searchJikan(query, category === "manga" ? "manga" : "anime");
     case "kitsu": return searchKitsu(query, category === "manga" ? "manga" : "anime");
+    case "mangadex": return searchMangaDex(query);
     case "openlibrary": return searchOpenLibrary(query, category);
     case "googlebooks": return searchGoogleBooks(query, category);
     case "wikidata": return category === "game" ? searchWikidataGames(query) : searchWikidataMovies(query);

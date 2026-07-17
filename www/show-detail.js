@@ -19,6 +19,58 @@ let showDetailState = {
   watchedEpisodeIds: []
 };
 
+function buildSyntheticAnimeEpisodes(totalEpisodes, meta = {}) {
+  const count = Math.max(0, parseInt(totalEpisodes) || 0);
+  if (!count) return [];
+  const summaryBase = meta.summary || meta.description || "";
+  const runtime = meta.runtime || meta.episodeRuntime || null;
+  const image = meta.thumbnail ? { medium: meta.thumbnail, original: meta.thumbnail } : null;
+  const sourceLabel = meta.sourceLabel || "Anime";
+  return Array.from({ length: count }, (_, index) => ({
+    id: index + 1,
+    season: 1,
+    number: index + 1,
+    name: `Episode ${index + 1}`,
+    runtime,
+    airdate: "",
+    summary: summaryBase ? `${summaryBase}${count > 1 ? ` This is episode ${index + 1} of ${count}.` : ""}` : `Episode ${index + 1} of ${sourceLabel}.`,
+    image,
+    rating: null
+  }));
+}
+
+async function fetchJikanAnimeEpisodes(malId, fallbackThumbnail = "") {
+  const episodes = [];
+  let page = 1;
+  let hasNextPage = true;
+
+  while (hasNextPage && page <= 5) {
+    const res = await fetch(`https://api.jikan.moe/v4/anime/${malId}/episodes?page=${page}`);
+    if (!res.ok) break;
+    const data = await res.json();
+    const items = Array.isArray(data?.data) ? data.data : [];
+    items.forEach(ep => {
+      episodes.push({
+        id: ep.mal_id ?? episodes.length + 1,
+        season: 1,
+        number: ep.mal_id ?? episodes.length + 1,
+        name: ep.title || `Episode ${ep.mal_id ?? episodes.length + 1}`,
+        runtime: ep.duration || null,
+        airdate: ep.aired ? String(ep.aired).slice(0, 10) : "",
+        summary: ep.synopsis || "",
+        image: fallbackThumbnail ? { medium: fallbackThumbnail, original: fallbackThumbnail } : null,
+        rating: null,
+        filler: Boolean(ep.filler),
+        recap: Boolean(ep.recap)
+      });
+    });
+    hasNextPage = Boolean(data?.pagination?.has_next_page);
+    page += 1;
+  }
+
+  return episodes;
+}
+
 function formatRuntimeHM(minutes) {
   const total = Math.round(minutes) || 0;
   if (!total) return "";
@@ -31,6 +83,46 @@ function formatRuntimeHM(minutes) {
 
 function showDetailIsOnline() {
   return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+function getNativeHttpPlugin() {
+  return window.CapacitorHttp
+    || window.Capacitor?.Plugins?.Http
+    || window.Capacitor?.Plugins?.CapacitorHttp
+    || null;
+}
+
+async function fetchJsonPortable(url, init = {}) {
+  const plugin = getNativeHttpPlugin();
+  if (plugin?.get) {
+    const response = await plugin.get({ url, headers: init.headers || {} });
+    return response?.data ?? null;
+  }
+  if (plugin?.request) {
+    const response = await plugin.request({
+      url,
+      method: init.method || "GET",
+      headers: init.headers || {},
+      data: init.body || null,
+      responseType: "json"
+    });
+    return response?.data ?? null;
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+    const proxyUrl = new URL("/proxy", window.location.origin);
+    proxyUrl.searchParams.set("url", url);
+    try {
+      const res = await fetch(proxyUrl.toString(), init);
+      if (res.ok) return res.json();
+    } catch (err) {
+      // fall through to direct fetch
+    }
+  }
+
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 function getUrlParams() {
@@ -55,14 +147,27 @@ async function initShowDetail() {
     showDetailState.provider = item.metadataSource || (item.tvmazeShowId ? "tvmaze" : "");
     showDetailState.watchedEpisodeIds = item.watchedEpisodeIds || [];
 
-    if (EPISODE_TRACKED_CATEGORIES.includes(item.category) && item.tvmazeShowId) {
+    if (EPISODE_TRACKED_CATEGORIES.includes(item.category) && (item.tvmazeShowId || item.metadataSource === "anilist" || item.metadataSource === "jikan" || item.metadataSource === "kitsu")) {
       if (Array.isArray(item.episodesCache) && item.episodesCache.length) {
         applyEpisodesToState(item.episodesCache, item);
       }
       if (showDetailIsOnline()) {
         try {
-          await refreshTvmazeItemMetadata(item);
-          await fetchAndCacheEpisodes(item.tvmazeShowId, item);
+          if (item.tvmazeShowId) {
+            await refreshTvmazeItemMetadata(item);
+            await fetchAndCacheEpisodes(item.tvmazeShowId, item);
+          } else if (item.metadataSource === "jikan" && item.providerId) {
+            const episodes = await fetchJikanAnimeEpisodes(item.providerId, item.thumbnail || "");
+            if (episodes.length) applyEpisodesToState(episodes, item);
+          } else if (item.metadataSource === "anilist" || item.metadataSource === "kitsu") {
+            const episodes = buildSyntheticAnimeEpisodes(item.totalEpisodes, {
+              summary: item.summary,
+              runtime: item.episodeRuntime,
+              thumbnail: item.thumbnail,
+              sourceLabel: item.title || "Anime"
+            });
+            if (episodes.length) applyEpisodesToState(episodes, item);
+          }
         } catch (err) {
           console.warn("Could not refresh episode list", err);
         }
@@ -237,6 +342,96 @@ async function initShowDetail() {
       console.warn("Could not load book details", err);
       renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load book details." });
     }
+  } else if (provider === "anilist" || provider === "jikan" || provider === "kitsu") {
+    try {
+      let show = null;
+      if (provider === "anilist") {
+        const query = `query($id:Int){Media(id:$id,type:ANIME){title{romaji english} coverImage{large medium} description(asHtml:false) episodes averageScore duration startDate{year} status}}`;
+        const res = await fetch("https://graphql.anilist.co", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ query, variables: { id: Number(providerId) } })
+        });
+        const data = res.ok ? await res.json() : null;
+        const media = data?.data?.Media;
+        if (media) {
+          const totalEpisodes = parseInt(media.episodes) || 0;
+          show = {
+            title: media.title?.english || media.title?.romaji || title,
+            thumbnail: media.coverImage?.large || media.coverImage?.medium || "",
+            meta: [media.startDate?.year || "", totalEpisodes ? `${totalEpisodes} episodes` : "", media.duration ? `~${media.duration} min/ep` : ""].filter(Boolean).join(" · "),
+            summary: media.description || "",
+            providerId,
+            totalEpisodes,
+            episodeRuntime: media.duration || 0,
+            productionStatus: media.status || ""
+          };
+        }
+      } else if (provider === "jikan") {
+        const res = await fetch(`https://api.jikan.moe/v4/anime/${providerId}/full`);
+        const data = res.ok ? await res.json() : null;
+        const entry = data?.data;
+        if (entry) {
+          const runtime = parseInt(String(entry.duration || "").match(/\d+/)?.[0] || "") || 0;
+          show = {
+            title: entry.title || title,
+            thumbnail: entry.images?.jpg?.large_image_url || entry.images?.jpg?.image_url || "",
+            meta: [entry.aired?.from ? String(entry.aired.from).slice(0, 4) : "", entry.episodes ? `${entry.episodes} episodes` : "", runtime ? `~${runtime} min/ep` : ""].filter(Boolean).join(" · "),
+            summary: stripHtml(entry.synopsis || ""),
+            providerId,
+            totalEpisodes: parseInt(entry.episodes) || 0,
+            episodeRuntime: runtime,
+            productionStatus: entry.status || ""
+          };
+        }
+      } else if (provider === "kitsu") {
+        const res = await fetch(`https://kitsu.io/api/edge/anime/${providerId}`, { headers: { Accept: "application/vnd.api+json" } });
+        const data = res.ok ? await res.json() : null;
+        const attrs = data?.data?.attributes || {};
+        if (data?.data) {
+          show = {
+            title: attrs.canonicalTitle || attrs.titles?.en || title,
+            thumbnail: attrs.posterImage?.large || attrs.posterImage?.medium || attrs.posterImage?.small || "",
+            meta: [attrs.startDate ? attrs.startDate.slice(0, 4) : "", attrs.episodeCount ? `${attrs.episodeCount} episodes` : "", attrs.episodeLength ? `~${attrs.episodeLength} min/ep` : ""].filter(Boolean).join(" · "),
+            summary: attrs.synopsis || "",
+            providerId,
+            totalEpisodes: parseInt(attrs.episodeCount) || 0,
+            episodeRuntime: parseInt(attrs.episodeLength) || 0,
+            productionStatus: attrs.status || ""
+          };
+        }
+      }
+
+      if (!show) {
+        renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load anime details." });
+        return;
+      }
+
+      showDetailState.show = show;
+      if (provider === "jikan" && show.providerId) {
+        const episodes = await fetchJikanAnimeEpisodes(show.providerId, show.thumbnail || "");
+        if (episodes.length) {
+          applyEpisodesToState(episodes, null);
+        } else {
+          showDetailState.seasons = show.totalEpisodes > 0 ? [1] : [];
+          showDetailState.episodes = buildSyntheticAnimeEpisodes(show.totalEpisodes, show);
+          showDetailState.activeSeason = showDetailState.seasons[0] || null;
+        }
+      } else {
+        showDetailState.seasons = show.totalEpisodes > 0 ? [1] : [];
+        showDetailState.episodes = buildSyntheticAnimeEpisodes(show.totalEpisodes, show);
+        showDetailState.activeSeason = showDetailState.seasons[0] || null;
+      }
+      renderShowDetailHeader(showDetailState.show);
+      renderStatusPicker(null);
+      renderAddToListPicker();
+      renderSeasonSection();
+      renderRatingWidget(null);
+      renderNotesField(null);
+    } catch (err) {
+      console.warn("Could not load anime details", err);
+      renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load anime details." });
+    }
   } else if (provider === "rawg") {
     try {
       const rawgKey = state.preferences.metadataSources.builtinApiKeys?.rawg || "";
@@ -259,6 +454,24 @@ async function initShowDetail() {
       renderNotesField(null);
     } catch (err) {
       console.warn("Could not load game details", err);
+      renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load game details." });
+    }
+  } else if (provider === "freetogame") {
+    try {
+      const games = await fetchJsonPortable("https://www.freetogame.com/api/games");
+      const game = (Array.isArray(games) ? games : []).find(g => String(g.id) === String(providerId)) || null;
+      const genres = [game?.genre, game?.platform, game?.publisher].filter(Boolean).slice(0, 3);
+      showDetailState.show = {
+        title: game?.title || title,
+        thumbnail: game?.thumbnail || "",
+        meta: [game?.release_date || "", genres.join(", "), game?.developer || ""].filter(Boolean).join(" · "),
+        summary: game?.short_description || "",
+        genres,
+        providerId
+      };
+      renderSimpleShowDetail();
+    } catch (err) {
+      console.warn("Could not load FreeToGame details", err);
       renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load game details." });
     }
   } else if (provider === "anilist") {
@@ -467,7 +680,7 @@ function applyEpisodesToState(episodes, existingItem) {
 // In Progress — once a title is On Hold/Dropped/Completed the delete action
 // moves elsewhere (this page keeps it out of the way to avoid accidental
 // removal of finished progress).
-const DELETABLE_STATUSES = ["Watchlist", "In Progress"];
+const DELETABLE_STATUSES = ["Watchlist", "In Progress", "Reading", "On Hold", "Dropped", "Completed", "Plan to Read", "Playing", "Backlog"];
 
 function updateShowDetailMenu() {
   const btn = document.getElementById("show-detail-delete-btn-top");

@@ -40,6 +40,46 @@ function discoverIsOnline() {
   return typeof navigator === "undefined" || navigator.onLine !== false;
 }
 
+function getNativeHttpPlugin() {
+  return window.CapacitorHttp
+    || window.Capacitor?.Plugins?.Http
+    || window.Capacitor?.Plugins?.CapacitorHttp
+    || null;
+}
+
+async function fetchJsonPortable(url, init = {}) {
+  const plugin = getNativeHttpPlugin();
+  if (plugin?.get) {
+    const response = await plugin.get({ url, headers: init.headers || {} });
+    return response?.data ?? null;
+  }
+  if (plugin?.request) {
+    const response = await plugin.request({
+      url,
+      method: init.method || "GET",
+      headers: init.headers || {},
+      data: init.body || null,
+      responseType: "json"
+    });
+    return response?.data ?? null;
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+    const proxyUrl = new URL("/proxy", window.location.origin);
+    proxyUrl.searchParams.set("url", url);
+    try {
+      const res = await fetch(proxyUrl.toString(), init);
+      if (res.ok) return res.json();
+    } catch (err) {
+      // fall through to direct fetch
+    }
+  }
+
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 // Best-effort category detection from a TVmaze show's language/genres, since
 // TVmaze itself has no first-class "anime"/"kdrama"/"cdrama" field.
 function detectTvmazeCategory(show) {
@@ -73,6 +113,10 @@ function tmdbAvailable() { return builtinSourceEnabled("tmdb") && Boolean(tmdbKe
 // {source, category, id, title, subtitle, thumbnail, rating} objects.
 function getDiscoverProviders(category) {
   const providers = [];
+
+  if (category === "game" && builtinSourceEnabled("freetogame")) {
+    providers.push({ key: "freetogame", suggest: fetchFreeToGameTopRated, search: searchFreeToGame });
+  }
 
   if (EPISODE_CATEGORIES_DISCOVER.includes(category)) {
     if (builtinSourceEnabled("tvmaze")) {
@@ -128,6 +172,9 @@ function getDiscoverProviders(category) {
     if (builtinSourceEnabled("googlebooks")) {
       providers.push({ key: "googlebooks", suggest: () => Promise.resolve([]), search: (q) => searchGoogleBooks(q, category) });
     }
+    if (category === "manga" && builtinSourceEnabled("mangadex")) {
+      providers.push({ key: "mangadex", suggest: () => Promise.resolve([]), search: searchMangaDex });
+    }
     if (category === "manga") {
       if (builtinSourceEnabled("anilist")) {
         providers.push({ key: "anilist", suggest: () => fetchAnilistTopRated("MANGA"), search: (q) => searchAnilist(q, "MANGA", "manga") });
@@ -147,6 +194,12 @@ function getDiscoverProviders(category) {
     }
     if (builtinSourceEnabled("wikidata")) {
       providers.push({ key: "wikidata", suggest: () => Promise.resolve([]), search: searchWikidataGames });
+    }
+  }
+
+  if (category === "anime" || category === "manga") {
+    if (builtinSourceEnabled("shikimori")) {
+      providers.push({ key: "shikimori", suggest: () => Promise.resolve([]), search: (q) => searchShikimori(q, category) });
     }
   }
 
@@ -598,6 +651,79 @@ async function searchRawg(query) {
   if (!res.ok) return [];
   const json = await res.json();
   return (Array.isArray(json.results) ? json.results : []).map(rawgGameToResult);
+}
+
+function freeToGameGameToResult(entry) {
+  return {
+    source: "freetogame",
+    category: "game",
+    id: entry.id,
+    title: entry.title || "",
+    subtitle: [entry.genre, entry.release_date || "", entry.developer || ""].filter(Boolean).join(" · "),
+    thumbnail: entry.thumbnail || "",
+    rating: null
+  };
+}
+
+async function fetchFreeToGameTopRated() {
+  const json = await fetchJsonPortable("https://www.freetogame.com/api/games");
+  return (Array.isArray(json) ? json : []).slice(0, 15).map(freeToGameGameToResult);
+}
+
+async function searchFreeToGame(query) {
+  const json = await fetchJsonPortable("https://www.freetogame.com/api/games");
+  const q = query.trim().toLowerCase();
+  return (Array.isArray(json) ? json : [])
+    .filter(entry =>
+      (entry.title || "").toLowerCase().includes(q) ||
+      (entry.genre || "").toLowerCase().includes(q) ||
+      (entry.developer || "").toLowerCase().includes(q)
+    )
+    .slice(0, 15)
+    .map(freeToGameGameToResult);
+}
+
+function mangaDexMangaToResult(entry) {
+  const attrs = entry.attributes || {};
+  const titles = attrs.title || {};
+  const title = titles.en || Object.values(titles)[0] || "";
+  const coverRel = (entry.relationships || []).find(rel => rel.type === "cover_art");
+  const coverId = coverRel?.attributes?.fileName || "";
+  return {
+    source: "mangadex",
+    category: "manga",
+    id: entry.id,
+    title,
+    subtitle: [attrs.year || "", attrs.status || ""].filter(Boolean).join(" · "),
+    thumbnail: coverId ? `https://uploads.mangadex.org/covers/${entry.id}/${coverId}.256.jpg` : "",
+    rating: null
+  };
+}
+
+async function searchMangaDex(query) {
+  const json = await fetchJsonPortable(`https://api.mangadex.org/manga?title=${encodeURIComponent(query)}&includes[]=cover_art&limit=15`);
+  return (Array.isArray(json.data) ? json.data : []).map(mangaDexMangaToResult);
+}
+
+function shikimoriToResult(entry, category) {
+  const id = entry.id;
+  return {
+    source: "shikimori",
+    category,
+    id,
+    title: entry.russian || entry.name || entry.title || "",
+    subtitle: [entry.kind || "", entry.year || "", entry.score ? `★ ${entry.score}` : ""].filter(Boolean).join(" · "),
+    thumbnail: entry.image?.original || entry.image?.preview || (category === "manga"
+      ? `https://shikimori.one/system/mangas/original/${id}.jpg`
+      : `https://shikimori.one/system/animes/original/${id}.jpg`),
+    rating: entry.score || null
+  };
+}
+
+async function searchShikimori(query, category) {
+  const endpoint = category === "manga" ? "mangas" : "animes";
+  const json = await fetchJsonPortable(`https://shikimori.one/api/${endpoint}?search=${encodeURIComponent(query)}&limit=15`);
+  return (Array.isArray(json) ? json : []).map(entry => shikimoriToResult(entry, category));
 }
 
 // ---- AniList (anime + manga; also used as a supplemental source for
