@@ -15,12 +15,20 @@ function sourceIsUsable(key) {
 }
 
 // ---- Sources grid (sources.html and explore.html) ----
-function renderSourcesList() {
+// sources.html lists every built-in source (dimmed if disabled/missing a key)
+// so it doubles as a way to discover what's available. explore.html is meant
+// to be a clean jumping-off point, so it only lists sources that are actually
+// usable right now — the toolbox icon there links to Settings for the rest.
+function renderSourcesList(enabledOnly = false) {
   const list = document.getElementById("sources-list");
   if (!list) return;
   normalizeMetadataSources();
 
-  list.innerHTML = state.preferences.metadataSources.builtinOrder.map(key => {
+  const keys = enabledOnly
+    ? state.preferences.metadataSources.builtinOrder.filter(key => sourceIsUsable(key))
+    : state.preferences.metadataSources.builtinOrder;
+
+  list.innerHTML = keys.map(key => {
     const info = BUILTIN_METADATA_SOURCES[key];
     if (!info) return "";
     const enabled = state.preferences.metadataSources.builtinEnabled[key];
@@ -34,6 +42,10 @@ function renderSourcesList() {
       </a>
     `;
   }).join("");
+
+  if (keys.length === 0) {
+    list.innerHTML = `<p class="settings-row-note">No sources enabled yet. Use the toolbox icon above to enable one.</p>`;
+  }
 
   if (window.lucide) lucide.createIcons();
 }
@@ -264,7 +276,8 @@ function renderSourceSearchResults() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  renderSourcesList();
+  const isExplorePage = Boolean(document.getElementById("tab-explore"));
+  renderSourcesList(isExplorePage);
   setupExploreQuickLinks();
   initSourceSearchPage();
 });

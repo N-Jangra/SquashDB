@@ -1,16 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Explore</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Explore</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="logcat.js"></script><script src="lucide.min.js"></script></head>
 <body><div id="app-container">
 <main><section id="tab-explore" class="tab-content active">
+
+<div class="explore-topbar">
+  <h2 class="explore-title">Explore</h2>
+  <a class="explore-icon-btn" href="manage-metadata-sources.html" title="Manage metadata sources"><i data-lucide="wrench"></i></a>
+</div>
+
+<h4 class="settings-section-title">Metadata Sources</h4>
+<div class="sources-grid" id="sources-list"></div>
+
+<hr class="explore-section-divider">
 
 <div class="explore-quick-links">
   <a class="explore-quick-link" href="timeline.html"><i data-lucide="calendar"></i> Timeline</a>
   <a class="explore-quick-link" href="statistics.html"><i data-lucide="pie-chart"></i> Statistics</a>
 </div>
-
-<h4 class="settings-section-title">Metadata Sources</h4>
-<div class="sources-grid" id="sources-list"></div>
 
 </section></main>
 <nav class="bottom-nav">
@@ -23,5 +30,5 @@
   <a class="nav-item" data-tab="tab-settings" href="settings.html" aria-label="Settings"><i data-lucide="settings"></i></a>
 </nav>
 </div>
-<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="sources.js"></script>
+<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script><script src="sources.js"></script>
 </body></html>
