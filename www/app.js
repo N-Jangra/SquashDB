@@ -139,6 +139,7 @@ let state = {
     defaultStartPage: "remember-last",
     ratingFormat: "5-stars",
     uiTheme: "dark",
+    uiFont: "inter",
     mainColor: "normal",
     dashboardRowActions: "menu",
     dashboardView: "list",
@@ -296,6 +297,7 @@ function loadData() {
   }
   if (!state.preferences.ratingFormat) state.preferences.ratingFormat = "5-stars";
   if (!state.preferences.uiTheme) state.preferences.uiTheme = "dark";
+  if (!state.preferences.uiFont) state.preferences.uiFont = "inter";
   if (!state.preferences.mainColor) state.preferences.mainColor = "normal";
   if (!state.preferences.dashboardRowActions) state.preferences.dashboardRowActions = "menu";
   if (!["list", "grid"].includes(state.preferences.dashboardView)) state.preferences.dashboardView = "list";
@@ -653,6 +655,7 @@ function applyPreferenceAttributes() {
   document.body.setAttribute("data-theme", theme);
   document.body.setAttribute("data-accent", accent);
   applyAnimationSpeed();
+  if (typeof applyUiFont === "function") applyUiFont();
 }
 
 function applyAnimationSpeed() {
@@ -1110,6 +1113,12 @@ function renderNavIconPickers() {
       });
       grid.appendChild(btn);
     });
+
+    if (grid.classList.contains("icon-picker-carousel")) {
+      const spacer = document.createElement("div");
+      spacer.className = "icon-picker-carousel-spacer";
+      grid.appendChild(spacer);
+    }
   });
 
   if (needsIcons && window.lucide) lucide.createIcons();
@@ -1252,6 +1261,23 @@ const SETTINGS_PICKERS = {
       { value: "amoled", label: "Amoled" },
       { value: "flashbang", label: "Flashbang" },
       { value: "material-you", label: "Material You" }
+    ]
+  },
+  uiFont: {
+    default: "inter",
+    options: [
+      { value: "system", label: "System Default" },
+      { value: "inter", label: "Inter (default)" },
+      { value: "outfit", label: "Outfit" },
+      { value: "serif", label: "Serif" },
+      { value: "monospace", label: "Monospace" },
+      { value: "rounded", label: "Rounded" },
+      { value: "poppins", label: "Poppins (online)" },
+      { value: "roboto", label: "Roboto (online)" },
+      { value: "nunito", label: "Nunito (online)" },
+      { value: "lato", label: "Lato (online)" },
+      { value: "merriweather", label: "Merriweather (online)" },
+      { value: "jetbrains-mono", label: "JetBrains Mono (online)" }
     ]
   },
   mainColor: {
@@ -1406,6 +1432,7 @@ function openSettingsPicker(pref, title) {
       setPickerValue(pref, opt.value);
       saveData();
       applyTheme();
+      if (pref === "uiFont" && typeof applyUiFont === "function") applyUiFont();
       updateLayoutToggleButtons();
       renderDashboard();
       renderTimeline();
@@ -1552,7 +1579,7 @@ function openCreateListModal() {
         </div>
         <div class="form-group">
           <label>Icon</label>
-          <div id="new-list-icon-picker" class="icon-picker-grid"></div>
+          <div class="icon-picker-carousel-wrap"><div id="new-list-icon-picker" class="icon-picker-carousel"></div></div>
         </div>
         <div class="form-group">
           <label for="new-list-statuses">Statuses (comma separated)</label>
@@ -1580,6 +1607,9 @@ function openCreateListModal() {
     });
     iconPicker.appendChild(btn);
   });
+  const spacer = document.createElement("div");
+  spacer.className = "icon-picker-carousel-spacer";
+  iconPicker.appendChild(spacer);
 
   modal.querySelector("#new-list-name").value = "";
   modal.querySelector("#new-list-statuses").value = DEFAULT_CUSTOM_STATUSES.join(", ");
@@ -3559,6 +3589,23 @@ async function syncFolderTreeMirror() {
   } catch (err) {
     console.warn("Folder tree sync skipped: no backup folder selected", err);
     return;
+  }
+
+  // Drop a .nomedia marker in squash-db/ so Android's media scanner skips every
+  // thumbnail.webp under it — otherwise each show/movie poster shows up in the
+  // device's photo gallery, which nobody wants for app-internal cache images.
+  if (!localStorage.getItem("squashdb_nomedia_written")) {
+    try {
+      await plugin.writeNestedFile({
+        uri: folderUri,
+        dirPath: ["squash-db"],
+        fileName: ".nomedia",
+        content: ""
+      });
+      localStorage.setItem("squashdb_nomedia_written", "true");
+    } catch (err) {
+      console.warn("Could not write .nomedia marker", err);
+    }
   }
 
   const syncedHashes = JSON.parse(localStorage.getItem("squashdb_synced_item_hashes") || "{}");
