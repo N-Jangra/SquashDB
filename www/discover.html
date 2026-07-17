@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Discover</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Discover</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="logcat.js"></script><script src="lucide.min.js"></script></head>
 <body><div id="app-container">
 <div class="chips-container" id="discover-category-chips"></div>
 <div id="discover-search-container" class="search-container" style="display:flex;">
   <i data-lucide="search"></i>
   <input type="text" id="discover-search-input" class="search-input" placeholder="Search...">
+  <button type="button" class="discover-filter-btn" id="discover-filter-btn" title="Filter sources" style="display:none;">
+    <i data-lucide="sliders-horizontal"></i>
+  </button>
 </div>
 <main>
   <section id="tab-discover" class="tab-content active">
@@ -35,6 +38,20 @@
   <a class="nav-item" data-tab="tab-stats" href="statistics.html" aria-label="Statistics"><i data-lucide="pie-chart"></i></a>
   <a class="nav-item" data-tab="tab-settings" href="settings.html" aria-label="Settings"><i data-lucide="settings"></i></a>
 </nav>
+<div id="discover-filter-modal" class="modal-overlay">
+  <div class="modal-content picker-sheet">
+    <div class="modal-header">
+      <h3 class="modal-title">Filter sources</h3>
+      <button class="modal-close" id="discover-filter-modal-close">&times;</button>
+    </div>
+    <p class="settings-row-note" style="margin: 0 0 12px;">Only searches sources available for the current category.</p>
+    <div id="discover-filter-source-list" class="discover-filter-source-list"></div>
+    <div class="discover-filter-actions">
+      <button type="button" class="picker-option-link" id="discover-filter-select-all">Select all</button>
+      <button type="button" class="picker-option-link" id="discover-filter-select-none">Select none</button>
+    </div>
+  </div>
 </div>
-<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="discover.js"></script>
+</div>
+<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script><script src="discover.js"></script>
 </body></html>

@@ -32,7 +32,8 @@ function normalizeMetadataSources() {
       anilist: true, jikan: true, kitsu: true, googlebooks: true, omdb: false, tmdb: false
     },
     builtinApiKeys: {},
-    custom: []
+    custom: [],
+    discoverSourceFilter: {}
   };
 
   const current = state.preferences.metadataSources;
@@ -64,6 +65,10 @@ function normalizeMetadataSources() {
   Object.keys(BUILTIN_METADATA_SOURCES).forEach(key => {
     if (typeof current.builtinApiKeys[key] !== "string") current.builtinApiKeys[key] = "";
   });
+
+  if (!current.discoverSourceFilter || typeof current.discoverSourceFilter !== "object") {
+    current.discoverSourceFilter = {};
+  }
 
   if (!Array.isArray(current.custom)) current.custom = [];
   current.custom = current.custom.filter(src => src && typeof src === "object" && src.id);
