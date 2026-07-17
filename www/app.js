@@ -755,6 +755,12 @@ function setupEventListeners() {
     });
   }
 
+  const gridSelectionCancel = document.getElementById("grid-selection-cancel");
+  if (gridSelectionCancel) gridSelectionCancel.addEventListener("click", clearGridSelection);
+
+  const gridSelectionDelete = document.getElementById("grid-selection-delete");
+  if (gridSelectionDelete) gridSelectionDelete.addEventListener("click", deleteSelectedGridItems);
+
   // Modal actions
   const modalClose = document.getElementById("modal-close-btn");
   if (modalClose) modalClose.addEventListener("click", closeModal);
@@ -1933,12 +1939,18 @@ function renderDashboard() {
     container.style.display = isGrid ? "grid" : "flex";
     container.classList.toggle("notes-grid-view", isGrid);
     container.dataset.rowActions = state.preferences.dashboardRowActions || "menu";
+    if (!isGrid && dashboardSelectedIds.size > 0) {
+      clearGridSelection();
+    }
+    updateGridSelectionBar();
     setupDashboardLazyLoad(container, filtered);
   }
 }
 
 const DASHBOARD_BATCH_SIZE = 30;
 let dashboardLazyLoadObserver = null;
+let dashboardGridSelectionMode = false;
+let dashboardSelectedIds = new Set();
 
 // Grid view: poster-only card with a progress strip along the bottom edge —
 // full purple bar for completed items, green partial bar for anything the
@@ -1946,6 +1958,7 @@ let dashboardLazyLoadObserver = null;
 function buildGridCard(item) {
   const card = document.createElement("div");
   card.className = "grid-card";
+  if (dashboardSelectedIds.has(item.id)) card.classList.add("grid-card-selected");
   card.dataset.id = item.id;
 
   const progress = calculateProgress(item);
@@ -1963,8 +1976,10 @@ function buildGridCard(item) {
   card.innerHTML = `
     ${thumbnailOrPlaceholder(item.thumbnail, "grid-card-thumb")}
     ${barHTML ? `<div class="grid-card-bar-track">${barHTML}</div>` : ""}
+    <div class="grid-card-select-overlay">
+      <div class="grid-card-select-check"><i data-lucide="check"></i></div>
+    </div>
   `;
-  card.addEventListener("click", () => openItemForCategory(item.id));
   return card;
 }
 
@@ -2070,6 +2085,61 @@ function setupDashboardLazyLoad(container, filtered) {
     }, { root: null, rootMargin: "400px" });
     dashboardLazyLoadObserver.observe(sentinel);
   }
+}
+
+function setDashboardGridSelectionMode(enabled) {
+  dashboardGridSelectionMode = enabled;
+  const bar = document.getElementById("grid-selection-bar");
+  if (bar) bar.style.display = enabled && dashboardSelectedIds.size > 0 ? "flex" : "none";
+  document.querySelectorAll(".grid-card").forEach(card => {
+    card.classList.toggle("grid-card-selected", dashboardSelectedIds.has(card.dataset.id));
+  });
+  attachCardEvents();
+}
+
+function updateGridSelectionBar() {
+  const bar = document.getElementById("grid-selection-bar");
+  const countEl = document.getElementById("grid-selection-count");
+  const count = dashboardSelectedIds.size;
+  if (countEl) countEl.textContent = `${count} selected`;
+  if (bar) bar.style.display = dashboardGridSelectionMode && count > 0 ? "flex" : "none";
+}
+
+function clearGridSelection() {
+  dashboardGridSelectionMode = false;
+  dashboardSelectedIds.clear();
+  updateGridSelectionBar();
+  document.querySelectorAll(".grid-card").forEach(card => card.classList.remove("grid-card-selected"));
+  attachCardEvents();
+}
+
+function toggleGridSelection(id, forceSelect = null) {
+  if (forceSelect === true) dashboardSelectedIds.add(id);
+  else if (forceSelect === false) dashboardSelectedIds.delete(id);
+  else if (dashboardSelectedIds.has(id)) dashboardSelectedIds.delete(id);
+  else dashboardSelectedIds.add(id);
+
+  dashboardGridSelectionMode = dashboardSelectedIds.size > 0;
+  updateGridSelectionBar();
+  document.querySelectorAll(`.grid-card[data-id="${id}"]`).forEach(card => {
+    card.classList.toggle("grid-card-selected", dashboardSelectedIds.has(id));
+  });
+}
+
+function deleteSelectedGridItems() {
+  if (dashboardSelectedIds.size === 0) return;
+  const ids = Array.from(dashboardSelectedIds);
+  if (!confirm(`Delete ${ids.length} selected item(s)? This cannot be undone.`)) return;
+  ids.forEach(id => {
+    const item = state.items.find(entry => entry.id === id);
+    state.items = state.items.filter(entry => entry.id !== id);
+    pruneDeletedItemFromFolderTree(item).catch(err => console.warn("Could not prune deleted item from folder tree", err));
+  });
+  saveData();
+  renderDashboard();
+  renderTimeline();
+  renderStats();
+  clearGridSelection();
 }
 
 // Generate stars icon HTML for note cards
@@ -2560,6 +2630,45 @@ function attachCardEvents() {
     });
   });
 
+  // Grid action overlay
+  bindOnce(".grid-card", card => {
+    if (state.preferences.dashboardView !== "grid") return;
+
+    let pressTimer = null;
+    let longPressed = false;
+
+    const start = () => {
+      if (card.dataset.boundGridPress === "true") return;
+      longPressed = false;
+      pressTimer = setTimeout(() => {
+        longPressed = true;
+        toggleGridSelection(card.dataset.id, true);
+      }, 450);
+    };
+    const cancel = () => {
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = null;
+    };
+
+    card.dataset.boundGridPress = "true";
+    card.addEventListener("touchstart", start, { passive: true });
+    card.addEventListener("touchend", cancel);
+    card.addEventListener("touchmove", cancel);
+    card.addEventListener("mousedown", start);
+    card.addEventListener("mouseup", cancel);
+    card.addEventListener("mouseleave", cancel);
+
+    card.addEventListener("click", (e) => {
+      if (dashboardGridSelectionMode || dashboardSelectedIds.size > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleGridSelection(card.dataset.id);
+        return;
+      }
+      if (!longPressed) openItemForCategory(card.dataset.id);
+    });
+  });
+
   // Menu action (3-dot)
   bindOnce(".menu-btn", btn => {
     btn.addEventListener("click", (e) => {
@@ -2584,6 +2693,44 @@ function attachCardEvents() {
       bindSwipe(card);
     }
     // "menu" mode: no row-tap handler — edit/delete only via the 3-dot menu
+  });
+
+  bindOnce(".grid-card", card => {
+    if (state.preferences.dashboardView !== "grid") return;
+    if (card.dataset.boundGridPress === "true") return;
+    card.dataset.boundGridPress = "true";
+
+    let pressTimer = null;
+    let longPressed = false;
+
+    const cancel = () => {
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = null;
+    };
+
+    const start = () => {
+      longPressed = false;
+      pressTimer = setTimeout(() => {
+        longPressed = true;
+        toggleGridSelection(card.dataset.id, true);
+      }, 450);
+    };
+
+    card.addEventListener("touchstart", start, { passive: true });
+    card.addEventListener("touchend", cancel);
+    card.addEventListener("touchmove", cancel);
+    card.addEventListener("mousedown", start);
+    card.addEventListener("mouseup", cancel);
+    card.addEventListener("mouseleave", cancel);
+    card.addEventListener("click", (e) => {
+      if (dashboardGridSelectionMode || dashboardSelectedIds.size > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleGridSelection(card.dataset.id);
+        return;
+      }
+      if (!longPressed) openItemForCategory(card.dataset.id);
+    });
   });
 }
 
@@ -2805,11 +2952,13 @@ function incrementProgress(id, type) {
 
 // Delete Tracking Entry
 function deleteEntry(id) {
+  const item = state.items.find(entry => entry.id === id);
   state.items = state.items.filter(item => item.id !== id);
   saveData();
   renderDashboard();
   renderTimeline();
   renderStats();
+  pruneDeletedItemFromFolderTree(item).catch(err => console.warn("Could not prune deleted item from folder tree", err));
 }
 
 // Opens the right editor for an existing item: the shared detail page for all
@@ -3680,6 +3829,68 @@ async function syncFolderTreeMirror() {
   }
 
   return { syncedCount, skippedUnchangedCount, syncErrors, totalItems: state.items.length };
+}
+
+// Removes a deleted item from the folder-tree mirror on Android. The mirror is
+// keyed by category/item slug, so we have to scan category folders and match the
+// stored index.json by item.id before deleting the row's folder contents.
+async function pruneDeletedItemFromFolderTree(item) {
+  if (!item || !backupFolderPluginAvailable()) return;
+  if (!localStorage.getItem("squashdb_backup_folder_uri")) return;
+
+  const plugin = window.Capacitor.Plugins.BackupFolder;
+  let folderUri;
+  try {
+    folderUri = await getOrPickBackupFolderUri();
+  } catch (err) {
+    return;
+  }
+
+  try {
+    const root = await plugin.listFiles({ uri: folderUri });
+    const squashDbFolder = (root?.files || []).find(f => f.name === "squash-db");
+    if (!squashDbFolder) return;
+
+    const categories = await plugin.listFiles({ uri: squashDbFolder.uri });
+    for (const categoryFolder of categories?.files || []) {
+      if (categoryFolder.name === "settings") continue;
+
+      const items = await plugin.listFiles({ uri: categoryFolder.uri });
+      for (const itemFolder of items?.files || []) {
+        try {
+          const files = await plugin.listFiles({ uri: itemFolder.uri });
+          const indexJson = (files?.files || []).find(f => f.name === "index.json");
+          if (!indexJson) continue;
+          const { content } = await plugin.readFile({ uri: indexJson.uri });
+          const storedItem = JSON.parse(content);
+          if (!storedItem || storedItem.id !== item.id) continue;
+
+          for (const file of files?.files || []) {
+            try {
+              await plugin.deleteFile({ uri: file.uri });
+            } catch (err) {
+              console.warn(`Could not delete mirror file "${file.name}" for item "${item.title}"`, err);
+            }
+          }
+
+          try {
+            await plugin.deleteFile({ uri: itemFolder.uri });
+          } catch (err) {
+            console.warn(`Could not delete mirror folder for item "${item.title}"`, err);
+          }
+
+          const syncedHashes = JSON.parse(localStorage.getItem("squashdb_synced_item_hashes") || "{}");
+          delete syncedHashes[item.id];
+          localStorage.setItem("squashdb_synced_item_hashes", JSON.stringify(syncedHashes));
+          return;
+        } catch (err) {
+          console.warn(`Could not inspect folder-tree mirror for item "${item.title}"`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Folder-tree prune skipped", err);
+  }
 }
 
 let folderSyncIdleTimer = null;

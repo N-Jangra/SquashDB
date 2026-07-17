@@ -676,18 +676,12 @@ function applyEpisodesToState(episodes, existingItem) {
   }
 }
 
-// Topbar delete button: only shown for tracked entries still in Watchlist or
-// In Progress — once a title is On Hold/Dropped/Completed the delete action
-// moves elsewhere (this page keeps it out of the way to avoid accidental
-// removal of finished progress).
-const DELETABLE_STATUSES = ["Watchlist", "In Progress", "Reading", "On Hold", "Dropped", "Completed", "Plan to Read", "Playing", "Backlog"];
-
 function updateShowDetailMenu() {
   const btn = document.getElementById("show-detail-delete-btn-top");
   if (!btn) return;
 
   const item = state.items.find(i => i.id === showDetailState.itemId);
-  const canDelete = !!item && DELETABLE_STATUSES.includes(item.status);
+  const canDelete = !!item;
   btn.style.display = canDelete ? "flex" : "none";
 
   if (!btn.dataset.bound) {
@@ -700,11 +694,40 @@ function updateShowDetailMenu() {
 function confirmDeleteShowDetailItem() {
   const item = state.items.find(i => i.id === showDetailState.itemId);
   if (!item) return;
-  if (!confirm(`Delete "${item.title}" from your list? This cannot be undone.`)) return;
-  state.items = state.items.filter(i => i.id !== showDetailState.itemId);
-  saveData();
-  flushPendingSave();
-  navigateBackWithinApp("dashboard.html");
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list || !titleEl) {
+    deleteEntry(item.id);
+    flushPendingSave();
+    window.location.href = "dashboard.html";
+    return;
+  }
+
+  titleEl.textContent = "Delete this tracker?";
+  list.innerHTML = "";
+
+  const confirmBtn = document.createElement("button");
+  confirmBtn.type = "button";
+  confirmBtn.className = "picker-option";
+  confirmBtn.innerHTML = `<i data-lucide="trash-2" class="picker-option-check" style="visibility:visible; color: var(--danger);"></i><span style="color: var(--danger);">Delete</span>`;
+  confirmBtn.addEventListener("click", () => {
+    closeSettingsPicker();
+    deleteEntry(item.id);
+    flushPendingSave();
+    window.location.href = "dashboard.html";
+  });
+  list.appendChild(confirmBtn);
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "picker-option";
+  cancelBtn.innerHTML = `<i data-lucide="x" class="picker-option-check" style="visibility:visible;"></i><span>Cancel</span>`;
+  cancelBtn.addEventListener("click", closeSettingsPicker);
+  list.appendChild(cancelBtn);
+
+  modal.classList.add("active");
+  if (window.lucide) lucide.createIcons();
 }
 
 // Shared render for providers with no episode/season feed — just header +
