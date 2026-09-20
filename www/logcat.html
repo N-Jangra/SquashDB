@@ -34,6 +34,10 @@
         </div>
 
         <div class="page-back-actions">
+          <a class="btn btn-secondary" href="logcat-history.html"><i data-lucide="archive"></i> View older logs</a>
+        </div>
+
+        <div class="page-back-actions">
           <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
         </div>
       </section>
@@ -71,13 +75,28 @@
           <span class="logcat-row-level">${e.level}</span>
           <span class="logcat-row-time">${formatLogcatTime(e.time)} · ${e.page}</span>
           <pre class="logcat-row-message"></pre>
+          <button type="button" class="logcat-expand" hidden>Show more</button>
         </div>
       `).join("");
 
       // Set message text via textContent (not innerHTML) so logged values with
       // HTML-like content (URLs, JSON, stack traces) can't inject markup.
-      list.querySelectorAll(".logcat-row-message").forEach((el, i) => {
-        el.textContent = entries[i].message;
+      const previewLength = 280;
+      list.querySelectorAll(".logcat-row").forEach((row, i) => {
+        const el = row.querySelector(".logcat-row-message");
+        const expand = row.querySelector(".logcat-expand");
+        const message = String(entries[i].message ?? "");
+        if (!el || !expand || message.length <= previewLength) {
+          if (el) el.textContent = message;
+          return;
+        }
+        el.textContent = `${message.slice(0, previewLength)}…`;
+        expand.hidden = false;
+        expand.addEventListener("click", () => {
+          const expanded = el.classList.toggle("expanded");
+          el.textContent = expanded ? message : `${message.slice(0, previewLength)}…`;
+          expand.textContent = expanded ? "Show less" : "Show more";
+        });
       });
 
       if (window.lucide) lucide.createIcons();
