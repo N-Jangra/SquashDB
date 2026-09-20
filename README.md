@@ -10,7 +10,8 @@ A watchlist and media progress tracker for games, movies, TV series, anime, mang
 - Optional online metadata lookup (TVmaze, Wikidata, Open Library) for thumbnails, runtimes, and episode counts
 - Customizable bottom navigation icons
 - Switchable app icon and app name (Android home screen), each with several presets
-- Local JSON export/import for backups
+- Local JSON export/import plus passphrase-protected encrypted `.sqdbe` backups
+- Optional encrypted cloud backup sync to a user-supplied HTTPS/WebDAV endpoint
 - Light/dark themes with multiple accent colors
 
 ## Project structure
@@ -18,7 +19,10 @@ A watchlist and media progress tracker for games, movies, TV series, anime, mang
 ```
 www/                 Web app source (HTML/CSS/JS) — loaded into the Capacitor WebView
   app.js             Core app logic (state, rendering, settings)
+  app-navigation.js  Shared page stack and Android back-button handling
+  app-backups.js     Backup, restore, and folder-sync operations
   metadata.js        Online metadata lookup (TVmaze, Wikidata, Open Library)
+  cache-manager.js   Metadata, image, font, and WebView cache controls
   index.css          Styles
   *.html             Dashboard, timeline, stats, and settings pages
 android/             Native Android project (Capacitor)
@@ -74,7 +78,7 @@ What it does, in order:
 - Plain HTML/CSS/JavaScript (no framework, no bundler)
 - [Capacitor](https://capacitorjs.com/) for the native Android wrapper
 - [Lucide](https://lucide.dev/) icons
-- LocalStorage for data persistence
+- Android Keystore-encrypted local state storage, with browser `localStorage` fallback
 
 ## License
 
