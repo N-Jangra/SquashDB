@@ -11,6 +11,7 @@
     "cap:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/app": "^6.0.3",
     "@capacitor/android": "^6.2.1",
     "@capacitor/core": "^6.2.1"
   },
