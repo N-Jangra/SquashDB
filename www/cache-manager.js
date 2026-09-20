@@ -119,13 +119,19 @@ async function clearSquashDbMetadataCache() {
 }
 
 async function clearSquashDbImageCache() {
-  if (window.caches) await caches.delete(SQUASHDB_IMAGE_CACHE);
-  if (window.caches) await caches.delete(SQUASHDB_FONT_CACHE);
+  const errors = [];
+  if (window.caches) {
+    try { await caches.delete(SQUASHDB_IMAGE_CACHE); } catch (err) { errors.push(err); }
+    try { await caches.delete(SQUASHDB_FONT_CACHE); } catch (err) { errors.push(err); }
+  }
 
   const nativeCache = window.Capacitor?.Plugins?.CacheManager;
   if (nativeCache?.clearWebViewCache) {
-    await nativeCache.clearWebViewCache();
+    try { await nativeCache.clearWebViewCache(); } catch (err) { errors.push(err); }
   }
+  // Cache storage is best-effort on Android WebView. Do not make pull-to-
+  // refresh fail just because one cache backend is unavailable.
+  if (errors.length) console.warn("Some temporary image caches could not be cleared", errors);
 }
 
 async function trimSquashDbImageCache(maxEntries = SQUASHDB_IMAGE_CACHE_MAX_ENTRIES) {
@@ -134,7 +140,7 @@ async function trimSquashDbImageCache(maxEntries = SQUASHDB_IMAGE_CACHE_MAX_ENTR
   const cache = await caches.open(SQUASHDB_IMAGE_CACHE);
   const requests = await cache.keys();
   for (const request of requests.slice(0, Math.max(0, requests.length - maxEntries))) {
-    await cache.delete(request);
+    try { await cache.delete(request); } catch (err) { console.warn("Could not trim cached image", err); }
   }
 }
 

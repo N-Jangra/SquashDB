@@ -403,9 +403,35 @@ function uniqueItemSlug(item, usedSlugs) {
   return suffixed;
 }
 
-// Fetches a remote thumbnail URL and re-encodes it as WebP, returning base64
-// (without the data-URL prefix) ready for writeNestedBinaryFile. Returns null
-// on any failure (offline, broken URL, decode error) so sync can skip it.
+async function decodeThumbnailBlob(blob) {
+  if (typeof createImageBitmap === "function") {
+    return createImageBitmap(blob);
+  }
+
+  // Older Android WebViews do not expose createImageBitmap. Decode through an
+  // object URL instead, then revoke it so repeated backups do not leak memory.
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    return await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Thumbnail image could not be decoded"));
+      image.src = objectUrl;
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function base64FromDataUrl(url) {
+  const match = String(url || "").match(/^data:[^;]+;base64,(.*)$/s);
+  return match ? match[1] : null;
+}
+
+// Fetches a thumbnail URL and re-encodes it as WebP, returning base64
+// (without the data-URL prefix) ready for writeNestedBinaryFile. If WebP
+// conversion is unavailable, the original image bytes are retained so an
+// Android WebView still gets a usable offline thumbnail.
 async function thumbnailUrlToWebpBase64(url) {
   if (typeof url !== "string" || !url) return null;
 
@@ -414,26 +440,33 @@ async function thumbnailUrlToWebpBase64(url) {
     if (!response.ok) return null;
     const blob = await response.blob();
 
-    const bitmap = await createImageBitmap(blob);
+    const bitmap = await decodeThumbnailBlob(blob);
     const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    canvas.width = bitmap.width || bitmap.naturalWidth || 1;
+    canvas.height = bitmap.height || bitmap.naturalHeight || 1;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas is unavailable");
+    context.drawImage(bitmap, 0, 0);
+    if (typeof bitmap.close === "function") bitmap.close();
 
     const webpBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/webp", 0.9));
-    if (!webpBlob) return null;
+    const outputBlob = webpBlob || blob;
 
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
       reader.onerror = reject;
-      reader.readAsDataURL(webpBlob);
+      reader.readAsDataURL(outputBlob);
     });
 
     const match = dataUrl.match(/^data:.*;base64,(.*)$/s);
     return match ? match[1] : null;
   } catch (err) {
-    console.warn("Could not convert thumbnail to WebP", url, err);
+    // A data URL may already be a complete offline image. Preserve it even
+    // when this WebView cannot decode/re-encode that particular format.
+    const original = base64FromDataUrl(url);
+    if (original) return original;
+    console.warn("Could not prepare thumbnail for backup", url, err);
     return null;
   }
 }
