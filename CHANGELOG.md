@@ -20,6 +20,7 @@ All notable changes to SquashDB are documented in this file.
 
 ### Dashboard and navigation
 - Added Continue Watching, Recently Added, and Completed dashboard sections without repeating the same item across sections.
+- Added a Not started yet section for saved items with no progress, marked as Ready to start without duplicating them in the main list.
 - Added list and poster-grid dashboard layouts with progress rings, progress strips, quick actions, and improved empty/loading states.
 - Added improved Android back-button handling, swipe-back behavior, direct bottom-bar navigation, and persistent navigation settings.
 - Added responsive mobile and tablet layout improvements, floating add actions, and cleaner bottom-sheet interactions.
@@ -35,6 +36,10 @@ All notable changes to SquashDB are documented in this file.
 - Added separate notification controls for episode reminders, backups, sync failures, and unfinished items, including quiet hours and snooze options.
 - Added toast feedback, animated success/error states, skeleton loading, pressed states, haptic-action hooks, reduced-motion support, and accessible contrast improvements.
 - Added configurable weekly/monthly statistics graphs and improved chart rendering.
+
+### App identity
+- Added Controller and Gear app icon/name choices in App Icons and Names.
+- Added Android launcher aliases and native icon resources so both choices can be applied from the installed app.
 
 ## [0.0.4]
 
