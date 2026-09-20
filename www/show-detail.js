@@ -83,7 +83,7 @@ function formatRuntimeHM(minutes) {
 }
 
 function showDetailIsOnline() {
-  return typeof navigator === "undefined" || navigator.onLine !== false;
+  return typeof squashDbIsOffline !== "function" || !squashDbIsOffline();
 }
 
 function getNativeHttpPlugin() {
@@ -832,8 +832,9 @@ function renderShowDetailHeader(show) {
   const hasCachedMetadata = Boolean(localItem && (localItem.summary || localItem.thumbnail || localItem.metadataSource || localItem.episodesCache?.length));
   if (cacheBadge) {
     cacheBadge.style.display = hasCachedMetadata ? "inline-flex" : "none";
-    cacheBadge.title = navigator.onLine === false ? "Showing saved metadata while offline" : "Metadata saved on this device";
-    cacheBadge.innerHTML = `<i data-lucide="${navigator.onLine === false ? "wifi-off" : "database"}"></i> ${navigator.onLine === false ? "Offline cache" : "Cached metadata"}`;
+    const offline = typeof squashDbIsOffline === "function" ? squashDbIsOffline() : navigator.onLine === false;
+    cacheBadge.title = offline ? "Showing saved metadata while offline" : "Metadata saved on this device";
+    cacheBadge.innerHTML = `<i data-lucide="${offline ? "wifi-off" : "database"}"></i> ${offline ? "Offline cache" : "Cached metadata"}`;
   }
 
   renderShowDetailProgress(show, localItem);
@@ -914,7 +915,7 @@ function renderPrimaryDetailActions() {
 }
 
 async function downloadCurrentItemForOffline() {
-  if (navigator.onLine === false) {
+  if (typeof squashDbIsOffline === "function" ? squashDbIsOffline() : navigator.onLine === false) {
     if (showDetailState.show?.title) queueMetadataUpdate(showDetailState.category, showDetailState.show.title, showDetailState.itemId || "");
     const notice = document.getElementById("show-detail-offline-notice");
     if (notice) { notice.textContent = "You are offline. This title will be queued for download when you reconnect."; notice.style.display = "block"; }
@@ -1051,7 +1052,7 @@ function detailText(value) {
 }
 
 function productionStatusSlug(status) {
-  const normalized = status.toLowerCase();
+  const normalized = String(status || "").trim().toLowerCase();
   if (normalized === "running") return "running";
   if (normalized === "ended") return "ended";
   if (normalized === "in development") return "development";

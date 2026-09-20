@@ -234,11 +234,11 @@ let state = {
     reducedMotion: false,
     dashboardRowActions: "menu",
     dashboardView: "list",
-    navigationSheet: true,
+    navigationSheet: false,
     oneHandedMode: "off",
     tabletTwoColumn: true,
     compactMode: false,
-    metadataMode: "offline",
+    metadataMode: "online",
     metadataThumbnails: true,
     episodeReminders: true,
     notificationsEnabled: false,
@@ -335,6 +335,12 @@ function setupVisualPolish() {
   document.getElementById("category-colors-picker")?.addEventListener("click", openCategoryColorsPicker);
 }
 
+let squashDbNetworkProbeOnline = false;
+
+function squashDbIsOffline() {
+  return typeof navigator !== "undefined" && navigator.onLine === false && !squashDbNetworkProbeOnline;
+}
+
 function setupOfflineIndicator() {
   let indicator = document.getElementById("squashdb-offline-indicator");
   if (!indicator) {
@@ -344,7 +350,7 @@ function setupOfflineIndicator() {
     document.body.appendChild(indicator);
   }
   const update = () => {
-    const offline = navigator.onLine === false;
+    const offline = squashDbIsOffline();
     const queueCount = typeof metadataQueueCount === "function" ? metadataQueueCount() : 0;
     indicator.classList.toggle("active", offline || queueCount > 0);
     indicator.innerHTML = offline
@@ -355,9 +361,19 @@ function setupOfflineIndicator() {
     if (window.lucide) lucide.createIcons();
   };
   window.addEventListener("online", update);
-  window.addEventListener("offline", update);
+  window.addEventListener("online", () => { squashDbNetworkProbeOnline = true; update(); });
+  window.addEventListener("offline", () => { squashDbNetworkProbeOnline = false; update(); });
   window.addEventListener("metadata-queue-updated", update);
   update();
+
+  // Android WebView can briefly report a stale navigator.onLine=false during
+  // startup. Verify connectivity through the same portable request path used
+  // by metadata search before displaying Offline mode.
+  if (navigator.onLine === false && typeof fetchJsonPortable === "function") {
+    fetchJsonPortable("https://api.tvmaze.com/shows/1")
+      .then(() => { squashDbNetworkProbeOnline = true; update(); })
+      .catch(() => {});
+  }
 }
 
 // Every thumbnail slot is compulsory: real image if we have one and thumbnails
@@ -493,11 +509,23 @@ async function loadData() {
   if (typeof state.preferences.reducedMotion !== "boolean") state.preferences.reducedMotion = false;
   if (!state.preferences.dashboardRowActions) state.preferences.dashboardRowActions = "menu";
   if (!["list", "grid"].includes(state.preferences.dashboardView)) state.preferences.dashboardView = "list";
-  if (typeof state.preferences.navigationSheet !== "boolean") state.preferences.navigationSheet = true;
+  if (typeof state.preferences.navigationSheet !== "boolean") state.preferences.navigationSheet = false;
+  if (state.preferences.navigationSheetDefaultApplied !== true) {
+    state.preferences.navigationSheet = false;
+    state.preferences.navigationSheetDefaultApplied = true;
+    saveData();
+  }
   if (!["off", "left", "right"].includes(state.preferences.oneHandedMode)) state.preferences.oneHandedMode = "off";
   if (typeof state.preferences.tabletTwoColumn !== "boolean") state.preferences.tabletTwoColumn = true;
   if (typeof state.preferences.compactMode !== "boolean") state.preferences.compactMode = false;
-  if (!state.preferences.metadataMode) state.preferences.metadataMode = "offline";
+  // Online metadata is the default. Migrate the old implicit offline default
+  // once, then preserve any explicit choice made afterward.
+  if (!state.preferences.metadataMode) state.preferences.metadataMode = "online";
+  if (state.preferences.metadataModeDefaultApplied !== true) {
+    state.preferences.metadataMode = "online";
+    state.preferences.metadataModeDefaultApplied = true;
+    saveData();
+  }
   if (typeof state.preferences.metadataThumbnails !== "boolean") state.preferences.metadataThumbnails = true;
   if (typeof state.preferences.episodeReminders !== "boolean") state.preferences.episodeReminders = true;
   if (typeof state.preferences.notificationsEnabled !== "boolean") state.preferences.notificationsEnabled = false;
@@ -645,12 +673,19 @@ async function loadData() {
       await encryptedStore.setState({
         data: JSON.stringify({ items: state.items, watchLog: state.watchLog || [], preferences: state.preferences })
       });
-      localStorage.removeItem("squashdb_items");
-      localStorage.removeItem("squashdb_watch_log");
-      localStorage.removeItem("squashdb_prefs");
     } catch (err) {
       console.warn("Could not migrate local data into encrypted storage", err);
     }
+  }
+
+  // Keep a readable JSON mirror for browser/local-storage users and backup
+  // tools. Android still uses the encrypted store as the primary source, but
+  // it must not delete the mirror because it contains item metadata and any
+  // locally embedded thumbnail data URLs.
+  if (encryptedState) {
+    localStorage.setItem("squashdb_items", JSON.stringify(state.items));
+    localStorage.setItem("squashdb_watch_log", JSON.stringify(state.watchLog || []));
+    localStorage.setItem("squashdb_prefs", JSON.stringify(state.preferences));
   }
 
 }
@@ -709,11 +744,6 @@ function flushPendingSave() {
   if (encryptedStore?.setState) {
     encryptedStore.setState({
       data: JSON.stringify({ items: state.items, watchLog: state.watchLog || [], preferences: state.preferences })
-    }).then(() => {
-      // Remove only the large primary-data keys after the encrypted copy is safe.
-      localStorage.removeItem("squashdb_items");
-      localStorage.removeItem("squashdb_watch_log");
-      localStorage.removeItem("squashdb_prefs");
     }).catch(err => console.warn("Encrypted local database save failed", err));
   }
   applyPreferenceAttributes();
@@ -804,6 +834,17 @@ function applyPreferenceAttributes() {
       || CATEGORIES[key].color;
   });
   document.body.classList.toggle("compact-mode", Boolean(state.preferences.compactMode));
+  const appShell = document.getElementById("app-container");
+  if (appShell && window.matchMedia("(max-width: 560px)").matches) {
+    const hand = state.preferences.oneHandedMode || "off";
+    appShell.style.width = hand === "off" ? "" : "calc(100% - 24px)";
+    appShell.style.marginLeft = hand === "right" ? "24px" : "";
+    appShell.style.marginRight = hand === "left" ? "24px" : "";
+  } else if (appShell) {
+    appShell.style.width = "";
+    appShell.style.marginLeft = "";
+    appShell.style.marginRight = "";
+  }
   applyAnimationSpeed();
   if (typeof applyUiFont === "function") applyUiFont();
 }
@@ -1169,6 +1210,19 @@ function setupEventListeners() {
     if (notificationPermissionStatus) notificationPermissionStatus.textContent = state.preferences.notificationsEnabled ? "On" : "Off";
   };
   updateNotificationStatus();
+  const refreshNotificationPermission = async () => {
+    const notifications = nativePlugin("Notifications");
+    if (!notifications?.hasPermission) return;
+    try {
+      const result = await notifications.hasPermission();
+      if (notificationPermissionStatus && !state.preferences.notificationsEnabled) {
+        notificationPermissionStatus.textContent = result?.granted ? "Allowed" : "Off";
+      }
+    } catch (err) {
+      console.warn("Could not read notification permission", err);
+    }
+  };
+  refreshNotificationPermission();
   if (notificationPermission) {
     notificationPermission.addEventListener("click", () => openChoicePopup(
       "Notifications",
@@ -1201,6 +1255,11 @@ function setupEventListeners() {
       async () => {
       const notifications = nativePlugin("Notifications");
       if (!notifications?.notify) throw new Error("Notifications are available in the installed Android app only.");
+      const permission = notifications.hasPermission ? await notifications.hasPermission() : null;
+      if (permission && !permission.granted) {
+        const requested = await notifications.requestPermission();
+        if (!requested?.granted) throw new Error("Please allow notifications in Android settings.");
+      }
       await notifications.notify({ title: "SquashDB test", body: "Notifications are working.", id: Date.now() & 0x7fffffff });
     }
     ));
@@ -1622,7 +1681,9 @@ const APP_LOOK_CHOICES = [
   { value: "capacitor", label: "Capacitor", preview: "icons/previews/ic_launcher_capacitor.png" },
   { value: "calculator", label: "Calculator", preview: "icons/previews/ic_launcher_calculator.png" },
   { value: "freeotp", label: "FreeOTP", preview: "icons/previews/ic_launcher_freeotp.png" },
-  { value: "termux", label: "Termux", preview: "icons/previews/ic_launcher_termux.png" }
+  { value: "termux", label: "Termux", preview: "icons/previews/ic_launcher_termux.png" },
+  { value: "controller", label: "Controller", preview: "icons/controller.svg" },
+  { value: "gear", label: "Gear", preview: "icons/gear.svg" }
 ];
 
 function isNativeApp() {
@@ -2675,11 +2736,19 @@ function renderDashboardInsights() {
     .sort((a, b) => String(b.completionDate || b.updated || "").localeCompare(String(a.completionDate || a.updated || "")))
     .slice(0, 4);
   const completedIds = new Set(completedItems.map(item => item.id));
+  const notStartedItems = items
+    .filter(item => item.status !== "Completed"
+      && calculateProgress(item) <= 0
+      && !["In Progress", "Playing", "Reading"].includes(item.status))
+    .sort((a, b) => (Number(b.created || b.updated) || 0) - (Number(a.created || a.updated) || 0))
+    .slice(0, 4);
+  const notStartedIds = new Set(notStartedItems.map(item => item.id));
   const staleCutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
   const staleItems = items
     .filter(item => {
       const lastUpdated = Number(item.updated || item.created || 0);
-      return !continueIds.has(item.id) && !completedIds.has(item.id) && lastUpdated > 0 && lastUpdated < staleCutoff;
+      return !continueIds.has(item.id) && !completedIds.has(item.id) && !notStartedIds.has(item.id)
+        && lastUpdated > 0 && lastUpdated < staleCutoff;
     })
     .sort((a, b) => (Number(a.updated || a.created) || 0) - (Number(b.updated || b.created) || 0))
     .slice(0, 4);
@@ -2692,11 +2761,13 @@ function renderDashboardInsights() {
   const section = (title, content, className = "") => content ? `<section class="dashboard-insight-section ${className}"><h3>${title}</h3><div class="dashboard-insight-scroller">${content}</div></section>` : "";
   root.innerHTML = [
     section("Continue watching", continueItems.map(item => dashboardInsightCard(item, item.status, `${calculateProgress(item)}%`)).join(""), "continue"),
+    section("Not started yet", notStartedItems.map(item => dashboardInsightCard(item, item.status || "No progress yet", "Ready to start")).join(""), "not-started"),
     section("Haven't updated in a long time", staleItems.map(item => dashboardInsightCard(item, item.status, staleLabel(item))).join(""), "stale"),
     section("Completed", completedItems.map(item => dashboardInsightCard(item, item.completionDate || "Completed")).join(""), "completed")
   ].join("");
   root.dataset.insightItemIds = JSON.stringify([...new Set([
     ...continueItems.map(item => item.id),
+    ...notStartedItems.map(item => item.id),
     ...staleItems.map(item => item.id),
     ...completedItems.map(item => item.id)
   ])]);
@@ -2713,7 +2784,8 @@ function setupDashboardPullToRefresh() {
   let startY = 0;
   let pulling = false;
   dashboard.addEventListener("touchstart", event => {
-    if (window.scrollY > 2 || document.querySelector(".modal-overlay.active")) return;
+    const scrollTop = document.querySelector("main")?.scrollTop || window.scrollY || 0;
+    if (scrollTop > 2 || document.querySelector(".modal-overlay.active")) return;
     startY = event.touches[0].clientY;
     pulling = true;
   }, { passive: true });
@@ -2733,8 +2805,12 @@ function setupDashboardPullToRefresh() {
     if (status) status.textContent = "Refreshing metadata and images…";
     try {
       if (window.SquashDBCache) {
-        await window.SquashDBCache.clearMetadata();
-        await window.SquashDBCache.clearImages();
+        // Clearing temporary caches is best-effort. A WebView may not expose
+        // one of the cache stores, but that must not make refresh look broken.
+        await Promise.allSettled([
+          window.SquashDBCache.clearMetadata(),
+          window.SquashDBCache.clearImages()
+        ]);
       }
       renderDashboard();
       if (status) status.textContent = "Dashboard refreshed";
@@ -3576,6 +3652,17 @@ function renderStatsWatchCharts(activeItemIds) {
 function attachCardEvents() {
   const rowActions = state.preferences.dashboardRowActions || "menu";
 
+  const dashboardContainer = document.getElementById("notes-container");
+  if (dashboardContainer && dashboardContainer.dataset.tapFallbackBound !== "true") {
+    dashboardContainer.dataset.tapFallbackBound = "true";
+    dashboardContainer.addEventListener("click", event => {
+      if (event.target.closest("button, input, a, .note-quick-actions")) return;
+      const card = event.target.closest(".note-card, .grid-card");
+      if (!card || !card.dataset.id || event.defaultPrevented) return;
+      openItemForCategory(card.dataset.id);
+    });
+  }
+
   const bindOnce = (selector, bind) => {
     document.querySelectorAll(`${selector}:not([data-bound])`).forEach(el => {
       el.dataset.bound = "true";
@@ -4010,7 +4097,18 @@ const SHOW_DETAIL_PAGE_CATEGORIES = [...EPISODE_TRACKED_CATEGORIES, "movie", "ga
 function openItemForCategory(id) {
   const item = state.items.find(i => i.id === id);
   if (item && SHOW_DETAIL_PAGE_CATEGORIES.includes(item.category)) {
-    window.location.href = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    const detailUrl = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    if (typeof navigateToAppPage === "function") navigateToAppPage(detailUrl);
+    else window.location.href = detailUrl;
+    return;
+  }
+  // Cards can be tapped while encrypted state is still being restored. Keep
+  // the tap useful for detail-page categories instead of opening an empty
+  // editor modal when the in-memory lookup briefly has no item.
+  if (!item && id) {
+    const detailUrl = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    if (typeof navigateToAppPage === "function") navigateToAppPage(detailUrl);
+    else window.location.href = detailUrl;
     return;
   }
   openModal(id);

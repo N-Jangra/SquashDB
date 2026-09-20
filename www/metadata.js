@@ -49,7 +49,7 @@ window.addEventListener("online", () => {
 });
 
 async function retryVisibleMetadataUpdate() {
-  if (navigator.onLine === false || typeof fetchAndApplyMetadataFromTitle !== "function") return;
+  if ((typeof squashDbIsOffline === "function" && squashDbIsOffline()) || typeof fetchAndApplyMetadataFromTitle !== "function") return;
   const category = document.getElementById("entry-category")?.value || state.activeCategoryChip;
   const title = document.getElementById("entry-title")?.value.trim() || "";
   const queued = readMetadataUpdateQueue().find(entry => entry.category === category && String(entry.title).toLowerCase() === title.toLowerCase());
@@ -624,7 +624,7 @@ async function fetchAndApplyMetadataFromTitle() {
   const title = document.getElementById("entry-title")?.value.trim();
   if (!title || !category || state.preferences.metadataMode !== "online") return;
   if (!["series", "kdrama", "cdrama", "anime", "movie", "game", "manga", "novel"].includes(category)) return;
-  if (navigator.onLine === false) {
+  if (typeof squashDbIsOffline === "function" ? squashDbIsOffline() : navigator.onLine === false) {
     queueMetadataUpdate(category, title);
     return;
   }

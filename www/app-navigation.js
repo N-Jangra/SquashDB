@@ -35,12 +35,50 @@ function setAppPageStack(stack) {
   sessionStorage.setItem("squashdb_page_stack", JSON.stringify(stack));
 }
 
+function getPageScrollPositions() {
+  try {
+    const value = JSON.parse(sessionStorage.getItem("squashdb_page_scroll") || "{}");
+    return value && typeof value === "object" ? value : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveCurrentPageScroll() {
+  const main = document.querySelector("main");
+  const positions = getPageScrollPositions();
+  positions[getCurrentPagePathWithQuery()] = {
+    main: main?.scrollTop || 0,
+    window: window.scrollY || 0
+  };
+  sessionStorage.setItem("squashdb_page_scroll", JSON.stringify(positions));
+}
+
+function restoreCurrentPageScroll() {
+  const saved = getPageScrollPositions()[getCurrentPagePathWithQuery()];
+  if (!saved) return;
+  const restore = () => {
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = Number(saved.main) || 0;
+    window.scrollTo(0, Number(saved.window) || 0);
+  };
+  requestAnimationFrame(() => {
+    restore();
+    setTimeout(restore, 80);
+  });
+}
+
 function recordCurrentPage() {
-  const current = getCurrentPagePath();
   const currentWithQuery = getCurrentPagePathWithQuery();
   const stack = getAppPageStack();
-  if (stack[stack.length - 1] !== current) {
-    stack.push(current);
+  const last = stack[stack.length - 1] || "";
+  // Older builds stored only the filename. Compare both forms while those
+  // sessions are being migrated, but store the complete URL from now on so
+  // separate detail pages and source-search queries remain distinct.
+  if (last !== currentWithQuery && last !== getCurrentPagePath()) {
+    stack.push(currentWithQuery);
+  } else if (last === getCurrentPagePath() && last !== currentWithQuery) {
+    stack[stack.length - 1] = currentWithQuery;
     setAppPageStack(stack);
   }
   if (history.state?.squashdbPage !== currentWithQuery) {
@@ -51,6 +89,11 @@ function recordCurrentPage() {
 function setupAppNavigation() {
   if (history.scrollRestoration) history.scrollRestoration = "manual";
   recordCurrentPage();
+  restoreCurrentPageScroll();
+  if (document.body.dataset.pageScrollBound !== "true") {
+    document.body.dataset.pageScrollBound = "true";
+    window.addEventListener("pagehide", saveCurrentPageScroll);
+  }
 
   document.querySelectorAll(".nav-item").forEach(navItem => {
     if (navItem.dataset.boundAppNav === "true") return;
@@ -59,19 +102,33 @@ function setupAppNavigation() {
       const href = navItem.getAttribute("href");
       if (!href) return;
       e.preventDefault();
-      // Bottom-bar items always navigate directly. The bar's order and
-      // visibility still come from manage-nav-bar.html; opening a second
-      // navigation sheet here made the selected page appear blank until the
-      // user tapped again inside the popup.
-      navigateToAppPage(href);
+      const navigationSheetEnabled = typeof state !== "undefined" && Boolean(state.preferences?.navigationSheet);
+      if (navigationSheetEnabled) {
+        openNavigationSheet();
+      } else {
+        navigateToAppPage(href);
+      }
     });
   });
+  // Page links outside the bottom bar (Settings subpages, About pages,
+  // metadata sources, and detail links) must also become part of the app
+  // stack before the browser performs the normal navigation.
+  if (document.body.dataset.internalLinkHistoryBound !== "true") {
+    document.body.dataset.internalLinkHistoryBound = "true";
+    document.addEventListener("click", event => {
+      const link = event.target.closest("a[href]");
+      if (!link || link.dataset.tab || link.target === "_blank" || link.hasAttribute("download")) return;
+      const href = link.getAttribute("href") || "";
+      if (!href || href.startsWith("#") || /^(https?:|mailto:|tel:|data:)/i.test(href)) return;
+      saveCurrentPageScroll();
+      recordCurrentPage();
+    }, true);
+  }
   setupSwipeBackGesture();
 }
 
 function navigateToAppPage(href) {
   recordCurrentPage();
-  history.pushState({ squashdbPage: href }, "", href);
   window.location.href = href;
 }
 
@@ -120,12 +177,25 @@ function setupPageBackButtons() {
 }
 
 function navigateBackWithinApp(fallback = "settings.html") {
+  // Full-page navigation already creates the correct WebView history entry.
+  // Prefer it so a back action returns to the exact previous page instead of
+  // selecting an older route from the session stack.
+  if (window.history.length > 1) {
+    animatePredictiveBack(() => window.history.back());
+    return true;
+  }
+
   const stack = getAppPageStack();
-  const current = getCurrentPagePath();
-  if (stack[stack.length - 1] === current) stack.pop();
+  const current = getCurrentPagePathWithQuery();
+  const currentPath = getCurrentPagePath();
+  if (stack[stack.length - 1] === current || stack[stack.length - 1] === currentPath) stack.pop();
   const previous = stack.pop();
   setAppPageStack(stack);
-  animatePredictiveBack(() => { window.location.href = previous || fallback; });
+  animatePredictiveBack(() => {
+    if (previous) {
+      window.location.href = previous;
+    } else window.location.href = fallback;
+  });
   return true;
 }
 
@@ -177,19 +247,16 @@ function setupHardwareBackButton() {
   if (!document.body || document.body.dataset.boundHardwareBack) return;
   document.body.dataset.boundHardwareBack = "true";
   document.addEventListener("backbutton", handler, false);
-  window.addEventListener("popstate", (e) => {
-    const path = getCurrentPagePath();
-    const stack = getAppPageStack();
-    if (e.state?.squashdbPage === path || stack.length > 1) {
-      navigateBackWithinApp("dashboard.html");
-    }
-  });
+  // Browser history already performs the correct back navigation after a
+  // normal swipe/back action. Do not also pop the app stack here, otherwise
+  // one gesture can skip the previous page and land on Dashboard.
+  window.addEventListener("popstate", closeNavigationSheet);
 
   const capApp = window.Capacitor?.Plugins?.App;
   if (capApp?.addListener) {
     capApp.addListener("backButton", () => {
-      const current = getCurrentPagePath();
-      const stack = getAppPageStack();
+    const current = getCurrentPagePath();
+    const stack = getAppPageStack();
       const atRoot = current === "dashboard.html" && stack.length <= 1;
       if (atRoot) {
         if (capApp.exitApp) capApp.exitApp();

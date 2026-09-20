@@ -37,7 +37,7 @@ function loadDiscoverSessionState() {
 }
 
 function discoverIsOnline() {
-  return typeof navigator === "undefined" || navigator.onLine !== false;
+  return typeof squashDbIsOffline !== "function" || !squashDbIsOffline();
 }
 
 function getNativeHttpPlugin() {

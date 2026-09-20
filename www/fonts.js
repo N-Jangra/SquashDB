@@ -31,7 +31,7 @@ const FONT_CHOICES = {
 };
 
 function fontIsOnline() {
-  return typeof navigator === "undefined" || navigator.onLine !== false;
+  return typeof squashDbIsOffline !== "function" || !squashDbIsOffline();
 }
 
 // Applies the currently saved font immediately for system fonts, or
