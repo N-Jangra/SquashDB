@@ -19,6 +19,58 @@ let showDetailState = {
   watchedEpisodeIds: []
 };
 
+function buildSyntheticAnimeEpisodes(totalEpisodes, meta = {}) {
+  const count = Math.max(0, parseInt(totalEpisodes) || 0);
+  if (!count) return [];
+  const summaryBase = meta.summary || meta.description || "";
+  const runtime = meta.runtime || meta.episodeRuntime || null;
+  const image = meta.thumbnail ? { medium: meta.thumbnail, original: meta.thumbnail } : null;
+  const sourceLabel = meta.sourceLabel || "Anime";
+  return Array.from({ length: count }, (_, index) => ({
+    id: index + 1,
+    season: 1,
+    number: index + 1,
+    name: `Episode ${index + 1}`,
+    runtime,
+    airdate: "",
+    summary: summaryBase ? `${summaryBase}${count > 1 ? ` This is episode ${index + 1} of ${count}.` : ""}` : `Episode ${index + 1} of ${sourceLabel}.`,
+    image,
+    rating: null
+  }));
+}
+
+async function fetchJikanAnimeEpisodes(malId, fallbackThumbnail = "") {
+  const episodes = [];
+  let page = 1;
+  let hasNextPage = true;
+
+  while (hasNextPage && page <= 5) {
+    const res = await fetch(`https://api.jikan.moe/v4/anime/${malId}/episodes?page=${page}`);
+    if (!res.ok) break;
+    const data = await res.json();
+    const items = Array.isArray(data?.data) ? data.data : [];
+    items.forEach(ep => {
+      episodes.push({
+        id: ep.mal_id ?? episodes.length + 1,
+        season: 1,
+        number: ep.mal_id ?? episodes.length + 1,
+        name: ep.title || `Episode ${ep.mal_id ?? episodes.length + 1}`,
+        runtime: ep.duration || null,
+        airdate: ep.aired ? String(ep.aired).slice(0, 10) : "",
+        summary: ep.synopsis || "",
+        image: fallbackThumbnail ? { medium: fallbackThumbnail, original: fallbackThumbnail } : null,
+        rating: null,
+        filler: Boolean(ep.filler),
+        recap: Boolean(ep.recap)
+      });
+    });
+    hasNextPage = Boolean(data?.pagination?.has_next_page);
+    page += 1;
+  }
+
+  return episodes;
+}
+
 function formatRuntimeHM(minutes) {
   const total = Math.round(minutes) || 0;
   if (!total) return "";
@@ -31,6 +83,46 @@ function formatRuntimeHM(minutes) {
 
 function showDetailIsOnline() {
   return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+function getNativeHttpPlugin() {
+  return window.CapacitorHttp
+    || window.Capacitor?.Plugins?.Http
+    || window.Capacitor?.Plugins?.CapacitorHttp
+    || null;
+}
+
+async function fetchJsonPortable(url, init = {}) {
+  const plugin = getNativeHttpPlugin();
+  if (plugin?.get) {
+    const response = await plugin.get({ url, headers: init.headers || {} });
+    return response?.data ?? null;
+  }
+  if (plugin?.request) {
+    const response = await plugin.request({
+      url,
+      method: init.method || "GET",
+      headers: init.headers || {},
+      data: init.body || null,
+      responseType: "json"
+    });
+    return response?.data ?? null;
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+    const proxyUrl = new URL("/proxy", window.location.origin);
+    proxyUrl.searchParams.set("url", url);
+    try {
+      const res = await fetch(proxyUrl.toString(), init);
+      if (res.ok) return res.json();
+    } catch (err) {
+      // fall through to direct fetch
+    }
+  }
+
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 function getUrlParams() {
@@ -55,14 +147,27 @@ async function initShowDetail() {
     showDetailState.provider = item.metadataSource || (item.tvmazeShowId ? "tvmaze" : "");
     showDetailState.watchedEpisodeIds = item.watchedEpisodeIds || [];
 
-    if (EPISODE_TRACKED_CATEGORIES.includes(item.category) && item.tvmazeShowId) {
+    if (EPISODE_TRACKED_CATEGORIES.includes(item.category) && (item.tvmazeShowId || item.metadataSource === "anilist" || item.metadataSource === "jikan" || item.metadataSource === "kitsu")) {
       if (Array.isArray(item.episodesCache) && item.episodesCache.length) {
         applyEpisodesToState(item.episodesCache, item);
       }
       if (showDetailIsOnline()) {
         try {
-          await refreshTvmazeItemMetadata(item);
-          await fetchAndCacheEpisodes(item.tvmazeShowId, item);
+          if (item.tvmazeShowId) {
+            await refreshTvmazeItemMetadata(item);
+            await fetchAndCacheEpisodes(item.tvmazeShowId, item);
+          } else if (item.metadataSource === "jikan" && item.providerId) {
+            const episodes = await fetchJikanAnimeEpisodes(item.providerId, item.thumbnail || "");
+            if (episodes.length) applyEpisodesToState(episodes, item);
+          } else if (item.metadataSource === "anilist" || item.metadataSource === "kitsu") {
+            const episodes = buildSyntheticAnimeEpisodes(item.totalEpisodes, {
+              summary: item.summary,
+              runtime: item.episodeRuntime,
+              thumbnail: item.thumbnail,
+              sourceLabel: item.title || "Anime"
+            });
+            if (episodes.length) applyEpisodesToState(episodes, item);
+          }
         } catch (err) {
           console.warn("Could not refresh episode list", err);
         }
@@ -89,12 +194,25 @@ async function initShowDetail() {
     return;
   }
 
-  // Online, not-yet-tracked flow (from Discover)
-  showDetailState.mode = "online";
+  // Online, not-yet-tracked flow (from Discover/Sources search). If this exact
+  // provider+providerId is already tracked locally, redirect to that item
+  // instead of creating a duplicate (legacy tvmaze items saved before
+  // `providerId` existed are matched via their `tvmazeShowId` fallback).
   const category = params.get("category") || "series";
   const provider = params.get("provider");
   const providerId = params.get("providerId");
   const title = params.get("title") || "";
+
+  const existingItem = state.items.find(i => {
+    if (provider === "tvmaze" && i.tvmazeShowId && String(i.tvmazeShowId) === String(providerId)) return true;
+    return i.metadataSource === provider && i.providerId != null && String(i.providerId) === String(providerId);
+  });
+  if (existingItem) {
+    window.location.href = `show-detail.html?source=local&itemId=${encodeURIComponent(existingItem.id)}`;
+    return;
+  }
+
+  showDetailState.mode = "online";
   showDetailState.category = category;
   showDetailState.provider = provider;
 
@@ -122,6 +240,7 @@ async function initShowDetail() {
         meta: [show?.premiered ? show.premiered.slice(0, 4) : "", genres.join(", "), runtime ? `~${formatRuntimeHM(runtime)}/ep` : "", network].filter(Boolean).join(" · "),
         summary: stripHtml(show?.summary || ""),
         tvmazeShowId: providerId,
+        providerId,
         episodeRuntime: runtime,
         network,
         genres,
@@ -184,7 +303,8 @@ async function initShowDetail() {
         meta: [releaseYear, genreLabel, runtime ? formatRuntimeHM(runtime) : ""].filter(Boolean).join(" · "),
         summary,
         playtime: runtime,
-        genres
+        genres,
+        providerId
       };
       renderShowDetailHeader(showDetailState.show);
       renderStatusPicker(null);
@@ -209,7 +329,8 @@ async function initShowDetail() {
         title: work?.title || title,
         thumbnail,
         meta: [publishYear].filter(Boolean).join(" · "),
-        summary
+        summary,
+        providerId
       };
       renderShowDetailHeader(showDetailState.show);
       renderStatusPicker(null);
@@ -220,6 +341,96 @@ async function initShowDetail() {
     } catch (err) {
       console.warn("Could not load book details", err);
       renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load book details." });
+    }
+  } else if (provider === "anilist" || provider === "jikan" || provider === "kitsu") {
+    try {
+      let show = null;
+      if (provider === "anilist") {
+        const query = `query($id:Int){Media(id:$id,type:ANIME){title{romaji english} coverImage{large medium} description(asHtml:false) episodes averageScore duration startDate{year} status}}`;
+        const res = await fetch("https://graphql.anilist.co", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ query, variables: { id: Number(providerId) } })
+        });
+        const data = res.ok ? await res.json() : null;
+        const media = data?.data?.Media;
+        if (media) {
+          const totalEpisodes = parseInt(media.episodes) || 0;
+          show = {
+            title: media.title?.english || media.title?.romaji || title,
+            thumbnail: media.coverImage?.large || media.coverImage?.medium || "",
+            meta: [media.startDate?.year || "", totalEpisodes ? `${totalEpisodes} episodes` : "", media.duration ? `~${media.duration} min/ep` : ""].filter(Boolean).join(" · "),
+            summary: media.description || "",
+            providerId,
+            totalEpisodes,
+            episodeRuntime: media.duration || 0,
+            productionStatus: media.status || ""
+          };
+        }
+      } else if (provider === "jikan") {
+        const res = await fetch(`https://api.jikan.moe/v4/anime/${providerId}/full`);
+        const data = res.ok ? await res.json() : null;
+        const entry = data?.data;
+        if (entry) {
+          const runtime = parseInt(String(entry.duration || "").match(/\d+/)?.[0] || "") || 0;
+          show = {
+            title: entry.title || title,
+            thumbnail: entry.images?.jpg?.large_image_url || entry.images?.jpg?.image_url || "",
+            meta: [entry.aired?.from ? String(entry.aired.from).slice(0, 4) : "", entry.episodes ? `${entry.episodes} episodes` : "", runtime ? `~${runtime} min/ep` : ""].filter(Boolean).join(" · "),
+            summary: stripHtml(entry.synopsis || ""),
+            providerId,
+            totalEpisodes: parseInt(entry.episodes) || 0,
+            episodeRuntime: runtime,
+            productionStatus: entry.status || ""
+          };
+        }
+      } else if (provider === "kitsu") {
+        const res = await fetch(`https://kitsu.io/api/edge/anime/${providerId}`, { headers: { Accept: "application/vnd.api+json" } });
+        const data = res.ok ? await res.json() : null;
+        const attrs = data?.data?.attributes || {};
+        if (data?.data) {
+          show = {
+            title: attrs.canonicalTitle || attrs.titles?.en || title,
+            thumbnail: attrs.posterImage?.large || attrs.posterImage?.medium || attrs.posterImage?.small || "",
+            meta: [attrs.startDate ? attrs.startDate.slice(0, 4) : "", attrs.episodeCount ? `${attrs.episodeCount} episodes` : "", attrs.episodeLength ? `~${attrs.episodeLength} min/ep` : ""].filter(Boolean).join(" · "),
+            summary: attrs.synopsis || "",
+            providerId,
+            totalEpisodes: parseInt(attrs.episodeCount) || 0,
+            episodeRuntime: parseInt(attrs.episodeLength) || 0,
+            productionStatus: attrs.status || ""
+          };
+        }
+      }
+
+      if (!show) {
+        renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load anime details." });
+        return;
+      }
+
+      showDetailState.show = show;
+      if (provider === "jikan" && show.providerId) {
+        const episodes = await fetchJikanAnimeEpisodes(show.providerId, show.thumbnail || "");
+        if (episodes.length) {
+          applyEpisodesToState(episodes, null);
+        } else {
+          showDetailState.seasons = show.totalEpisodes > 0 ? [1] : [];
+          showDetailState.episodes = buildSyntheticAnimeEpisodes(show.totalEpisodes, show);
+          showDetailState.activeSeason = showDetailState.seasons[0] || null;
+        }
+      } else {
+        showDetailState.seasons = show.totalEpisodes > 0 ? [1] : [];
+        showDetailState.episodes = buildSyntheticAnimeEpisodes(show.totalEpisodes, show);
+        showDetailState.activeSeason = showDetailState.seasons[0] || null;
+      }
+      renderShowDetailHeader(showDetailState.show);
+      renderStatusPicker(null);
+      renderAddToListPicker();
+      renderSeasonSection();
+      renderRatingWidget(null);
+      renderNotesField(null);
+    } catch (err) {
+      console.warn("Could not load anime details", err);
+      renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load anime details." });
     }
   } else if (provider === "rawg") {
     try {
@@ -233,7 +444,8 @@ async function initShowDetail() {
         thumbnail: game?.background_image || "",
         meta: [releaseYear, genres.join(", "), game?.metacritic ? `Metacritic ${game.metacritic}` : ""].filter(Boolean).join(" · "),
         summary: game?.description_raw || "",
-        genres
+        genres,
+        providerId
       };
       renderShowDetailHeader(showDetailState.show);
       renderStatusPicker(null);
@@ -242,6 +454,24 @@ async function initShowDetail() {
       renderNotesField(null);
     } catch (err) {
       console.warn("Could not load game details", err);
+      renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load game details." });
+    }
+  } else if (provider === "freetogame") {
+    try {
+      const games = await fetchJsonPortable("https://www.freetogame.com/api/games");
+      const game = (Array.isArray(games) ? games : []).find(g => String(g.id) === String(providerId)) || null;
+      const genres = [game?.genre, game?.platform, game?.publisher].filter(Boolean).slice(0, 3);
+      showDetailState.show = {
+        title: game?.title || title,
+        thumbnail: game?.thumbnail || "",
+        meta: [game?.release_date || "", genres.join(", "), game?.developer || ""].filter(Boolean).join(" · "),
+        summary: game?.short_description || "",
+        genres,
+        providerId
+      };
+      renderSimpleShowDetail();
+    } catch (err) {
+      console.warn("Could not load FreeToGame details", err);
       renderShowDetailHeader({ title, thumbnail: "", meta: "Failed to load game details." });
     }
   } else if (provider === "anilist") {
@@ -262,7 +492,8 @@ async function initShowDetail() {
         thumbnail: media?.coverImage?.large || "",
         meta: [media?.startDate?.year, genres.join(", "), unitLabel, media?.status || ""].filter(Boolean).join(" · "),
         summary: stripHtml(media?.description || ""),
-        genres
+        genres,
+        providerId
       };
       renderSimpleShowDetail();
     } catch (err) {
@@ -283,7 +514,8 @@ async function initShowDetail() {
         thumbnail: entry?.images?.jpg?.large_image_url || entry?.images?.jpg?.image_url || "",
         meta: [year, genres.join(", "), unitLabel, entry?.score ? `★ ${entry.score}` : ""].filter(Boolean).join(" · "),
         summary: entry?.synopsis || "",
-        genres
+        genres,
+        providerId
       };
       renderSimpleShowDetail();
     } catch (err) {
@@ -301,7 +533,8 @@ async function initShowDetail() {
         title: attrs?.canonicalTitle || attrs?.titles?.en || title,
         thumbnail: attrs?.posterImage?.large || attrs?.posterImage?.medium || "",
         meta: [attrs?.startDate ? attrs.startDate.slice(0, 4) : "", unitLabel, attrs?.averageRating ? `★ ${(attrs.averageRating / 10).toFixed(1)}` : ""].filter(Boolean).join(" · "),
-        summary: attrs?.synopsis || attrs?.description || ""
+        summary: attrs?.synopsis || attrs?.description || "",
+        providerId
       };
       renderSimpleShowDetail();
     } catch (err) {
@@ -318,7 +551,8 @@ async function initShowDetail() {
         thumbnail: (info?.imageLinks?.thumbnail || info?.imageLinks?.smallThumbnail || "").replace("http://", "https://"),
         meta: [info?.publishedDate ? info.publishedDate.slice(0, 4) : "", info?.authors?.[0] || "", info?.pageCount ? `${info.pageCount} pages` : ""].filter(Boolean).join(" · "),
         summary: info?.description || "",
-        genres: (info?.categories || []).slice(0, 3)
+        genres: (info?.categories || []).slice(0, 3),
+        providerId
       };
       renderSimpleShowDetail();
     } catch (err) {
@@ -336,7 +570,8 @@ async function initShowDetail() {
         thumbnail: data?.Poster && data.Poster !== "N/A" ? data.Poster : "",
         meta: [data?.Year, genres.join(", "), data?.Runtime && data.Runtime !== "N/A" ? data.Runtime : "", data?.imdbRating && data.imdbRating !== "N/A" ? `IMDb ${data.imdbRating}` : ""].filter(Boolean).join(" · "),
         summary: data?.Plot && data.Plot !== "N/A" ? data.Plot : "",
-        genres
+        genres,
+        providerId
       };
       renderSimpleShowDetail();
     } catch (err) {
@@ -357,7 +592,8 @@ async function initShowDetail() {
         thumbnail: data?.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : "",
         meta: [releaseDate ? releaseDate.slice(0, 4) : "", genres.join(", "), runtime ? formatRuntimeHM(runtime) : "", data?.vote_average ? `★ ${data.vote_average.toFixed(1)}` : ""].filter(Boolean).join(" · "),
         summary: data?.overview || "",
-        genres
+        genres,
+        providerId
       };
       renderSimpleShowDetail();
     } catch (err) {
@@ -440,45 +676,35 @@ function applyEpisodesToState(episodes, existingItem) {
   }
 }
 
-// Topbar 3-dot menu — only shown once the item exists locally, since its
-// actions (delete) only make sense for a tracked entry.
+// Topbar delete button: only shown for tracked entries still in Watchlist or
+// In Progress — once a title is On Hold/Dropped/Completed the delete action
+// moves elsewhere (this page keeps it out of the way to avoid accidental
+// removal of finished progress).
+const DELETABLE_STATUSES = ["Watchlist", "In Progress", "Reading", "On Hold", "Dropped", "Completed", "Plan to Read", "Playing", "Backlog"];
+
 function updateShowDetailMenu() {
-  const btn = document.getElementById("show-detail-menu-btn");
+  const btn = document.getElementById("show-detail-delete-btn-top");
   if (!btn) return;
-  btn.style.display = showDetailState.itemId ? "flex" : "none";
+
+  const item = state.items.find(i => i.id === showDetailState.itemId);
+  const canDelete = !!item && DELETABLE_STATUSES.includes(item.status);
+  btn.style.display = canDelete ? "flex" : "none";
+
   if (!btn.dataset.bound) {
     btn.dataset.bound = "true";
-    btn.addEventListener("click", openShowDetailMenu);
+    btn.addEventListener("click", confirmDeleteShowDetailItem);
   }
+  if (window.lucide) lucide.createIcons();
 }
 
-function openShowDetailMenu() {
-  const modal = document.getElementById("picker-modal");
-  const list = document.getElementById("picker-options-list");
-  const titleEl = document.getElementById("picker-modal-title");
-  if (!modal || !list) return;
-
-  if (titleEl) titleEl.textContent = "Options";
-  list.innerHTML = "";
-
-  const delBtn = document.createElement("button");
-  delBtn.type = "button";
-  delBtn.className = "picker-option";
-  delBtn.innerHTML = `<i data-lucide="trash-2" class="picker-option-check" style="visibility:visible;"></i><span>Delete from list</span>`;
-  delBtn.addEventListener("click", () => {
-    closeSettingsPicker();
-    const item = state.items.find(i => i.id === showDetailState.itemId);
-    if (!item) return;
-    if (!confirm(`Delete "${item.title}" from your list? This cannot be undone.`)) return;
-    state.items = state.items.filter(i => i.id !== showDetailState.itemId);
-    saveData();
-    flushPendingSave();
-    navigateBackWithinApp("dashboard.html");
-  });
-  list.appendChild(delBtn);
-
-  modal.classList.add("active");
-  lucide.createIcons();
+function confirmDeleteShowDetailItem() {
+  const item = state.items.find(i => i.id === showDetailState.itemId);
+  if (!item) return;
+  if (!confirm(`Delete "${item.title}" from your list? This cannot be undone.`)) return;
+  state.items = state.items.filter(i => i.id !== showDetailState.itemId);
+  saveData();
+  flushPendingSave();
+  navigateBackWithinApp("dashboard.html");
 }
 
 // Shared render for providers with no episode/season feed — just header +
@@ -504,8 +730,19 @@ function stripHtml(html) {
 function renderShowDetailHeader(show) {
   document.getElementById("show-detail-topbar-title").textContent = show.title || "";
   document.getElementById("show-detail-meta").textContent = show.meta || "";
-  document.getElementById("show-detail-thumb-wrap").innerHTML =
-    thumbnailOrPlaceholder(show.thumbnail, "show-detail-thumb");
+
+  const categoryEl = document.getElementById("show-detail-topbar-category");
+  if (categoryEl) categoryEl.textContent = CATEGORIES[showDetailState.category]?.label || "";
+
+  const thumbWrap = document.getElementById("show-detail-thumb-wrap");
+  thumbWrap.innerHTML = thumbnailOrPlaceholder(show.thumbnail, "show-detail-thumb");
+  if (show.thumbnail) {
+    thumbWrap.classList.add("show-detail-poster-clickable");
+    thumbWrap.onclick = () => openEpisodeImageModal(show.thumbnail);
+  } else {
+    thumbWrap.classList.remove("show-detail-poster-clickable");
+    thumbWrap.onclick = null;
+  }
 
   const summaryEl = document.getElementById("show-detail-summary");
   if (summaryEl) {
@@ -554,10 +791,18 @@ function productionStatusSlug(status) {
   return "unknown";
 }
 
+function showTrackingGroup() {
+  const title = document.getElementById("show-detail-tracking-title");
+  const group = document.getElementById("show-detail-tracking-group");
+  if (title) title.style.display = "block";
+  if (group) group.style.display = "block";
+}
+
 function renderAddToListPicker() {
-  const group = document.getElementById("show-detail-addlist-group");
+  const row = document.getElementById("show-detail-addlist-row");
+  const valueEl = document.getElementById("show-detail-addlist-value");
   const select = document.getElementById("show-detail-addlist");
-  if (!group || !select) return;
+  if (!row || !select || !valueEl) return;
 
   const enabledCategories = getEnabledOrderedCategories();
   const options = enabledCategories.includes(showDetailState.category)
@@ -566,10 +811,11 @@ function renderAddToListPicker() {
   select.innerHTML = `<option value="">Select a list…</option>` +
     options.map(cat => `<option value="${cat}">${CATEGORIES[cat].label}</option>`).join("");
   select.value = showDetailState.category || "";
-  group.style.display = "block";
+  valueEl.textContent = CATEGORIES[showDetailState.category]?.label || "Select a list…";
+  row.style.display = "flex";
+  showTrackingGroup();
 
-  select.onchange = () => {
-    const cat = select.value;
+  const applyChoice = (cat) => {
     if (!cat || !CATEGORIES[cat]) return;
     showDetailState.category = cat;
     ensureLocalItem({ category: cat });
@@ -577,13 +823,39 @@ function renderAddToListPicker() {
     renderAddToListPicker();
     renderSeasonSection();
   };
+
+  select.onchange = () => applyChoice(select.value);
+
+  row.onclick = () => {
+    const modal = document.getElementById("picker-modal");
+    const list = document.getElementById("picker-options-list");
+    const titleEl = document.getElementById("picker-modal-title");
+    if (!modal || !list) return;
+    if (titleEl) titleEl.textContent = "Add to list";
+    list.innerHTML = "";
+    options.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `picker-option${cat === showDetailState.category ? " active" : ""}`;
+      btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${CATEGORIES[cat].label}</span>`;
+      btn.addEventListener("click", () => {
+        closeSettingsPicker();
+        applyChoice(cat);
+      });
+      list.appendChild(btn);
+    });
+    modal.classList.add("active");
+    lucide.createIcons();
+  };
 }
 
 function renderRatingWidget(existingItem) {
+  const title = document.getElementById("show-detail-rating-title");
   const group = document.getElementById("show-detail-rating-group");
   const container = document.getElementById("show-detail-rating-widget");
   if (!group || !container) return;
 
+  if (title) title.style.display = "block";
   group.style.display = "block";
   const currentRating = existingItem?.rating || 0;
   const format = state.preferences.ratingFormat || "5-stars";
@@ -617,10 +889,12 @@ function renderRatingWidget(existingItem) {
 }
 
 function renderNotesField(existingItem) {
+  const title = document.getElementById("show-detail-notes-title");
   const group = document.getElementById("show-detail-notes-group");
   const textarea = document.getElementById("show-detail-notes");
   if (!group || !textarea) return;
 
+  if (title) title.style.display = "block";
   group.style.display = "block";
   textarea.value = existingItem?.notes || "";
   textarea.onchange = () => {
@@ -629,38 +903,68 @@ function renderNotesField(existingItem) {
 }
 
 function renderStatusPicker(existingItem) {
-  const group = document.getElementById("show-detail-status-group");
+  const row = document.getElementById("show-detail-status-row");
+  const valueEl = document.getElementById("show-detail-status-value");
   const select = document.getElementById("show-detail-status");
-  if (!group || !select) return;
+  if (!row || !select || !valueEl) return;
 
   const category = showDetailState.category;
   const config = CATEGORIES[category];
   if (!config) return;
 
   select.innerHTML = config.statuses.map(st => `<option value="${st}">${st}</option>`).join("");
-  select.value = existingItem?.status || config.statuses[0];
-  group.style.display = "block";
+  const currentStatus = existingItem?.status || config.statuses[0];
+  select.value = currentStatus;
+  valueEl.textContent = currentStatus;
+  row.style.display = "flex";
+  showTrackingGroup();
 
-  renderCompletionDatePicker(existingItem, select.value);
+  renderCompletionDatePicker(existingItem, currentStatus);
 
-  select.onchange = () => {
-    renderCompletionDatePicker(existingItem, select.value);
+  const applyChoice = (status) => {
+    select.value = status;
+    valueEl.textContent = status;
+    renderCompletionDatePicker(existingItem, status);
     const compDateInput = document.getElementById("show-detail-compdate");
-    ensureLocalItem({ status: select.value, completionDate: compDateInput ? compDateInput.value : (existingItem?.completionDate || "") });
+    ensureLocalItem({ status, completionDate: compDateInput ? compDateInput.value : (existingItem?.completionDate || "") });
+  };
+
+  select.onchange = () => applyChoice(select.value);
+
+  row.onclick = () => {
+    const modal = document.getElementById("picker-modal");
+    const list = document.getElementById("picker-options-list");
+    const titleEl = document.getElementById("picker-modal-title");
+    if (!modal || !list) return;
+    if (titleEl) titleEl.textContent = "Status";
+    list.innerHTML = "";
+    config.statuses.forEach(st => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `picker-option${st === select.value ? " active" : ""}`;
+      btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${st}</span>`;
+      btn.addEventListener("click", () => {
+        closeSettingsPicker();
+        applyChoice(st);
+      });
+      list.appendChild(btn);
+    });
+    modal.classList.add("active");
+    lucide.createIcons();
   };
 }
 
 function renderCompletionDatePicker(existingItem, status) {
-  const group = document.getElementById("show-detail-compdate-group");
+  const row = document.getElementById("show-detail-compdate-row");
   const input = document.getElementById("show-detail-compdate");
-  if (!group || !input) return;
+  if (!row || !input) return;
 
   if (status !== "Completed") {
-    group.style.display = "none";
+    row.style.display = "none";
     return;
   }
 
-  group.style.display = "block";
+  row.style.display = "flex";
   if (!input.value) {
     input.value = existingItem?.completionDate || new Date().toISOString().split("T")[0];
   }
@@ -672,8 +976,9 @@ function renderCompletionDatePicker(existingItem, status) {
 
 function renderSeasonSection() {
   const section = document.getElementById("show-detail-season-section");
-  const seasonSelect = document.getElementById("show-detail-season-select");
-  if (!section || !seasonSelect) return;
+  const seasonBtn = document.getElementById("show-detail-season-select");
+  const seasonBtnLabel = document.getElementById("show-detail-season-btn-label");
+  if (!section || !seasonBtn || !seasonBtnLabel) return;
 
   if (!EPISODE_TRACKED_CATEGORIES.includes(showDetailState.category) || showDetailState.seasons.length === 0) {
     section.style.display = "none";
@@ -681,11 +986,30 @@ function renderSeasonSection() {
   }
 
   section.style.display = "block";
-  seasonSelect.innerHTML = showDetailState.seasons.map(s => `<option value="${s}">Season ${s}</option>`).join("");
-  seasonSelect.value = showDetailState.activeSeason;
-  seasonSelect.onchange = () => {
-    showDetailState.activeSeason = parseInt(seasonSelect.value, 10);
-    renderEpisodeList();
+  seasonBtnLabel.textContent = `Season ${showDetailState.activeSeason}`;
+
+  seasonBtn.onclick = () => {
+    const modal = document.getElementById("picker-modal");
+    const list = document.getElementById("picker-options-list");
+    const titleEl = document.getElementById("picker-modal-title");
+    if (!modal || !list) return;
+    if (titleEl) titleEl.textContent = "Select season";
+    list.innerHTML = "";
+    showDetailState.seasons.forEach(s => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `picker-option${s === showDetailState.activeSeason ? " active" : ""}`;
+      btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>Season ${s}</span>`;
+      btn.addEventListener("click", () => {
+        closeSettingsPicker();
+        showDetailState.activeSeason = s;
+        seasonBtnLabel.textContent = `Season ${s}`;
+        renderEpisodeList();
+      });
+      list.appendChild(btn);
+    });
+    modal.classList.add("active");
+    lucide.createIcons();
   };
 
   renderEpisodeList();
@@ -700,34 +1024,81 @@ function renderEpisodeList() {
 
   list.innerHTML = episodes.map(ep => {
     const summary = stripHtml(ep.summary || "");
+    const thumbUrl = ep.image?.medium || ep.image?.original || "";
     return `
-    <div class="show-detail-episode-row" data-episode-id="${ep.id}">
+    <div class="show-detail-episode-row${summary ? " has-summary" : ""}" data-episode-id="${ep.id}">
       <div class="show-detail-episode-row-main">
-        ${thumbnailOrPlaceholder(ep.image?.medium || ep.image?.original || "", "show-detail-episode-thumb")}
+        <div class="show-detail-episode-thumb-btn" data-thumb-url="${thumbUrl ? encodeURIComponent(ep.image?.original || thumbUrl) : ""}">
+          ${thumbnailOrPlaceholder(thumbUrl, "show-detail-episode-thumb")}
+        </div>
         <div class="show-detail-episode-body">
           <span class="show-detail-episode-title">${ep.number}. ${ep.name || "Untitled"}</span>
           <span class="show-detail-episode-meta">
             ${ep.airdate ? `<span><i data-lucide="calendar"></i> ${ep.airdate}</span>` : ""}
             ${ep.runtime ? `<span><i data-lucide="clock"></i> ${ep.runtime}m</span>` : ""}
             ${ep.rating?.average ? `<span><i data-lucide="star"></i> ${ep.rating.average}</span>` : ""}
+            ${summary ? `<i data-lucide="chevron-down" class="show-detail-episode-expand-caret"></i>` : ""}
           </span>
         </div>
-        <input type="checkbox" class="show-detail-episode-checkbox" data-episode-id="${ep.id}" ${watchedSet.has(ep.id) ? "checked" : ""}>
+        <button type="button" class="show-detail-episode-check${watchedSet.has(ep.id) ? " checked" : ""}" data-episode-id="${ep.id}" aria-label="Mark episode watched"></button>
       </div>
       ${summary ? `<p class="show-detail-episode-summary">${summary}</p>` : ""}
     </div>
   `;
   }).join("");
 
-  list.querySelectorAll(".show-detail-episode-checkbox").forEach(checkbox => {
-    checkbox.addEventListener("change", () => {
-      const epId = parseInt(checkbox.dataset.episodeId, 10);
-      toggleEpisodeWatched(epId, checkbox.checked);
+  list.querySelectorAll(".show-detail-episode-check").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const epId = parseInt(btn.dataset.episodeId, 10);
+      const nowWatched = !btn.classList.contains("checked");
+      toggleEpisodeWatched(epId, nowWatched);
+    });
+  });
+
+  list.querySelectorAll(".show-detail-episode-thumb-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const url = btn.dataset.thumbUrl;
+      if (url) openEpisodeImageModal(decodeURIComponent(url));
+    });
+  });
+
+  list.querySelectorAll(".show-detail-episode-row.has-summary").forEach(row => {
+    row.addEventListener("click", () => {
+      row.classList.toggle("expanded");
     });
   });
 
   if (window.lucide) lucide.createIcons();
 }
+
+function openEpisodeImageModal(url) {
+  const modal = document.getElementById("episode-image-modal");
+  const img = document.getElementById("episode-image-modal-img");
+  if (!modal || !img) return;
+  img.src = url;
+  modal.classList.add("active");
+}
+
+function closeEpisodeImageModal() {
+  const modal = document.getElementById("episode-image-modal");
+  const img = document.getElementById("episode-image-modal-img");
+  if (!modal) return;
+  modal.classList.remove("active");
+  if (img) img.src = "";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const modal = document.getElementById("episode-image-modal");
+  const closeBtn = document.getElementById("episode-image-modal-close");
+  if (closeBtn) closeBtn.addEventListener("click", closeEpisodeImageModal);
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeEpisodeImageModal();
+    });
+  }
+});
 
 const BOOK_TRACKED_CATEGORIES = ["manga", "novel"];
 
@@ -857,6 +1228,7 @@ function ensureLocalItem(extraFields) {
     if (itemIndex !== -1) {
       state.items[itemIndex] = { ...state.items[itemIndex], ...extraFields };
       saveData();
+      updateShowDetailMenu();
     }
     return;
   }
@@ -879,6 +1251,7 @@ function ensureLocalItem(extraFields) {
     network: show.network || "",
     genres: show.genres || [],
     metadataSource: showDetailState.provider || "",
+    providerId: show.providerId || null,
     productionStatus: show.productionStatus || "",
     tvmazeShowId: show.tvmazeShowId || null,
     episodeRuntime: show.episodeRuntime || "",

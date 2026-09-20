@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SquashDB - App Info</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="index.css">
+  <script src="logcat.js"></script>
+  <script src="lucide.min.js"></script>
+</head>
+<body>
+  <div id="app-container">
+    <main>
+      <section class="tab-content active">
+        <div class="show-detail-topbar">
+          <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
+        </div>
+
+        <div class="settings-page-header">
+          <h2>App Info</h2>
+          <p>What SquashDB is, and how it works.</p>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">What it does</h4>
+          <p class="settings-note">
+            SquashDB is a personal watchlist and progress tracker for TV series, K-dramas, C-dramas, anime, movies,
+            manga, novels, and games. You track what you're watching, reading, or playing — status, ratings, notes,
+            episode/volume progress — and browse online metadata sources to look up new titles without leaving the app.
+          </p>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">How it works</h4>
+          <p class="settings-note">
+            Everything you track lives locally on your device — nothing is sent to a remote server. Data is stored
+            in your browser's local storage and, if you've chosen a backup folder in Settings → Backups, mirrored
+            as a plain folder tree (<code>squash-db/&lt;category&gt;/&lt;title&gt;/index.json</code> + a poster
+            thumbnail) that you can back up, sync, or inspect yourself.
+          </p>
+          <p class="settings-note">
+            Discovering new titles is optional and online-only: SquashDB calls public metadata APIs (TVmaze,
+            Wikidata, Open Library, AniList, and others you enable in Settings → Metadata Sources) directly from
+            the app. A title only gets saved to your list once you open it and change something — status, rating,
+            an episode tick, a note.
+          </p>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Offline-first</h4>
+          <p class="settings-note">
+            You can track everything by hand with Metadata Mode set to Offline — no internet connection needed.
+            Switching it to Online adds the ability to search and auto-fill details, but tracking itself never
+            requires a connection.
+          </p>
+        </div>
+
+        <div class="settings-section">
+          <h4 class="settings-section-title">Want the details?</h4>
+          <div class="settings-list">
+            <a class="settings-row settings-row-link" href="usage-guide.html">
+              <div class="settings-row-icon"><i data-lucide="book-open-check"></i></div>
+              <div class="settings-row-body">
+                <label>Usage Guide</label>
+                <span>Walkthroughs for every tab and setting.</span>
+              </div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+            <a class="settings-row settings-row-link" href="changelog.html">
+              <div class="settings-row-icon"><i data-lucide="history"></i></div>
+              <div class="settings-row-body">
+                <label>Changelog</label>
+                <span>What's new in each version.</span>
+              </div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+          </div>
+        </div>
+
+        <div class="page-back-actions">
+          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script>
+</body>
+</html>

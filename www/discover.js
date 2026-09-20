@@ -12,6 +12,16 @@ let discoverResults = [];
 let discoverCategory = null;
 let discoverRequestId = 0;
 
+// Per-category source filter — a narrower scope on top of the permanent
+// Settings → Metadata Sources enable/disable list, saved with the rest of
+// state.preferences so it survives app restarts. Keyed by category so
+// switching categories doesn't lose which sources were deselected for each
+// one. Absence of a category's key means "all enabled sources".
+function getDiscoverSourceFilter() {
+  normalizeMetadataSources();
+  return state.preferences.metadataSources.discoverSourceFilter;
+}
+
 function saveDiscoverSessionState(category, query) {
   try {
     sessionStorage.setItem("squashdb_discover_state", JSON.stringify({ category, query }));
@@ -28,6 +38,46 @@ function loadDiscoverSessionState() {
 
 function discoverIsOnline() {
   return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+function getNativeHttpPlugin() {
+  return window.CapacitorHttp
+    || window.Capacitor?.Plugins?.Http
+    || window.Capacitor?.Plugins?.CapacitorHttp
+    || null;
+}
+
+async function fetchJsonPortable(url, init = {}) {
+  const plugin = getNativeHttpPlugin();
+  if (plugin?.get) {
+    const response = await plugin.get({ url, headers: init.headers || {} });
+    return response?.data ?? null;
+  }
+  if (plugin?.request) {
+    const response = await plugin.request({
+      url,
+      method: init.method || "GET",
+      headers: init.headers || {},
+      data: init.body || null,
+      responseType: "json"
+    });
+    return response?.data ?? null;
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+    const proxyUrl = new URL("/proxy", window.location.origin);
+    proxyUrl.searchParams.set("url", url);
+    try {
+      const res = await fetch(proxyUrl.toString(), init);
+      if (res.ok) return res.json();
+    } catch (err) {
+      // fall through to direct fetch
+    }
+  }
+
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 // Best-effort category detection from a TVmaze show's language/genres, since
@@ -63,6 +113,10 @@ function tmdbAvailable() { return builtinSourceEnabled("tmdb") && Boolean(tmdbKe
 // {source, category, id, title, subtitle, thumbnail, rating} objects.
 function getDiscoverProviders(category) {
   const providers = [];
+
+  if (category === "game" && builtinSourceEnabled("freetogame")) {
+    providers.push({ key: "freetogame", suggest: fetchFreeToGameTopRated, search: searchFreeToGame });
+  }
 
   if (EPISODE_CATEGORIES_DISCOVER.includes(category)) {
     if (builtinSourceEnabled("tvmaze")) {
@@ -118,6 +172,9 @@ function getDiscoverProviders(category) {
     if (builtinSourceEnabled("googlebooks")) {
       providers.push({ key: "googlebooks", suggest: () => Promise.resolve([]), search: (q) => searchGoogleBooks(q, category) });
     }
+    if (category === "manga" && builtinSourceEnabled("mangadex")) {
+      providers.push({ key: "mangadex", suggest: () => Promise.resolve([]), search: searchMangaDex });
+    }
     if (category === "manga") {
       if (builtinSourceEnabled("anilist")) {
         providers.push({ key: "anilist", suggest: () => fetchAnilistTopRated("MANGA"), search: (q) => searchAnilist(q, "MANGA", "manga") });
@@ -140,7 +197,31 @@ function getDiscoverProviders(category) {
     }
   }
 
+  if (category === "anime" || category === "manga") {
+    if (builtinSourceEnabled("shikimori")) {
+      providers.push({ key: "shikimori", suggest: () => Promise.resolve([]), search: (q) => searchShikimori(q, category) });
+    }
+  }
+
+  const filter = getDiscoverSourceFilter();
+  const selected = filter[category];
+  if (Array.isArray(selected)) {
+    return providers.filter(p => selected.includes(p.key));
+  }
   return providers;
+}
+
+// All providers that could possibly serve this category, ignoring the saved
+// filter — used to populate the filter sheet's checkbox list (so a source the
+// user just deselected still shows up to be re-selected later).
+function getAllDiscoverProviderKeysForCategory(category) {
+  const filter = getDiscoverSourceFilter();
+  const selected = filter[category];
+  filter[category] = null;
+  const keys = getDiscoverProviders(category).map(p => p.key);
+  if (selected != null) filter[category] = selected;
+  else delete filter[category];
+  return [...new Set(keys)];
 }
 
 function updateDiscoverOnlineNotice() {
@@ -152,11 +233,17 @@ function updateDiscoverOnlineNotice() {
   if (searchInput) searchInput.disabled = !online;
 }
 
+// Kdrama/Cdrama are dashboard-only tracking categories in Discover — TVmaze
+// (their main source) has no first-class distinction for them, so searching
+// "Series" already surfaces them (see tvmazeCategoryMatches) without a
+// separate chip that would just duplicate the same TV-series search.
+const DISCOVER_HIDDEN_CATEGORIES = ["kdrama", "cdrama"];
+
 function renderDiscoverCategoryChips() {
   const chipsEl = document.getElementById("discover-category-chips");
   if (!chipsEl) return;
 
-  const enabledCategories = getEnabledOrderedCategories();
+  const enabledCategories = getEnabledOrderedCategories().filter(cat => !DISCOVER_HIDDEN_CATEGORIES.includes(cat));
   if (enabledCategories.length === 0) {
     chipsEl.style.display = "none";
     chipsEl.innerHTML = "";
@@ -211,10 +298,12 @@ function setDiscoverCategory(category, preservedQuery = "") {
   }
   if (noCategoryNotice) noCategoryNotice.style.display = "none";
 
-  const providers = getDiscoverProviders(category);
-  if (providers.length === 0) {
+  const allKeys = getAllDiscoverProviderKeysForCategory(category);
+  const filterBtn = document.getElementById("discover-filter-btn");
+  if (allKeys.length === 0) {
     if (searchInput) searchInput.style.display = "none";
     if (gameNotice) gameNotice.style.display = "flex";
+    if (filterBtn) filterBtn.style.display = "none";
     clearDiscoverResults();
     return;
   }
@@ -224,12 +313,82 @@ function setDiscoverCategory(category, preservedQuery = "") {
     searchInput.value = preservedQuery;
     searchInput.placeholder = `Search ${CATEGORIES[category].label.toLowerCase()}...`;
   }
+  if (filterBtn) {
+    filterBtn.style.display = "flex";
+    updateDiscoverFilterButtonState();
+  }
+
+  const providers = getDiscoverProviders(category);
+  if (providers.length === 0) {
+    clearDiscoverResults();
+    const emptyEl = document.getElementById("discover-empty");
+    if (emptyEl) {
+      emptyEl.style.display = "flex";
+      emptyEl.querySelector("h3").textContent = "No Sources Selected";
+      emptyEl.querySelector("p").textContent = "Use the filter button to enable at least one source for this category.";
+    }
+    return;
+  }
 
   if (preservedQuery) {
     runDiscoverSearch(preservedQuery);
   } else {
     loadDiscoverSuggestions(category);
   }
+}
+
+function updateDiscoverFilterButtonState() {
+  const filterBtn = document.getElementById("discover-filter-btn");
+  if (!filterBtn || !discoverCategory) return;
+  const allKeys = getAllDiscoverProviderKeysForCategory(discoverCategory);
+  const selected = getDiscoverSourceFilter()[discoverCategory];
+  const isNarrowed = Array.isArray(selected) && selected.length < allKeys.length;
+  filterBtn.classList.toggle("has-active-filter", isNarrowed);
+}
+
+function openDiscoverFilterModal() {
+  if (!discoverCategory) return;
+  const modal = document.getElementById("discover-filter-modal");
+  const list = document.getElementById("discover-filter-source-list");
+  if (!modal || !list) return;
+
+  const allKeys = getAllDiscoverProviderKeysForCategory(discoverCategory);
+  const selected = getDiscoverSourceFilter()[discoverCategory] || allKeys;
+
+  list.innerHTML = allKeys.map(key => {
+    const info = BUILTIN_METADATA_SOURCES[key];
+    return `
+    <label class="discover-filter-source-row">
+      <span class="discover-filter-source-name"><i data-lucide="${info?.icon || "database"}"></i>${info?.name || key}</span>
+      <label class="switch">
+        <input type="checkbox" data-source-key="${key}" ${selected.includes(key) ? "checked" : ""}>
+        <span class="slider"></span>
+      </label>
+    </label>
+  `;
+  }).join("");
+
+  list.querySelectorAll("input[data-source-key]").forEach(input => {
+    input.addEventListener("change", () => {
+      const filter = getDiscoverSourceFilter();
+      const currentAllKeys = getAllDiscoverProviderKeysForCategory(discoverCategory);
+      const currentlySelected = new Set(filter[discoverCategory] || currentAllKeys);
+      if (input.checked) currentlySelected.add(input.dataset.sourceKey);
+      else currentlySelected.delete(input.dataset.sourceKey);
+      filter[discoverCategory] = currentAllKeys.filter(k => currentlySelected.has(k));
+      saveData();
+      updateDiscoverFilterButtonState();
+      runDiscoverSearch(document.getElementById("discover-search-input")?.value || "");
+    });
+  });
+
+  if (window.lucide) lucide.createIcons();
+  modal.classList.add("active");
+}
+
+function closeDiscoverFilterModal() {
+  const modal = document.getElementById("discover-filter-modal");
+  if (modal) modal.classList.remove("active");
 }
 
 function clearDiscoverResults() {
@@ -314,15 +473,27 @@ function tvmazeShowToResult(show, category) {
   };
 }
 
+// "Series" is the only TV chip shown in Discover — Kdrama/Cdrama are
+// dashboard-only tracking categories now, since TVmaze has no first-class
+// distinction for them either. Searching "series" therefore accepts anything
+// detected as series/kdrama/cdrama, but each result keeps its own detected
+// category so the detail page still defaults status/progress fields
+// correctly and the user can still see/change it to Kdrama or Cdrama there.
+function tvmazeCategoryMatches(show, category) {
+  const detected = detectTvmazeCategory(show);
+  if (category === "series") return ["series", "kdrama", "cdrama"].includes(detected);
+  return detected === category;
+}
+
 async function fetchTvmazeTopRated(category) {
   const res = await fetch("https://api.tvmaze.com/shows?page=1");
   if (!res.ok) return [];
   const shows = await res.json();
   return (Array.isArray(shows) ? shows : [])
-    .filter(show => show.rating?.average && detectTvmazeCategory(show) === category)
+    .filter(show => show.rating?.average && tvmazeCategoryMatches(show, category))
     .sort((a, b) => b.rating.average - a.rating.average)
     .slice(0, 15)
-    .map(show => tvmazeShowToResult(show, category));
+    .map(show => tvmazeShowToResult(show, detectTvmazeCategory(show)));
 }
 
 async function searchTvmaze(query, category) {
@@ -331,8 +502,8 @@ async function searchTvmaze(query, category) {
   const json = await res.json();
   return (Array.isArray(json) ? json : [])
     .map(entry => entry.show)
-    .filter(show => show && detectTvmazeCategory(show) === category)
-    .map(show => tvmazeShowToResult(show, category));
+    .filter(show => show && tvmazeCategoryMatches(show, category))
+    .map(show => tvmazeShowToResult(show, detectTvmazeCategory(show)));
 }
 
 // ---- Wikidata (movies + games) ----
@@ -480,6 +651,79 @@ async function searchRawg(query) {
   if (!res.ok) return [];
   const json = await res.json();
   return (Array.isArray(json.results) ? json.results : []).map(rawgGameToResult);
+}
+
+function freeToGameGameToResult(entry) {
+  return {
+    source: "freetogame",
+    category: "game",
+    id: entry.id,
+    title: entry.title || "",
+    subtitle: [entry.genre, entry.release_date || "", entry.developer || ""].filter(Boolean).join(" · "),
+    thumbnail: entry.thumbnail || "",
+    rating: null
+  };
+}
+
+async function fetchFreeToGameTopRated() {
+  const json = await fetchJsonPortable("https://www.freetogame.com/api/games");
+  return (Array.isArray(json) ? json : []).slice(0, 15).map(freeToGameGameToResult);
+}
+
+async function searchFreeToGame(query) {
+  const json = await fetchJsonPortable("https://www.freetogame.com/api/games");
+  const q = query.trim().toLowerCase();
+  return (Array.isArray(json) ? json : [])
+    .filter(entry =>
+      (entry.title || "").toLowerCase().includes(q) ||
+      (entry.genre || "").toLowerCase().includes(q) ||
+      (entry.developer || "").toLowerCase().includes(q)
+    )
+    .slice(0, 15)
+    .map(freeToGameGameToResult);
+}
+
+function mangaDexMangaToResult(entry) {
+  const attrs = entry.attributes || {};
+  const titles = attrs.title || {};
+  const title = titles.en || Object.values(titles)[0] || "";
+  const coverRel = (entry.relationships || []).find(rel => rel.type === "cover_art");
+  const coverId = coverRel?.attributes?.fileName || "";
+  return {
+    source: "mangadex",
+    category: "manga",
+    id: entry.id,
+    title,
+    subtitle: [attrs.year || "", attrs.status || ""].filter(Boolean).join(" · "),
+    thumbnail: coverId ? `https://uploads.mangadex.org/covers/${entry.id}/${coverId}.256.jpg` : "",
+    rating: null
+  };
+}
+
+async function searchMangaDex(query) {
+  const json = await fetchJsonPortable(`https://api.mangadex.org/manga?title=${encodeURIComponent(query)}&includes[]=cover_art&limit=15`);
+  return (Array.isArray(json.data) ? json.data : []).map(mangaDexMangaToResult);
+}
+
+function shikimoriToResult(entry, category) {
+  const id = entry.id;
+  return {
+    source: "shikimori",
+    category,
+    id,
+    title: entry.russian || entry.name || entry.title || "",
+    subtitle: [entry.kind || "", entry.year || "", entry.score ? `★ ${entry.score}` : ""].filter(Boolean).join(" · "),
+    thumbnail: entry.image?.original || entry.image?.preview || (category === "manga"
+      ? `https://shikimori.one/system/mangas/original/${id}.jpg`
+      : `https://shikimori.one/system/animes/original/${id}.jpg`),
+    rating: entry.score || null
+  };
+}
+
+async function searchShikimori(query, category) {
+  const endpoint = category === "manga" ? "mangas" : "animes";
+  const json = await fetchJsonPortable(`https://shikimori.one/api/${endpoint}?search=${encodeURIComponent(query)}&limit=15`);
+  return (Array.isArray(json) ? json : []).map(entry => shikimoriToResult(entry, category));
 }
 
 // ---- AniList (anime + manga; also used as a supplemental source for
@@ -686,6 +930,41 @@ document.addEventListener("DOMContentLoaded", () => {
       saveDiscoverSessionState(discoverCategory, e.target.value);
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => runDiscoverSearch(e.target.value), 400);
+    });
+  }
+
+  const filterBtn = document.getElementById("discover-filter-btn");
+  if (filterBtn) filterBtn.addEventListener("click", openDiscoverFilterModal);
+
+  const filterModal = document.getElementById("discover-filter-modal");
+  const filterModalClose = document.getElementById("discover-filter-modal-close");
+  if (filterModalClose) filterModalClose.addEventListener("click", closeDiscoverFilterModal);
+  if (filterModal) {
+    filterModal.addEventListener("click", (e) => {
+      if (e.target === filterModal) closeDiscoverFilterModal();
+    });
+  }
+
+  const selectAllBtn = document.getElementById("discover-filter-select-all");
+  const selectNoneBtn = document.getElementById("discover-filter-select-none");
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener("click", () => {
+      if (!discoverCategory) return;
+      delete getDiscoverSourceFilter()[discoverCategory];
+      saveData();
+      openDiscoverFilterModal();
+      updateDiscoverFilterButtonState();
+      runDiscoverSearch(document.getElementById("discover-search-input")?.value || "");
+    });
+  }
+  if (selectNoneBtn) {
+    selectNoneBtn.addEventListener("click", () => {
+      if (!discoverCategory) return;
+      getDiscoverSourceFilter()[discoverCategory] = [];
+      saveData();
+      openDiscoverFilterModal();
+      updateDiscoverFilterButtonState();
+      runDiscoverSearch(document.getElementById("discover-search-input")?.value || "");
     });
   }
 

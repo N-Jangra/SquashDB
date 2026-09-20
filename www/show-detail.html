@@ -1,45 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Show Details</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Show Details</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="logcat.js"></script><script src="lucide.min.js"></script></head>
 <body><div id="app-container">
 <main><section class="tab-content active">
 
 <div class="show-detail-topbar">
-  <button class="page-back-btn show-detail-topbar-back" type="button" id="show-detail-back-btn-top" data-back-fallback="dashboard.html"><i data-lucide="arrow-left"></i></button>
-  <button class="show-detail-icon-btn" type="button" id="show-detail-menu-btn" title="More options" style="display:none;"><i data-lucide="more-vertical"></i></button>
+  <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" id="show-detail-back-btn-top" data-back-fallback="dashboard.html"><i data-lucide="chevron-left"></i>Back</button>
+  <span class="show-detail-topbar-category" id="show-detail-topbar-category"></span>
+  <button class="show-detail-topbar-delete" type="button" id="show-detail-delete-btn-top" title="Delete from list" style="display:none;"><i data-lucide="trash-2"></i></button>
 </div>
 
-<div class="show-detail-title-row">
-  <h2 id="show-detail-topbar-title" class="show-detail-topbar-title"></h2>
-  <span id="show-detail-production-badge" class="show-detail-production-badge" style="display:none;"></span>
-  <span id="show-detail-source-badge" class="discover-result-source" style="display:none;"></span>
-</div>
-
-<div id="show-detail-header" class="show-detail-header">
-  <div id="show-detail-thumb-wrap"></div>
+<div class="show-detail-header" id="show-detail-header">
+  <div id="show-detail-thumb-wrap" class="show-detail-poster-wrap"></div>
   <div class="show-detail-header-body">
+    <h1 id="show-detail-topbar-title" class="show-detail-title"></h1>
+    <div class="show-detail-badge-row">
+      <span id="show-detail-production-badge" class="show-detail-production-badge" style="display:none;"></span>
+      <span id="show-detail-source-badge" class="discover-result-source" style="display:none;"></span>
+    </div>
     <p id="show-detail-meta" class="show-detail-meta"></p>
-    <p class="show-detail-summary" id="show-detail-summary" style="display:none;"></p>
   </div>
 </div>
 
-<div class="form-group" id="show-detail-addlist-group" style="display:none;">
-  <label for="show-detail-addlist">Add to list</label>
-  <select id="show-detail-addlist" class="form-control">
-    <option value="">Select a list…</option>
-  </select>
-</div>
-<div class="form-group" id="show-detail-status-group" style="display:none;">
-  <label for="show-detail-status">Status</label>
-  <select id="show-detail-status" class="form-control"></select>
-</div>
-
-<div class="form-group" id="show-detail-compdate-group" style="display:none;">
-  <label for="show-detail-compdate">Completion Date</label>
-  <input type="date" id="show-detail-compdate" class="form-control">
-</div>
+<p class="show-detail-summary" id="show-detail-summary" style="display:none;"></p>
 
 <p class="settings-row-note" id="show-detail-offline-notice" style="display:none;">You're offline — showing the last saved details for this title. Episode list may be incomplete until you're back online.</p>
+
+<div class="show-detail-section-title" id="show-detail-tracking-title" style="display:none;">Tracking</div>
+<div class="show-detail-menu-group" id="show-detail-tracking-group" style="display:none;">
+  <button type="button" class="show-detail-menu-item" id="show-detail-addlist-row" style="display:none;">
+    <span>Add to list</span>
+    <span class="show-detail-menu-value"><span id="show-detail-addlist-value"></span><span class="show-detail-chevron">❯</span></span>
+  </button>
+  <select id="show-detail-addlist" style="display:none;">
+    <option value="">Select a list…</option>
+  </select>
+
+  <button type="button" class="show-detail-menu-item" id="show-detail-status-row" style="display:none;">
+    <span>Status</span>
+    <span class="show-detail-menu-value"><span id="show-detail-status-value"></span><span class="show-detail-chevron">❯</span></span>
+  </button>
+  <select id="show-detail-status" style="display:none;"></select>
+
+  <div class="show-detail-menu-item" id="show-detail-compdate-row" style="display:none;">
+    <span>Completion Date</span>
+    <input type="date" id="show-detail-compdate" class="show-detail-inline-date">
+  </div>
+</div>
 
 <div class="settings-section" id="show-detail-book-progress-section" style="display:none;">
   <div class="form-row">
@@ -68,22 +75,22 @@
   </div>
 </div>
 
-<div class="settings-section" id="show-detail-season-section" style="display:none;">
-  <div class="form-group">
-    <label for="show-detail-season-select">Season</label>
-    <select id="show-detail-season-select" class="form-control"></select>
-  </div>
+<div class="show-detail-season-section" id="show-detail-season-section" style="display:none;">
+  <button type="button" class="show-detail-season-btn" id="show-detail-season-select">
+    <span id="show-detail-season-btn-label">Season</span>
+    <span class="show-detail-season-btn-caret">▼</span>
+  </button>
   <div id="show-detail-episode-list" class="show-detail-episode-list"></div>
 </div>
 
-<div class="form-group" id="show-detail-rating-group" style="display:none;">
-  <label>Rating</label>
+<div class="show-detail-section-title" id="show-detail-rating-title" style="display:none;">Rating</div>
+<div class="show-detail-menu-group show-detail-inline-group" id="show-detail-rating-group" style="display:none;">
   <div id="show-detail-rating-widget"></div>
 </div>
 
-<div class="form-group" id="show-detail-notes-group" style="display:none;">
-  <label for="show-detail-notes">Notes / Thoughts</label>
-  <textarea id="show-detail-notes" class="form-control" rows="3" placeholder="Add optional details, links, or comments..."></textarea>
+<div class="show-detail-section-title" id="show-detail-notes-title" style="display:none;">Notes / Thoughts</div>
+<div class="show-detail-menu-group show-detail-inline-group" id="show-detail-notes-group" style="display:none;">
+  <textarea id="show-detail-notes" class="show-detail-notes-textarea" rows="3" placeholder="Add optional details, links, or comments..."></textarea>
 </div>
 
 <div class="page-back-actions">
@@ -100,6 +107,10 @@
     <div id="picker-options-list" class="picker-options-list"></div>
   </div>
 </div>
+<div id="episode-image-modal" class="modal-overlay image-modal-overlay">
+  <button class="modal-close image-modal-close" id="episode-image-modal-close">&times;</button>
+  <img id="episode-image-modal-img" class="image-modal-img" src="" alt="Episode still">
 </div>
-<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="show-detail.js"></script>
+</div>
+<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script><script src="show-detail.js"></script>
 </body></html>

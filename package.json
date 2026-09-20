@@ -4,17 +4,18 @@
   "description": "SquashDB - Watchlist & Media Progress Tracker",
   "main": "app.js",
   "scripts": {
-    "build": "echo \"Building static web assets...\"",
+    "build": "cp CHANGELOG.md www/CHANGELOG.md && echo \"Building static web assets...\"",
+    "serve": "node dev-server.js",
     "cap:sync": "cap sync",
     "cap:add": "cap add android",
     "cap:open": "cap open android"
   },
   "dependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/core": "^6.0.0"
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/core": "^6.2.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.0.0"
+    "@capacitor/cli": "^6.2.1"
   },
   "author": "SquashDB Team",
   "license": "Apache-2.0"

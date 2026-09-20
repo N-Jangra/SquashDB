@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Settings</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Settings</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="logcat.js"></script><script src="lucide.min.js"></script></head>
 <body><div id="app-container">
 <main><section id="tab-settings" class="tab-content active">
 <div class="settings-page-header">
@@ -9,6 +9,38 @@
 <div class="settings-section">
   <h4 class="settings-section-title">Appearance</h4>
   <div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" id="ui-theme-picker" data-pref="uiTheme">
+      <div class="settings-row-icon"><i data-lucide="palette"></i></div>
+      <div class="settings-row-body">
+        <label>Theme</label>
+        <span>Switch between dark and light modes.</span>
+      </div>
+      <div class="settings-row-value"><span id="ui-theme-picker-value">Dark</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" id="ui-font-picker" data-pref="uiFont">
+      <div class="settings-row-icon"><i data-lucide="type"></i></div>
+      <div class="settings-row-body">
+        <label>Font</label>
+        <span>Change the font used throughout the app. Some options need a connection the first time.</span>
+      </div>
+      <div class="settings-row-value"><span id="ui-font-picker-value">Inter (default)</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" id="main-color-picker" data-pref="mainColor">
+      <div class="settings-row-icon"><i data-lucide="droplets"></i></div>
+      <div class="settings-row-body">
+        <label>Main Color</label>
+        <span>Change the accent color.</span>
+      </div>
+      <div class="settings-row-value"><span id="main-color-picker-value">Normal</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" id="animation-speed-picker" data-pref="animationSpeed">
+      <div class="settings-row-icon"><i data-lucide="zap"></i></div>
+      <div class="settings-row-body">
+        <label>Animation Speed</label>
+        <span>Controls the speed of transitions and animations throughout the app.</span>
+      </div>
+      <div class="settings-row-value"><span id="animation-speed-picker-value">Normal</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
     <button type="button" class="settings-row settings-row-picker" id="dashboard-view-picker" data-pref="dashboardView">
       <div class="settings-row-icon"><i data-lucide="layout-grid"></i></div>
       <div class="settings-row-body">
@@ -25,14 +57,6 @@
       </div>
       <div class="settings-row-value"><span id="dashboard-row-actions-picker-value">3-dot menu</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" id="main-color-picker" data-pref="mainColor">
-      <div class="settings-row-icon"><i data-lucide="droplets"></i></div>
-      <div class="settings-row-body">
-        <label>Main Color</label>
-        <span>Change the accent color.</span>
-      </div>
-      <div class="settings-row-value"><span id="main-color-picker-value">Normal</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
-    </button>
     <button type="button" class="settings-row settings-row-picker" id="rating-format-picker" data-pref="ratingFormat">
       <div class="settings-row-icon"><i data-lucide="star"></i></div>
       <div class="settings-row-body">
@@ -40,22 +64,6 @@
         <span>Choose how ratings are displayed.</span>
       </div>
       <div class="settings-row-value"><span id="rating-format-picker-value">5 stars</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
-    </button>
-    <button type="button" class="settings-row settings-row-picker" id="ui-theme-picker" data-pref="uiTheme">
-      <div class="settings-row-icon"><i data-lucide="palette"></i></div>
-      <div class="settings-row-body">
-        <label>Theme</label>
-        <span>Switch between dark and light modes.</span>
-      </div>
-      <div class="settings-row-value"><span id="ui-theme-picker-value">Dark</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
-    </button>
-    <button type="button" class="settings-row settings-row-picker" id="animation-speed-picker" data-pref="animationSpeed">
-      <div class="settings-row-icon"><i data-lucide="zap"></i></div>
-      <div class="settings-row-body">
-        <label>Animation Speed</label>
-        <span>Controls the speed of transitions and animations throughout the app.</span>
-      </div>
-      <div class="settings-row-value"><span id="animation-speed-picker-value">Normal</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
   </div>
 </div>
@@ -182,6 +190,53 @@
     </a>
   </div>
 </div>
+<div class="settings-page-header">
+  <h4 class="settings-section-title">App Data</h4>
+</div>
+<div class="settings-section">
+  <div class="settings-list">
+    <a class="settings-row settings-row-link" href="app-info.html">
+      <div class="settings-row-icon"><i data-lucide="info"></i></div>
+      <div class="settings-row-body">
+        <label>App Info</label>
+        <span>What SquashDB is and how it works.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="usage-guide.html">
+      <div class="settings-row-icon"><i data-lucide="book-open-check"></i></div>
+      <div class="settings-row-body">
+        <label>Usage Guide</label>
+        <span>How to use each tab and setting.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="logcat.html">
+      <div class="settings-row-icon"><i data-lucide="terminal"></i></div>
+      <div class="settings-row-body">
+        <label>Logcat</label>
+        <span>View app logs, filter by level.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="changelog.html">
+      <div class="settings-row-icon"><i data-lucide="history"></i></div>
+      <div class="settings-row-body">
+        <label>Changelog</label>
+        <span>What's new in each version.</span>
+      </div>
+      <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+    </a>
+    <a class="settings-row settings-row-link" href="https://github.com/N-Jangra/SquashDB" target="_blank" rel="noopener">
+      <div class="settings-row-icon"><i data-lucide="code-2"></i></div>
+      <div class="settings-row-body">
+        <label>GitHub</label>
+        <span>View the source code and report issues.</span>
+      </div>
+      <i data-lucide="external-link" class="settings-row-chevron"></i>
+    </a>
+  </div>
+</div>
 </section></main>
 <nav class="bottom-nav"><a class="nav-item" data-tab="tab-dashboard" href="dashboard.html" aria-label="Dashboard"><i data-lucide="layout-grid"></i></a><a class="nav-item" data-tab="tab-timeline" href="timeline.html" aria-label="Timeline"><i data-lucide="calendar"></i></a><a class="nav-item" data-tab="tab-discover" href="discover.html" aria-label="Discover"><i data-lucide="search"></i></a><a class="nav-item" data-tab="tab-sources" href="sources.html" aria-label="Sources"><i data-lucide="database"></i></a><a class="nav-item" data-tab="tab-explore" href="explore.html" aria-label="Explore"><i data-lucide="compass"></i></a><a class="nav-item" data-tab="tab-stats" href="statistics.html" aria-label="Statistics"><i data-lucide="pie-chart"></i></a><a class="nav-item active" data-tab="tab-settings" href="settings.html" aria-label="Settings"><i data-lucide="settings"></i></a></nav>
 <div id="picker-modal" class="modal-overlay">
@@ -193,4 +248,4 @@
     <div id="picker-options-list" class="picker-options-list"></div>
   </div>
 </div>
-</div><script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script></body></html>
+</div><script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script></body></html>

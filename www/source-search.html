@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Source Search</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="lucide.min.js"></script></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Source Search</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="logcat.js"></script><script src="lucide.min.js"></script></head>
 <body><div id="app-container">
 <main><section class="tab-content active">
 
 <div class="show-detail-topbar">
-  <button class="page-back-btn show-detail-topbar-back" type="button" data-back-fallback="sources.html"><i data-lucide="arrow-left"></i></button>
+  <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="sources.html"><i data-lucide="chevron-left"></i>Back</button>
 </div>
 
 <div class="show-detail-title-row">
-  <h2 id="source-search-title" class="show-detail-topbar-title"></h2>
+  <h2 id="source-search-title" class="source-search-title"></h2>
 </div>
 
 <div class="chips-container" id="source-category-chips"></div>
@@ -34,5 +34,5 @@
 
 </section></main>
 </div>
-<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="discover.js"></script><script src="sources.js"></script>
+<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script><script src="discover.js"></script><script src="sources.js"></script>
 </body></html>
