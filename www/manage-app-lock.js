@@ -6,7 +6,8 @@ const APP_LOCK_METHOD_CHOICES = [
   { value: "none", label: "None", desc: "No password — the app opens directly." },
   { value: "pin", label: "PIN", desc: "A numeric code, 4 or more digits." },
   { value: "pattern", label: "Pattern", desc: "Connect 2 or more dots in any order." },
-  { value: "alphanumeric", label: "Alphanumeric Password", desc: "Any combination of letters, numbers, symbols." }
+  { value: "alphanumeric", label: "Alphanumeric Password", desc: "Any combination of letters, numbers, symbols." },
+  { value: "biometric", label: "Biometric", desc: "Use fingerprint, face, or your Android device screen lock." }
 ];
 
 let appLockDraftMethod = null;
@@ -60,6 +61,15 @@ function renderAppLockSetupArea() {
     state.preferences.appLock.passwordSalt = "";
     saveData();
     updateAppLockSettingsSummary();
+    return;
+  }
+
+  if (appLockDraftMethod === "biometric") {
+    setupSection.style.display = "block";
+    questionsSection.style.display = "none";
+    setupTitle.textContent = "Biometric Unlock";
+    setupArea.innerHTML = `<p class="setting-desc">Android will verify your enrolled fingerprint, face, or device credential when the app opens.</p>`;
+    appLockPendingSecret = "__biometric__";
     return;
   }
 
@@ -139,6 +149,19 @@ function setupAppLockSaveButton() {
   saveBtn.addEventListener("click", async () => {
     if (!appLockPendingSecret) {
       alert("Please finish setting your PIN, pattern, or password first.");
+      return;
+    }
+
+    if (appLockDraftMethod === "biometric") {
+      const biometric = window.Capacitor?.Plugins?.Biometric;
+      const available = await biometric?.isAvailable?.();
+      if (!available?.available) {
+        alert("No biometric or device credential is available on this Android device.");
+        return;
+      }
+      setBiometricAppLock();
+      alert("Biometric unlock enabled.");
+      window.location.href = "settings.html";
       return;
     }
 

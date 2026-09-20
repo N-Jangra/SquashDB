@@ -18,7 +18,7 @@ function normalizeAppLock() {
     state.preferences.appLock = { ...defaults };
     return;
   }
-  if (!["none", "pin", "pattern", "alphanumeric"].includes(current.method)) current.method = "none";
+  if (!["none", "pin", "pattern", "alphanumeric", "biometric"].includes(current.method)) current.method = "none";
   if (typeof current.passwordHash !== "string") current.passwordHash = "";
   if (typeof current.passwordSalt !== "string") current.passwordSalt = "";
   if (!Array.isArray(current.securityQuestions)) current.securityQuestions = [];
@@ -68,6 +68,15 @@ async function setAppLockSecret(method, secret) {
   state.preferences.appLock.method = method;
   state.preferences.appLock.passwordHash = hash;
   state.preferences.appLock.passwordSalt = salt;
+  saveData();
+}
+
+function setBiometricAppLock() {
+  normalizeAppLock();
+  state.preferences.appLock.method = "biometric";
+  state.preferences.appLock.passwordHash = "";
+  state.preferences.appLock.passwordSalt = "";
+  state.preferences.appLock.securityQuestions = [];
   saveData();
 }
 
@@ -156,6 +165,22 @@ function renderAppLockOverlay() {
   if (forgotBtn) forgotBtn.addEventListener("click", renderAppLockForgotFlow);
 }
 
+async function handleBiometricUnlock() {
+  const biometric = window.Capacitor?.Plugins?.Biometric;
+  if (!biometric?.authenticate) {
+    showAppLockError("Biometric unlock is available in the installed Android app only.");
+    return;
+  }
+  try {
+    await biometric.authenticate({ reason: "Unlock your SquashDB library" });
+    markSessionUnlocked();
+    document.getElementById("app-lock-overlay")?.remove();
+    document.dispatchEvent(new CustomEvent("app-unlocked"));
+  } catch (err) {
+    showAppLockError("Biometric authentication was not completed.");
+  }
+}
+
 function showAppLockError(message) {
   const errorEl = document.getElementById("app-lock-error");
   if (errorEl) {
@@ -185,7 +210,14 @@ function renderAppLockInputArea(method) {
   const area = document.getElementById("app-lock-input-area");
   if (!area) return;
 
-  if (method === "pin") {
+  if (method === "biometric") {
+    area.innerHTML = `
+      <p class="setting-desc">Use your fingerprint, face, or device screen lock to continue.</p>
+      <button type="button" class="btn btn-primary" id="app-lock-biometric-btn" style="width:100%;margin-top:10px;">Unlock with biometrics</button>
+    `;
+    document.getElementById("app-lock-biometric-btn").addEventListener("click", handleBiometricUnlock);
+    setTimeout(handleBiometricUnlock, 150);
+  } else if (method === "pin") {
     area.innerHTML = `
       <input type="password" inputmode="numeric" pattern="[0-9]*" id="app-lock-pin-input" class="form-control app-lock-text-input" placeholder="Enter PIN" autocomplete="off">
       <button type="button" class="btn btn-primary" id="app-lock-submit-btn" style="width:100%;margin-top:10px;">Unlock</button>

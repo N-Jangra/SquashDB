@@ -1,5 +1,93 @@
 // SquashDB - App logic
 
+// Feature modules are loaded separately so the large application file does not
+// own navigation and backup implementation. The promise is awaited before
+// initialization because the legacy multi-page app exposes these functions as
+// globals between classic scripts.
+function loadAppFeatureModule(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Could not load ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+// Feature modules are included as ordinary script tags in each HTML page.
+// Static loading works in Android WebViews and CSP-constrained desktop hosts,
+// where dynamically injected scripts may be rejected before app initialization.
+const appFeatureModulesReady = Promise.resolve();
+
+function nativePlugin(name) {
+  return window.Capacitor?.Plugins?.[name] || null;
+}
+
+async function updateProgressWidget() {
+  const widget = nativePlugin("Widget");
+  if (!widget?.update) return;
+  const enabled = state.items.filter(item => state.preferences[item.category]);
+  await widget.update({
+    total: enabled.length,
+    completed: enabled.filter(item => item.status === "Completed").length,
+    inProgress: enabled.filter(item => ["Playing", "In Progress", "Reading"].includes(item.status)).length
+  }).catch(err => console.warn("Could not update progress widget", err));
+}
+
+async function handleIncomingShareIntent() {
+  const share = nativePlugin("ShareIntent");
+  if (!share?.getInitialShare || getCurrentPageTab() !== "tab-dashboard") return;
+  try {
+    const result = await share.getInitialShare();
+    const text = String(result?.text || "").trim();
+    if (!text || sessionStorage.getItem(`squashdb_shared_${text}`) === "true") return;
+    sessionStorage.setItem(`squashdb_shared_${text}`, "true");
+    openModal();
+    const titleInput = document.getElementById("entry-title");
+    const notesInput = document.getElementById("entry-notes");
+    const sharedTitle = text.split("\n")[0].trim();
+    if (titleInput) titleInput.value = sharedTitle.slice(0, 200);
+    if (notesInput && text.includes("\n")) notesInput.value = text;
+    if (state.preferences.metadataMode === "online" && titleInput) {
+      setTimeout(() => fetchAndApplyMetadataFromTitle().catch(err => console.warn("Shared metadata lookup failed", err)), 150);
+    }
+  } catch (err) {
+    console.warn("Could not read shared content", err);
+  }
+}
+
+async function handleNotificationAction() {
+  const notifications = nativePlugin("Notifications");
+  if (!notifications?.getPendingAction) return;
+  try {
+    const result = await notifications.getPendingAction();
+    if (!result?.action) return;
+    const item = state.items.find(entry => entry.id === result.itemId);
+    if (result.action === "mark_watched" && item) {
+      const episodes = Array.isArray(item.episodesCache) ? item.episodesCache : [];
+      const watched = new Set(item.watchedEpisodeIds || []);
+      const next = episodes.find(episode => !watched.has(episode.id));
+      if (next) {
+        watched.add(next.id);
+        item.watchedEpisodeIds = Array.from(watched);
+        item.episodesDone = item.watchedEpisodeIds.length;
+        if (episodes.length && item.episodesDone >= episodes.length) item.status = "Completed";
+        saveData();
+      } else if (!episodes.length) {
+        item.status = "Completed";
+        item.completionDate = new Date().toISOString().split("T")[0];
+        saveData();
+      }
+      if (getCurrentPageTab() === "tab-dashboard") renderDashboard();
+    }
+    if (result.action === "open" && result.actionUrl && getCurrentPageTab() === "tab-dashboard") {
+      window.location.href = result.actionUrl;
+    }
+  } catch (err) {
+    console.warn("Could not handle notification action", err);
+  }
+}
+
 // Icon choices offered when creating a custom tracking category
 const CATEGORY_ICON_CHOICES = [
   "list", "star", "bookmark", "heart", "tag", "package", "layers",
@@ -141,10 +229,30 @@ let state = {
     uiTheme: "dark",
     uiFont: "inter",
     mainColor: "normal",
+    categoryColors: {},
+    highContrast: false,
+    reducedMotion: false,
     dashboardRowActions: "menu",
     dashboardView: "list",
+    navigationSheet: true,
+    oneHandedMode: "off",
+    tabletTwoColumn: true,
+    compactMode: false,
     metadataMode: "offline",
     metadataThumbnails: true,
+    episodeReminders: true,
+    notificationsEnabled: false,
+    notificationEpisodeReminders: true,
+    notificationBackupReminders: false,
+    notificationCloudFailures: true,
+    notificationUnfinishedItems: false,
+    notificationSnoozeMinutes: 60,
+    notificationQuietHours: false,
+    notificationQuietStart: "22:00",
+    notificationQuietEnd: "07:00",
+    notificationReminderTime: "09:00",
+    imageCacheMaxEntries: 250,
+    backgroundBackups: false,
     folderSyncDelay: "30000",
     animationSpeed: "normal",
     metadataSources: {
@@ -167,7 +275,7 @@ let state = {
     },
     appLook: "default",
     appLock: {
-      method: "none",           // "none" | "pin" | "pattern" | "alphanumeric"
+      method: "none",           // "none" | "pin" | "pattern" | "alphanumeric" | "biometric"
       passwordHash: "",         // hex PBKDF2 hash of the PIN/pattern/password
       passwordSalt: "",         // hex random salt used for passwordHash
       securityQuestions: []     // [{ question, answerHash, answerSalt }, ...] (exactly 3 once set)
@@ -180,6 +288,9 @@ let state = {
   currentSort: "alphabetical-asc",
   lastEntryCategory: "game",
   searchQuery: "",
+  lastEntryStatusByCategory: {},
+  searchHistory: [],
+  dashboardFilters: { status: "", unwatched: false, recentlyAdded: false, rated: false },
   timelineFilter: "all",
   timelineSearch: "",
   timelineMonth: "",
@@ -189,6 +300,64 @@ let state = {
 
 function thumbnailsEnabled() {
   return Boolean(state.preferences.metadataThumbnails);
+}
+
+function showToast(message, type = "info", duration = 3200) {
+  if (!document.body) return;
+  let toast = document.getElementById("squashdb-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "squashdb-toast";
+    toast.className = "squashdb-toast";
+    document.body.appendChild(toast);
+  }
+  toast.className = `squashdb-toast ${type}`;
+  toast.innerHTML = `<i data-lucide="${type === "error" ? "circle-alert" : type === "success" ? "circle-check" : "info"}"></i><span></span>`;
+  toast.querySelector("span").textContent = String(message || "");
+  toast.classList.add("active");
+  if (window.lucide) lucide.createIcons();
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(() => toast.classList.remove("active"), duration);
+}
+
+function setupVisualPolish() {
+  if (!window.__squashdbAlertPatched) {
+    window.__squashdbAlertPatched = true;
+    window.alert = message => showToast(message, "info");
+  }
+  document.addEventListener("click", event => {
+    const target = event.target.closest("button, .btn, .settings-row, .nav-item, .chip, a");
+    if (!target || target.disabled || target.closest(".modal-close")) return;
+    const haptics = nativePlugin("Haptics");
+    if (haptics?.impact) haptics.impact({ style: "light" }).catch(() => {});
+    else if (navigator.vibrate) navigator.vibrate(8);
+  }, { passive: true });
+  document.getElementById("category-colors-picker")?.addEventListener("click", openCategoryColorsPicker);
+}
+
+function setupOfflineIndicator() {
+  let indicator = document.getElementById("squashdb-offline-indicator");
+  if (!indicator) {
+    indicator = document.createElement("div");
+    indicator.id = "squashdb-offline-indicator";
+    indicator.className = "squashdb-offline-indicator";
+    document.body.appendChild(indicator);
+  }
+  const update = () => {
+    const offline = navigator.onLine === false;
+    const queueCount = typeof metadataQueueCount === "function" ? metadataQueueCount() : 0;
+    indicator.classList.toggle("active", offline || queueCount > 0);
+    indicator.innerHTML = offline
+      ? `<i data-lucide="wifi-off"></i><span>Offline mode · saved data is available</span>`
+      : queueCount > 0
+        ? `<i data-lucide="cloud-sync"></i><span>${queueCount} metadata update${queueCount === 1 ? "" : "s"} queued</span>`
+        : "";
+    if (window.lucide) lucide.createIcons();
+  };
+  window.addEventListener("online", update);
+  window.addEventListener("offline", update);
+  window.addEventListener("metadata-queue-updated", update);
+  update();
 }
 
 // Every thumbnail slot is compulsory: real image if we have one and thumbnails
@@ -209,8 +378,10 @@ function itemSourceName(item) {
 }
 
 // Initialize Application
-document.addEventListener("DOMContentLoaded", () => {
-  loadData();
+document.addEventListener("DOMContentLoaded", async () => {
+  await appFeatureModulesReady;
+  renderDashboardSkeleton();
+  await loadData();
 
   // If a lock method is set and this session hasn't been unlocked yet, block all
   // further rendering until a correct PIN/pattern/password (or a security-question
@@ -225,6 +396,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function runAppInit() {
   applyTheme();
   setupEventListeners();
+  setupVisualPolish();
   setupAppNavigation();
   setupPageBackButtons();
   setupHardwareBackButton();
@@ -241,6 +413,12 @@ function runAppInit() {
   renderNavIconPickers();
   renderAppIconPicker();
   lucide.createIcons();
+  updateProgressWidget();
+  handleIncomingShareIntent();
+  handleNotificationAction();
+  scheduleUnfinishedItemReminder();
+  setupOfflineIndicator();
+  setupDashboardPullToRefresh();
 }
 
 window.addEventListener("pagehide", flushPendingSave);
@@ -249,8 +427,19 @@ document.addEventListener("visibilitychange", () => {
 });
 
 // Load data from LocalStorage
-function loadData() {
-  const savedItems = localStorage.getItem("squashdb_items");
+async function loadData() {
+  let encryptedState = null;
+  const encryptedStore = nativePlugin("EncryptedStore");
+  if (encryptedStore?.getState) {
+    try {
+      const result = await encryptedStore.getState();
+      if (result?.exists && result.data) encryptedState = JSON.parse(result.data);
+    } catch (err) {
+      console.error("Encrypted local database could not be opened", err);
+    }
+  }
+
+  const savedItems = encryptedState?.items ? JSON.stringify(encryptedState.items) : localStorage.getItem("squashdb_items");
   if (savedItems) {
     try {
       state.items = JSON.parse(savedItems);
@@ -260,7 +449,7 @@ function loadData() {
     }
   }
 
-  const savedWatchLog = localStorage.getItem("squashdb_watch_log");
+  const savedWatchLog = encryptedState?.watchLog ? JSON.stringify(encryptedState.watchLog) : localStorage.getItem("squashdb_watch_log");
   if (savedWatchLog) {
     try {
       state.watchLog = JSON.parse(savedWatchLog);
@@ -270,7 +459,7 @@ function loadData() {
     }
   }
 
-  const savedPrefs = localStorage.getItem("squashdb_prefs");
+  const savedPrefs = encryptedState?.preferences ? JSON.stringify(encryptedState.preferences) : localStorage.getItem("squashdb_prefs");
   if (savedPrefs) {
     try {
       state.preferences = { ...state.preferences, ...JSON.parse(savedPrefs) };
@@ -299,10 +488,30 @@ function loadData() {
   if (!state.preferences.uiTheme) state.preferences.uiTheme = "dark";
   if (!state.preferences.uiFont) state.preferences.uiFont = "inter";
   if (!state.preferences.mainColor) state.preferences.mainColor = "normal";
+  if (!state.preferences.categoryColors || typeof state.preferences.categoryColors !== "object") state.preferences.categoryColors = {};
+  if (typeof state.preferences.highContrast !== "boolean") state.preferences.highContrast = false;
+  if (typeof state.preferences.reducedMotion !== "boolean") state.preferences.reducedMotion = false;
   if (!state.preferences.dashboardRowActions) state.preferences.dashboardRowActions = "menu";
   if (!["list", "grid"].includes(state.preferences.dashboardView)) state.preferences.dashboardView = "list";
+  if (typeof state.preferences.navigationSheet !== "boolean") state.preferences.navigationSheet = true;
+  if (!["off", "left", "right"].includes(state.preferences.oneHandedMode)) state.preferences.oneHandedMode = "off";
+  if (typeof state.preferences.tabletTwoColumn !== "boolean") state.preferences.tabletTwoColumn = true;
+  if (typeof state.preferences.compactMode !== "boolean") state.preferences.compactMode = false;
   if (!state.preferences.metadataMode) state.preferences.metadataMode = "offline";
   if (typeof state.preferences.metadataThumbnails !== "boolean") state.preferences.metadataThumbnails = true;
+  if (typeof state.preferences.episodeReminders !== "boolean") state.preferences.episodeReminders = true;
+  if (typeof state.preferences.notificationsEnabled !== "boolean") state.preferences.notificationsEnabled = false;
+  if (typeof state.preferences.notificationEpisodeReminders !== "boolean") state.preferences.notificationEpisodeReminders = state.preferences.episodeReminders;
+  if (typeof state.preferences.notificationBackupReminders !== "boolean") state.preferences.notificationBackupReminders = false;
+  if (typeof state.preferences.notificationCloudFailures !== "boolean") state.preferences.notificationCloudFailures = true;
+  if (typeof state.preferences.notificationUnfinishedItems !== "boolean") state.preferences.notificationUnfinishedItems = false;
+  if (![60, 180, 1440, 10080, 0].includes(Number(state.preferences.notificationSnoozeMinutes))) state.preferences.notificationSnoozeMinutes = 60;
+  if (typeof state.preferences.notificationQuietHours !== "boolean") state.preferences.notificationQuietHours = false;
+  if (!/^\d{2}:\d{2}$/.test(state.preferences.notificationQuietStart)) state.preferences.notificationQuietStart = "22:00";
+  if (!/^\d{2}:\d{2}$/.test(state.preferences.notificationQuietEnd)) state.preferences.notificationQuietEnd = "07:00";
+  if (!/^\d{2}:\d{2}$/.test(state.preferences.notificationReminderTime)) state.preferences.notificationReminderTime = "09:00";
+  if (![0, 250, 500, 1000].includes(Number(state.preferences.imageCacheMaxEntries))) state.preferences.imageCacheMaxEntries = 250;
+  if (typeof state.preferences.backgroundBackups !== "boolean") state.preferences.backgroundBackups = false;
   if (!["0", "5000", "10000", "30000", "60000"].includes(String(state.preferences.folderSyncDelay))) {
     state.preferences.folderSyncDelay = "30000";
   }
@@ -371,6 +580,27 @@ function loadData() {
     state.currentSort = savedSort;
   }
 
+  try {
+    const savedHistory = JSON.parse(localStorage.getItem("squashdb_search_history") || "[]");
+    state.searchHistory = Array.isArray(savedHistory) ? savedHistory.filter(Boolean).slice(0, 8) : [];
+  } catch (err) {
+    state.searchHistory = [];
+  }
+  try {
+    const savedDashboardFilters = JSON.parse(localStorage.getItem("squashdb_dashboard_filters") || "{}");
+    state.dashboardFilters = {
+      ...state.dashboardFilters,
+      ...(savedDashboardFilters && typeof savedDashboardFilters === "object" ? savedDashboardFilters : {})
+    };
+  } catch (err) {
+    state.dashboardFilters = { status: "", unwatched: false, recentlyAdded: false, rated: false };
+  }
+  state.dashboardFilters.status = ["", "in-progress", "completed"].includes(state.dashboardFilters.status)
+    ? state.dashboardFilters.status : "";
+  ["unwatched", "recentlyAdded", "rated"].forEach(key => {
+    state.dashboardFilters[key] = Boolean(state.dashboardFilters[key]);
+  });
+
   const savedChip = localStorage.getItem("squashdb_category_chip");
   if (savedChip) {
     state.activeCategoryChip = savedChip;
@@ -388,6 +618,12 @@ function loadData() {
   if (savedLastCategory) {
     state.lastEntryCategory = savedLastCategory;
   }
+  try {
+    const savedStatuses = JSON.parse(localStorage.getItem("squashdb_last_entry_statuses") || "{}");
+    if (savedStatuses && typeof savedStatuses === "object") state.lastEntryStatusByCategory = savedStatuses;
+  } catch (err) {
+    state.lastEntryStatusByCategory = {};
+  }
 
   const savedLastTab = localStorage.getItem("squashdb_last_tab");
   if (savedLastTab && document.querySelector(`.nav-item[data-tab="${savedLastTab}"]`)) {
@@ -398,6 +634,23 @@ function loadData() {
 
   if (!state.activeCategoryChip) {
     state.activeCategoryChip = "series";
+  }
+
+  rebuildSearchIndex();
+
+  // Migrate existing plaintext records into the Android Keystore-backed store
+  // before deleting the large localStorage copies.
+  if (encryptedStore?.setState && !encryptedState && (savedItems || savedWatchLog || savedPrefs)) {
+    try {
+      await encryptedStore.setState({
+        data: JSON.stringify({ items: state.items, watchLog: state.watchLog || [], preferences: state.preferences })
+      });
+      localStorage.removeItem("squashdb_items");
+      localStorage.removeItem("squashdb_watch_log");
+      localStorage.removeItem("squashdb_prefs");
+    } catch (err) {
+      console.warn("Could not migrate local data into encrypted storage", err);
+    }
   }
 
 }
@@ -426,135 +679,6 @@ function initializePage() {
   lucide.createIcons();
 }
 
-function getCurrentPageTab() {
-  return document.getElementById("tab-dashboard") ? "tab-dashboard" :
-    document.getElementById("tab-timeline") ? "tab-timeline" :
-    document.getElementById("tab-discover") ? "tab-discover" :
-    document.getElementById("tab-sources") ? "tab-sources" :
-    document.getElementById("tab-explore") ? "tab-explore" :
-    document.getElementById("tab-stats") ? "tab-stats" :
-    document.getElementById("tab-settings") ? "tab-settings" :
-    null;
-}
-
-function getCurrentPagePath() {
-  return window.location.pathname.split("/").pop() || "index.html";
-}
-
-function getCurrentPagePathWithQuery() {
-  return getCurrentPagePath() + window.location.search;
-}
-
-function getAppPageStack() {
-  try {
-    const raw = sessionStorage.getItem("squashdb_page_stack");
-    const stack = raw ? JSON.parse(raw) : [];
-    return Array.isArray(stack) ? stack : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function setAppPageStack(stack) {
-  sessionStorage.setItem("squashdb_page_stack", JSON.stringify(stack));
-}
-
-function recordCurrentPage() {
-  const current = getCurrentPagePath();
-  const currentWithQuery = getCurrentPagePathWithQuery();
-  const stack = getAppPageStack();
-  if (stack[stack.length - 1] !== current) {
-    stack.push(current);
-    setAppPageStack(stack);
-  }
-  if (history.state?.squashdbPage !== currentWithQuery) {
-    history.replaceState({ squashdbPage: currentWithQuery }, "", currentWithQuery);
-  }
-}
-
-function setupAppNavigation() {
-  if (history.scrollRestoration) {
-    history.scrollRestoration = "manual";
-  }
-  recordCurrentPage();
-
-  document.querySelectorAll(".nav-item").forEach(navItem => {
-    if (navItem.dataset.boundAppNav === "true") return;
-    navItem.dataset.boundAppNav = "true";
-    navItem.addEventListener("click", (e) => {
-      const href = navItem.getAttribute("href");
-      if (!href) return;
-      e.preventDefault();
-      recordCurrentPage();
-      history.pushState({ squashdbPage: href }, "", href);
-      window.location.href = href;
-    });
-  });
-}
-
-function setupPageBackButtons() {
-  document.querySelectorAll(".page-back-btn").forEach(btn => {
-    if (btn.dataset.boundBack === "true") return;
-    btn.dataset.boundBack = "true";
-    btn.addEventListener("click", () => {
-      const fallback = btn.getAttribute("data-back-fallback") || "settings.html";
-      navigateBackWithinApp(fallback);
-    });
-  });
-}
-
-function navigateBackWithinApp(fallback = "settings.html") {
-  const stack = getAppPageStack();
-  const current = getCurrentPagePath();
-  if (stack[stack.length - 1] === current) {
-    stack.pop();
-  }
-  const previous = stack.pop();
-  setAppPageStack(stack);
-  if (previous) {
-    window.location.href = previous;
-    return true;
-  }
-  window.location.href = fallback;
-  return true;
-}
-
-function setupHardwareBackButton() {
-  const handler = (e) => {
-    if (e) e.preventDefault();
-    navigateBackWithinApp("dashboard.html");
-  };
-
-  if (document.body && !document.body.dataset.boundHardwareBack) {
-    document.body.dataset.boundHardwareBack = "true";
-    document.addEventListener("backbutton", handler, false);
-    window.addEventListener("popstate", (e) => {
-      const path = getCurrentPagePath();
-      const stack = getAppPageStack();
-      if (e.state?.squashdbPage === path || stack.length > 1) {
-        navigateBackWithinApp("dashboard.html");
-      }
-    });
-
-    // Capacitor fires the Android back button AND the system back-swipe
-    // gesture through its App plugin, not the legacy Cordova "backbutton"
-    // DOM event — without this listener the OS default closes the app.
-    const capApp = window.Capacitor?.Plugins?.App;
-    if (capApp?.addListener) {
-      capApp.addListener("backButton", () => {
-        const current = getCurrentPagePath();
-        const stack = getAppPageStack();
-        const atRoot = current === "dashboard.html" && stack.length <= 1;
-        if (atRoot) {
-          if (capApp.exitApp) capApp.exitApp();
-        } else {
-          navigateBackWithinApp("dashboard.html");
-        }
-      });
-    }
-  }
-}
-
 // Save data to LocalStorage
 let saveTimer = null;
 let saveQueued = false;
@@ -571,13 +695,29 @@ function flushPendingSave() {
   localStorage.setItem("squashdb_prefs", JSON.stringify(state.preferences));
   localStorage.setItem("squashdb_theme", state.theme);
   localStorage.setItem("squashdb_sort", state.currentSort);
+  localStorage.setItem("squashdb_search_history", JSON.stringify(state.searchHistory || []));
+  localStorage.setItem("squashdb_dashboard_filters", JSON.stringify(state.dashboardFilters || {}));
   localStorage.setItem("squashdb_category_chip", state.activeCategoryChip);
   localStorage.setItem("squashdb_timeline_filter", state.timelineFilter);
   localStorage.setItem("squashdb_last_entry_category", state.lastEntryCategory);
+  localStorage.setItem("squashdb_last_entry_statuses", JSON.stringify(state.lastEntryStatusByCategory || {}));
   localStorage.setItem("squashdb_ui_theme", state.preferences.uiTheme);
   localStorage.setItem("squashdb_main_color", state.preferences.mainColor);
   localStorage.setItem("squashdb_rating_format", state.preferences.ratingFormat);
+  rebuildSearchIndex();
+  const encryptedStore = nativePlugin("EncryptedStore");
+  if (encryptedStore?.setState) {
+    encryptedStore.setState({
+      data: JSON.stringify({ items: state.items, watchLog: state.watchLog || [], preferences: state.preferences })
+    }).then(() => {
+      // Remove only the large primary-data keys after the encrypted copy is safe.
+      localStorage.removeItem("squashdb_items");
+      localStorage.removeItem("squashdb_watch_log");
+      localStorage.removeItem("squashdb_prefs");
+    }).catch(err => console.warn("Encrypted local database save failed", err));
+  }
   applyPreferenceAttributes();
+  updateProgressWidget();
 }
 
 function saveData() {
@@ -654,6 +794,16 @@ function applyPreferenceAttributes() {
   const accent = state.preferences.mainColor || "normal";
   document.body.setAttribute("data-theme", theme);
   document.body.setAttribute("data-accent", accent);
+  document.body.setAttribute("data-one-handed", state.preferences.oneHandedMode || "off");
+  document.body.setAttribute("data-tablet-layout", state.preferences.tabletTwoColumn ? "two-column" : "single-column");
+  document.body.setAttribute("data-contrast", state.preferences.highContrast ? "high" : "normal");
+  document.body.classList.toggle("reduced-motion", Boolean(state.preferences.reducedMotion));
+  Object.keys(CATEGORIES).forEach(key => {
+    CATEGORIES[key].color = state.preferences.categoryColors?.[key]
+      || BUILTIN_CATEGORIES[key]?.color
+      || CATEGORIES[key].color;
+  });
+  document.body.classList.toggle("compact-mode", Boolean(state.preferences.compactMode));
   applyAnimationSpeed();
   if (typeof applyUiFont === "function") applyUiFont();
 }
@@ -688,7 +838,18 @@ function setupEventListeners() {
   if (globalSearch) {
     globalSearch.addEventListener("input", (e) => {
       state.searchQuery = e.target.value.toLowerCase().trim();
+      renderSearchHistory();
       renderDashboard();
+    });
+    globalSearch.addEventListener("focus", renderSearchHistory);
+    globalSearch.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") recordSearchHistory(globalSearch.value);
+      if (e.key === "Escape") {
+        globalSearch.value = "";
+        state.searchQuery = "";
+        renderSearchHistory();
+        renderDashboard();
+      }
     });
   }
 
@@ -698,6 +859,8 @@ function setupEventListeners() {
     filterBtn.addEventListener("click", openDashboardStatusFilter);
     updateDashboardFilterButton();
   }
+  const sortBtn = document.getElementById("dashboard-sort-btn");
+  if (sortBtn) sortBtn.addEventListener("click", openDashboardSortFilter);
 
   // Floating cross-links between Timeline and Statistics (each page carries
   // a FAB to the other, since only one of the two sits in the bottom bar)
@@ -774,7 +937,13 @@ function setupEventListeners() {
     });
   }
   const trackerForm = document.getElementById("tracker-form");
-  if (trackerForm) trackerForm.addEventListener("submit", handleFormSubmit);
+  if (trackerForm) {
+    trackerForm.addEventListener("submit", handleFormSubmit);
+    trackerForm.addEventListener("input", scheduleFormDraftSave);
+    trackerForm.addEventListener("change", scheduleFormDraftSave);
+  }
+  const scanCodeBtn = document.getElementById("scan-code-btn");
+  if (scanCodeBtn) scanCodeBtn.addEventListener("click", scanBarcodeOrQr);
 
   // Category switch dynamically adjusts fields in modal
   const entryCategory = document.getElementById("entry-category");
@@ -783,6 +952,8 @@ function setupEventListeners() {
       state.lastEntryCategory = e.target.value;
       saveData();
       renderDynamicFormFields(e.target.value);
+      applyRememberedStatus(e.target.value);
+      saveFormDraft();
     });
   }
 
@@ -808,6 +979,12 @@ function setupEventListeners() {
   const backupExport = document.getElementById("backup-export");
   if (backupExport) backupExport.addEventListener("click", exportData);
 
+  const encryptedExport = document.getElementById("backup-export-encrypted");
+  if (encryptedExport) encryptedExport.addEventListener("click", async () => {
+    try { await exportEncryptedBackup(); }
+    catch (err) { console.warn("Encrypted backup export failed", err); alert(err.message || "Could not create encrypted backup."); }
+  });
+
   // Backup Import
   const importTrigger = document.getElementById("backup-import-trigger");
   const importFileInput = document.getElementById("backup-import-file");
@@ -815,6 +992,35 @@ function setupEventListeners() {
     importTrigger.addEventListener("click", () => importFileInput.click());
     importFileInput.addEventListener("change", importData);
   }
+
+  const encryptedImport = document.getElementById("backup-import-encrypted");
+  if (encryptedImport && importFileInput) encryptedImport.addEventListener("click", () => importFileInput.click());
+
+  const cloudSave = document.getElementById("cloud-sync-upload");
+  const savedCloud = cloudSyncConfig();
+  const cloudEndpointInput = document.getElementById("cloud-endpoint");
+  const cloudUsernameInput = document.getElementById("cloud-username");
+  if (cloudEndpointInput) cloudEndpointInput.value = savedCloud.endpoint;
+  if (cloudUsernameInput) cloudUsernameInput.value = savedCloud.username;
+  if (cloudSave) cloudSave.addEventListener("click", async () => {
+    try { await syncEncryptedBackupToCloud(); }
+    catch (err) { console.warn("Cloud upload failed", err); localStorage.setItem("squashdb_cloud_last_sync", "Failed"); sendConfiguredNotification("notificationCloudFailures", "Cloud sync failed", err.message || "Could not upload encrypted backup."); alert(err.message || "Could not upload encrypted backup."); }
+  });
+
+  const cloudRestore = document.getElementById("cloud-sync-download");
+  if (cloudRestore) cloudRestore.addEventListener("click", async () => {
+    try { await restoreEncryptedBackupFromCloud(); }
+    catch (err) { console.warn("Cloud download failed", err); localStorage.setItem("squashdb_cloud_last_sync", "Failed"); sendConfiguredNotification("notificationCloudFailures", "Cloud sync failed", err.message || "Could not download encrypted backup."); alert(err.message || "Could not download encrypted backup."); }
+  });
+
+  const recoveryRefresh = document.getElementById("backup-recovery-refresh");
+  if (recoveryRefresh) {
+    recoveryRefresh.addEventListener("click", refreshBackupRecoveryCenter);
+    refreshBackupRecoveryCenter();
+    updateBackupStorageUsage();
+  }
+  const healthCheck = document.getElementById("backup-health-check");
+  if (healthCheck) healthCheck.addEventListener("click", runBackupHealthCheck);
 
   // Change Backup Folder
   const chooseFolderBtn = document.getElementById("backup-choose-folder");
@@ -848,6 +1054,7 @@ function setupEventListeners() {
           }
         } catch (err) {
           console.warn("Manual folder tree sync failed", err);
+          setBackupProgress("Backup failed", 0, false);
           alert("Could not sync folder tree. Please try again.");
         } finally {
           syncFolderTreeBtn.disabled = false;
@@ -871,6 +1078,261 @@ function setupEventListeners() {
         switchTab("tab-dashboard");
       }
     });
+  }
+
+  // Temporary cache controls. These never touch localStorage user data or
+  // the SAF backup folder; they only remove metadata/cache responses and the
+  // Android WebView's HTTP resource cache.
+  const cacheControls = [
+    ["clear-metadata-cache", "metadata", "Metadata cache cleared."],
+    ["clear-image-cache", "images", "Image and font cache cleared."],
+    ["clear-all-cache", "temporary", "All temporary cache cleared."]
+  ];
+  cacheControls.forEach(([id, type, message]) => {
+    const button = document.getElementById(id);
+    if (!button || !window.SquashDBCache) return;
+    button.addEventListener("click", () => openActionPopup(
+      button.querySelector("label")?.textContent || "Clear cache",
+      `${message} Your tracked items and backups will not be changed.`,
+      "Clear now",
+      async () => {
+        if (type === "metadata") await window.SquashDBCache.clearMetadata();
+        else if (type === "images") await window.SquashDBCache.clearImages();
+        else await window.SquashDBCache.clearTemporary();
+        const status = document.getElementById("metadata-cache-status");
+        if (status) status.textContent = "Cleared";
+      }
+    ));
+  });
+  const trimImageCache = document.getElementById("trim-image-cache");
+  if (trimImageCache && window.SquashDBCache?.trimImages) {
+    const imageCacheLimitStatus = document.getElementById("image-cache-limit-status");
+    const imageCacheLabel = value => Number(value) === 0 ? "Unlimited" : `${value} images`;
+    if (imageCacheLimitStatus) imageCacheLimitStatus.textContent = imageCacheLabel(state.preferences.imageCacheMaxEntries);
+    trimImageCache.addEventListener("click", () => openChoicePopup(
+      "Limit Image Cache",
+      "Choose the maximum number of cached images to keep on this device.",
+      [
+        { value: 250, label: "250 images" },
+        { value: 500, label: "500 images" },
+        { value: 1000, label: "1,000 images" },
+        { value: 0, label: "Unlimited" }
+      ],
+      state.preferences.imageCacheMaxEntries,
+      async value => {
+        state.preferences.imageCacheMaxEntries = Number(value);
+        await window.SquashDBCache.trimImages(state.preferences.imageCacheMaxEntries);
+        saveData();
+        if (imageCacheLimitStatus) imageCacheLimitStatus.textContent = imageCacheLabel(value);
+      }
+    ));
+  }
+
+  const backgroundBackups = document.getElementById("background-backups-toggle");
+  const backgroundBackupStatus = document.getElementById("background-backups-status");
+  const updateBackgroundBackupStatus = () => {
+    if (backgroundBackupStatus) backgroundBackupStatus.textContent = state.preferences.backgroundBackups ? "On" : "Off";
+  };
+  updateBackgroundBackupStatus();
+  if (backgroundBackups) backgroundBackups.addEventListener("click", () => openChoicePopup(
+    "Background Encrypted Backups",
+    "Android WorkManager will create an encrypted snapshot about once per day.",
+    [
+      { value: "on", label: "On" },
+      { value: "off", label: "Off" }
+    ],
+    state.preferences.backgroundBackups ? "on" : "off",
+    async value => {
+      const scheduler = nativePlugin("BackupScheduler");
+      if (value === "on" && (!scheduler?.schedule || !backupFolderPluginAvailable())) {
+        throw new Error("Select a backup folder in the Android app first.");
+      }
+      const previous = state.preferences.backgroundBackups;
+      state.preferences.backgroundBackups = value === "on";
+      try {
+        if (state.preferences.backgroundBackups) await scheduler.schedule();
+        else if (scheduler?.cancel) await scheduler.cancel();
+        saveData();
+        updateBackgroundBackupStatus();
+    } catch (err) {
+      state.preferences.backgroundBackups = previous;
+      updateBackgroundBackupStatus();
+      sendConfiguredNotification("notificationBackupReminders", "Backup setup needs attention", err.message || "Encrypted background backup could not be scheduled.");
+      throw err;
+    }
+    }
+  ));
+
+  const notificationPermission = document.getElementById("notification-permission");
+  const notificationPermissionStatus = document.getElementById("notification-permission-status");
+  const updateNotificationStatus = () => {
+    if (notificationPermissionStatus) notificationPermissionStatus.textContent = state.preferences.notificationsEnabled ? "On" : "Off";
+  };
+  updateNotificationStatus();
+  if (notificationPermission) {
+    notificationPermission.addEventListener("click", () => openChoicePopup(
+      "Notifications",
+      "Turn SquashDB reminders on or off. Android permission may still need to be allowed in system settings.",
+      [
+        { value: "on", label: "On" },
+        { value: "off", label: "Off" }
+      ],
+      state.preferences.notificationsEnabled ? "on" : "off",
+      async value => {
+        if (value === "on") {
+          const notifications = nativePlugin("Notifications");
+          if (!notifications?.requestPermission) throw new Error("Notifications are available in the installed Android app only.");
+          const result = await notifications.requestPermission();
+          if (!result?.granted) throw new Error("Please allow notifications in Android settings.");
+        }
+        state.preferences.notificationsEnabled = value === "on";
+        saveData();
+        updateNotificationStatus();
+      }
+    ));
+  }
+
+  const notificationTest = document.getElementById("notification-test");
+  if (notificationTest) {
+    notificationTest.addEventListener("click", () => openActionPopup(
+      "Test Notification",
+      "Send a test notification to confirm Android permission is working.",
+      "Send test notification",
+      async () => {
+      const notifications = nativePlugin("Notifications");
+      if (!notifications?.notify) throw new Error("Notifications are available in the installed Android app only.");
+      await notifications.notify({ title: "SquashDB test", body: "Notifications are working.", id: Date.now() & 0x7fffffff });
+    }
+    ));
+  }
+
+  const notificationToggleRows = [
+    ["notification-episode-reminders", "notificationEpisodeReminders", "notification-episode-reminders-status"],
+    ["notification-backup-reminders", "notificationBackupReminders", "notification-backup-reminders-status"],
+    ["notification-cloud-failures", "notificationCloudFailures", "notification-cloud-failures-status"],
+    ["notification-unfinished-items", "notificationUnfinishedItems", "notification-unfinished-items-status"]
+  ];
+  notificationToggleRows.forEach(([id, key, statusId]) => {
+    const row = document.getElementById(id);
+    const status = document.getElementById(statusId);
+    const update = () => { if (status) status.textContent = state.preferences[key] ? "On" : "Off"; };
+    update();
+    row?.addEventListener("click", () => openChoicePopup(
+      row.querySelector("label")?.textContent || "Notification setting",
+      "Choose whether SquashDB may send this type of reminder.",
+      [{ value: "on", label: "On" }, { value: "off", label: "Off" }],
+      state.preferences[key] ? "on" : "off",
+      async value => { state.preferences[key] = value === "on"; if (key === "notificationEpisodeReminders") state.preferences.episodeReminders = state.preferences[key]; saveData(); update(); }
+    ));
+  });
+
+  const snoozeRow = document.getElementById("notification-snooze");
+  const snoozeStatus = document.getElementById("notification-snooze-status");
+  const snoozeLabels = { 0: "Off", 60: "1 hour", 180: "3 hours", 1440: "Tomorrow", 10080: "Next week" };
+  if (snoozeStatus) snoozeStatus.textContent = snoozeLabels[state.preferences.notificationSnoozeMinutes] || "1 hour";
+  snoozeRow?.addEventListener("click", () => openChoicePopup(
+    "Remind me later", "Choose the default delay for notification snooze actions.",
+    Object.entries(snoozeLabels).map(([value, label]) => ({ value, label })),
+    String(state.preferences.notificationSnoozeMinutes),
+    async value => { state.preferences.notificationSnoozeMinutes = Number(value); saveData(); if (snoozeStatus) snoozeStatus.textContent = snoozeLabels[value]; }
+  ));
+
+  const timePicker = (title, key, statusId) => {
+    const modal = document.getElementById("picker-modal");
+    const list = document.getElementById("picker-options-list");
+    const titleEl = document.getElementById("picker-modal-title");
+    if (!modal || !list || !titleEl) return;
+    titleEl.textContent = title;
+    list.innerHTML = `<p class="settings-row-note action-popup-message">Select a local device time.</p><input type="time" class="form-control notification-time-input" value="${state.preferences[key]}"><button type="button" class="picker-option active" data-save-notification-time><span class="choice-radio"></span><span>Save time</span></button>`;
+    list.querySelector("[data-save-notification-time]").addEventListener("click", () => {
+      const value = list.querySelector("input").value || state.preferences[key];
+      state.preferences[key] = value;
+      saveData();
+      const status = document.getElementById(statusId);
+      if (status) status.textContent = value;
+      closeSettingsPicker();
+    });
+    modal.classList.add("active");
+  };
+  document.getElementById("notification-reminder-time")?.addEventListener("click", () => timePicker("Custom Reminder Time", "notificationReminderTime", "notification-reminder-time-status"));
+  const reminderTimeStatus = document.getElementById("notification-reminder-time-status");
+  if (reminderTimeStatus) reminderTimeStatus.textContent = state.preferences.notificationReminderTime;
+
+  const quietRow = document.getElementById("notification-quiet-hours");
+  const quietStatus = document.getElementById("notification-quiet-hours-status");
+  const updateQuietStatus = () => { if (quietStatus) quietStatus.textContent = state.preferences.notificationQuietHours ? `${state.preferences.notificationQuietStart}–${state.preferences.notificationQuietEnd}` : "Off"; };
+  updateQuietStatus();
+  quietRow?.addEventListener("click", () => openNotificationQuietHoursPopup(updateQuietStatus));
+}
+
+function openNotificationQuietHoursPopup(updateStatus) {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const title = document.getElementById("picker-modal-title");
+  if (!modal || !list || !title) return;
+  title.textContent = "Quiet Hours";
+  list.innerHTML = `<p class="settings-row-note action-popup-message">Reminders will be skipped during this time window.</p><label class="notification-time-label">Quiet hours <input type="checkbox" id="quiet-hours-enabled" ${state.preferences.notificationQuietHours ? "checked" : ""}></label><div class="notification-time-pair"><label>From<input type="time" id="quiet-hours-start" class="form-control" value="${state.preferences.notificationQuietStart}"></label><label>Until<input type="time" id="quiet-hours-end" class="form-control" value="${state.preferences.notificationQuietEnd}"></label></div><button type="button" class="picker-option active" id="quiet-hours-save"><span class="choice-radio"></span><span>Save</span></button>`;
+  list.querySelector("#quiet-hours-save").addEventListener("click", () => {
+    state.preferences.notificationQuietHours = list.querySelector("#quiet-hours-enabled").checked;
+    state.preferences.notificationQuietStart = list.querySelector("#quiet-hours-start").value || "22:00";
+    state.preferences.notificationQuietEnd = list.querySelector("#quiet-hours-end").value || "07:00";
+    saveData();
+    updateStatus();
+    closeSettingsPicker();
+  });
+  modal.classList.add("active");
+}
+
+function isNotificationQuietHours(date = new Date()) {
+  if (!state.preferences.notificationQuietHours) return false;
+  const current = date.getHours() * 60 + date.getMinutes();
+  const [startHour, startMinute] = state.preferences.notificationQuietStart.split(":").map(Number);
+  const [endHour, endMinute] = state.preferences.notificationQuietEnd.split(":").map(Number);
+  const start = startHour * 60 + startMinute;
+  const end = endHour * 60 + endMinute;
+  return start === end ? false : start < end ? current >= start && current < end : current >= start || current < end;
+}
+
+function notificationFeatureEnabled(key) {
+  return Boolean(state.preferences.notificationsEnabled && state.preferences[key] && !isNotificationQuietHours());
+}
+
+async function sendConfiguredNotification(key, title, body, itemId = "") {
+  if (!notificationFeatureEnabled(key)) return false;
+  const notifications = nativePlugin("Notifications");
+  if (!notifications?.notify) return false;
+  await notifications.notify({
+    id: Math.abs([...`${key}:${itemId}:${title}`].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)) || 1,
+    title, body, itemId,
+    actionUrl: itemId ? `show-detail.html?source=local&itemId=${encodeURIComponent(itemId)}` : "",
+    snoozeMinutes: state.preferences.notificationSnoozeMinutes || 60
+  });
+  return true;
+}
+
+async function scheduleUnfinishedItemReminder() {
+  if (!notificationFeatureEnabled("notificationUnfinishedItems")) return;
+  const notifications = nativePlugin("Notifications");
+  if (!notifications?.schedule) return;
+  const item = state.items.find(entry => state.preferences[entry.category] && entry.status !== "Completed");
+  if (!item) return;
+  const [hour, minute] = state.preferences.notificationReminderTime.split(":").map(Number);
+  const at = new Date();
+  at.setHours(hour, minute, 0, 0);
+  if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1);
+  if (isNotificationQuietHours(at)) at.setDate(at.getDate() + 1);
+  try {
+    await notifications.schedule({
+      id: Math.abs([...`unfinished:${item.id}`].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)) || 2,
+      at: at.getTime(),
+      title: "Continue your list",
+      body: `${item.title} is still unfinished.`,
+      itemId: item.id,
+      actionUrl: `show-detail.html?source=local&itemId=${encodeURIComponent(item.id)}`,
+      snoozeMinutes: state.preferences.notificationSnoozeMinutes || 60
+    });
+  } catch (err) {
+    console.warn("Could not schedule unfinished-item reminder", err);
   }
 }
 
@@ -971,7 +1433,7 @@ function updateAppLockSettingsSummary() {
   const summaryEl = document.getElementById("app-lock-settings-summary");
   if (!summaryEl) return;
   normalizeAppLock();
-  const labels = { none: "Off", pin: "PIN", pattern: "Pattern", alphanumeric: "Password" };
+  const labels = { none: "Off", pin: "PIN", pattern: "Pattern", alphanumeric: "Password", biometric: "Biometric" };
   summaryEl.textContent = labels[state.preferences.appLock.method] || "Off";
 }
 
@@ -1004,7 +1466,11 @@ function applyNavBarConfig() {
   cfg.order.forEach(key => {
     const item = itemsByKey[key];
     if (!item) return;
-    item.style.display = cfg.visible[key] === false ? "none" : "";
+    const hidden = cfg.visible[key] === false;
+    item.style.display = hidden ? "none" : "";
+    item.hidden = hidden;
+    item.setAttribute("aria-hidden", hidden ? "true" : "false");
+    item.tabIndex = hidden ? -1 : 0;
     nav.appendChild(item);
   });
 }
@@ -1308,6 +1774,20 @@ const SETTINGS_PICKERS = {
       { value: "material-you", label: "Material You" }
     ]
   },
+  highContrast: {
+    default: "false",
+    options: [
+      { value: "false", label: "Standard contrast" },
+      { value: "true", label: "High contrast" }
+    ]
+  },
+  reducedMotion: {
+    default: "false",
+    options: [
+      { value: "false", label: "Allow motion" },
+      { value: "true", label: "Reduce motion" }
+    ]
+  },
   dashboardRowActions: {
     default: "menu",
     options: [
@@ -1321,6 +1801,35 @@ const SETTINGS_PICKERS = {
     options: [
       { value: "list", label: "List" },
       { value: "grid", label: "Grid" }
+    ]
+  },
+  navigationSheet: {
+    default: "true",
+    options: [
+      { value: "true", label: "Bottom sheet" },
+      { value: "false", label: "Direct navigation" }
+    ]
+  },
+  oneHandedMode: {
+    default: "off",
+    options: [
+      { value: "off", label: "Off" },
+      { value: "left", label: "Left-handed" },
+      { value: "right", label: "Right-handed" }
+    ]
+  },
+  tabletTwoColumn: {
+    default: "true",
+    options: [
+      { value: "true", label: "Two columns" },
+      { value: "false", label: "Single column" }
+    ]
+  },
+  compactMode: {
+    default: "false",
+    options: [
+      { value: "false", label: "Off" },
+      { value: "true", label: "On" }
     ]
   },
   metadataMode: {
@@ -1390,6 +1899,9 @@ function updatePickerRowValues() {
 
 function setupSettingsPickers() {
   document.querySelectorAll(".settings-row-picker").forEach(row => {
+    // Action rows (cache, notifications, background backups) use their own
+    // click handlers. Only rows with a data-pref belong to the picker sheet.
+    if (!row.dataset.pref) return;
     if (row.dataset.bound === "true") return;
     row.dataset.bound = "true";
     row.addEventListener("click", () => {
@@ -1433,11 +1945,12 @@ function openSettingsPicker(pref, title) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `picker-option${opt.value === current ? " active" : ""}`;
-    btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${opt.label}</span>`;
+    btn.innerHTML = `<span class="choice-radio" aria-hidden="true"></span><span>${opt.label}</span>`;
     btn.addEventListener("click", () => {
       setPickerValue(pref, opt.value);
       saveData();
       applyTheme();
+      applyPreferenceAttributes();
       if (pref === "uiFont" && typeof applyUiFont === "function") applyUiFont();
       updateLayoutToggleButtons();
       renderDashboard();
@@ -1451,6 +1964,122 @@ function openSettingsPicker(pref, title) {
 
   modal.classList.add("active");
   if (window.lucide && list.childElementCount > 0) lucide.createIcons();
+}
+
+function openCategoryColorsPicker() {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const title = document.getElementById("picker-modal-title");
+  if (!modal || !list || !title) return;
+  title.textContent = "Category Colors";
+  const draft = { ...(state.preferences.categoryColors || {}) };
+  list.innerHTML = `<p class="settings-row-note action-popup-message">Choose a separate accent color for each tracking category.</p>`;
+  Object.keys(CATEGORIES).forEach(key => {
+    const row = document.createElement("label");
+    row.className = "category-color-option";
+    row.innerHTML = `<span><i data-lucide="${CATEGORIES[key].icon || "circle"}"></i>${CATEGORIES[key].label}</span><input type="color" value="${draft[key] || CATEGORIES[key].color}" aria-label="${CATEGORIES[key].label} color">`;
+    row.querySelector("input").addEventListener("input", event => { draft[key] = event.target.value; });
+    list.appendChild(row);
+  });
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "picker-option active category-color-save";
+  save.innerHTML = `<i data-lucide="check"></i><span>Save colors</span>`;
+  save.addEventListener("click", () => {
+    state.preferences.categoryColors = draft;
+    saveData();
+    applyPreferenceAttributes();
+    renderDashboard();
+    renderStats();
+    closeSettingsPicker();
+    showToast("Category colors updated", "success");
+  });
+  list.appendChild(save);
+  modal.classList.add("active");
+  if (window.lucide) lucide.createIcons();
+}
+
+function openActionPopup(title, message, actionLabel, action) {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list || !titleEl) return;
+
+  titleEl.textContent = title;
+  list.innerHTML = "";
+
+  const description = document.createElement("p");
+  description.className = "settings-row-note action-popup-message";
+  description.textContent = message;
+  list.appendChild(description);
+
+  const actionButton = document.createElement("button");
+  actionButton.type = "button";
+  actionButton.className = "picker-option active";
+  actionButton.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${actionLabel}</span>`;
+  actionButton.addEventListener("click", async () => {
+    actionButton.disabled = true;
+    try {
+      await action();
+      closeSettingsPicker();
+      showToast(`${title} completed`, "success");
+    } catch (err) {
+      console.warn(`${title} action failed`, err);
+      showToast(err?.message || `${title} failed`, "error");
+      description.textContent = err?.message || "This action could not be completed. Please try again.";
+      description.style.color = "var(--danger)";
+    } finally {
+      actionButton.disabled = false;
+    }
+  });
+  list.appendChild(actionButton);
+
+  const cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.className = "picker-option";
+  cancelButton.innerHTML = `<i data-lucide="x" class="picker-option-check" style="visibility:visible;color:var(--text-muted);"></i><span>Cancel</span>`;
+  cancelButton.addEventListener("click", closeSettingsPicker);
+  list.appendChild(cancelButton);
+
+  modal.classList.add("active");
+  if (window.lucide) lucide.createIcons();
+}
+
+function openChoicePopup(title, message, options, currentValue, onSelect) {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list || !titleEl) return;
+
+  titleEl.textContent = title;
+  list.innerHTML = "";
+  const description = document.createElement("p");
+  description.className = "settings-row-note action-popup-message";
+  description.textContent = message;
+  list.appendChild(description);
+
+  options.forEach(option => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `picker-option${String(option.value) === String(currentValue) ? " active" : ""}`;
+    button.innerHTML = `<span class="choice-radio" aria-hidden="true"></span><span>${option.label}</span>`;
+    button.addEventListener("click", async () => {
+      list.querySelectorAll(".picker-option").forEach(row => row.classList.remove("active"));
+      button.classList.add("active");
+      try {
+        await onSelect(option.value);
+        closeSettingsPicker();
+      } catch (err) {
+        console.warn(`${title} selection failed`, err);
+        description.textContent = err?.message || "This option could not be selected.";
+        description.style.color = "var(--danger)";
+      }
+    });
+    list.appendChild(button);
+  });
+
+  modal.classList.add("active");
+  if (window.lucide) lucide.createIcons();
 }
 
 function closeSettingsPicker() {
@@ -1833,7 +2462,120 @@ function dashboardStatusFilterActive() {
 function updateDashboardFilterButton() {
   const btn = document.getElementById("dashboard-filter-btn");
   if (!btn) return;
-  btn.classList.toggle("active", dashboardStatusFilterActive());
+  btn.classList.toggle("active", dashboardStatusFilterActive() || dashboardFiltersActive());
+}
+
+function dashboardFiltersActive() {
+  return Boolean(state.dashboardFilters?.status || state.dashboardFilters?.unwatched
+    || state.dashboardFilters?.recentlyAdded || state.dashboardFilters?.rated);
+}
+
+function saveDashboardViewState() {
+  localStorage.setItem("squashdb_dashboard_filters", JSON.stringify(state.dashboardFilters));
+  localStorage.setItem("squashdb_sort", state.currentSort);
+}
+
+function recordSearchHistory(value) {
+  const query = String(value || "").trim().toLowerCase();
+  if (query.length < 2) return;
+  state.searchHistory = [query, ...(state.searchHistory || []).filter(entry => entry !== query)].slice(0, 8);
+  localStorage.setItem("squashdb_search_history", JSON.stringify(state.searchHistory));
+  renderSearchHistory();
+}
+
+function escapeSearchHistoryText(value) {
+  return String(value || "").replace(/[&<>\"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;"
+  }[character]));
+}
+
+function renderSearchHistory() {
+  const root = document.getElementById("dashboard-search-history");
+  const input = document.getElementById("global-search");
+  if (!root || !input) return;
+  const entries = (state.searchHistory || []).filter(entry => !state.searchQuery || entry.includes(state.searchQuery));
+  if (document.activeElement !== input || !entries.length || state.searchQuery) {
+    root.style.display = "none";
+    root.innerHTML = "";
+    return;
+  }
+  root.innerHTML = `<div class="dashboard-search-history-header"><span>Recent searches</span><button type="button" data-clear-history>Clear</button></div>${entries.map(entry => `<button type="button" class="dashboard-search-history-item" data-search-history="${escapeSearchHistoryText(entry)}"><i data-lucide="history"></i><span>${escapeSearchHistoryText(entry)}</span></button>`).join("")}`;
+  root.style.display = "block";
+  root.querySelectorAll("[data-search-history]").forEach(button => button.addEventListener("click", () => {
+    input.value = button.dataset.searchHistory;
+    state.searchQuery = input.value.toLowerCase().trim();
+    root.style.display = "none";
+    renderDashboard();
+  }));
+  root.querySelector("[data-clear-history]")?.addEventListener("click", () => {
+    state.searchHistory = [];
+    localStorage.removeItem("squashdb_search_history");
+    renderSearchHistory();
+  });
+  if (window.lucide) lucide.createIcons();
+}
+
+function dashboardReleaseTime(item) {
+  const value = item.releaseDate || item.premiered || item.firstAirDate || item.release_date || item.publishedDate;
+  const time = value ? Date.parse(value) : 0;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function dashboardHasUnwatched(item) {
+  if (item.status === "Completed") return false;
+  if (Array.isArray(item.episodesCache) && item.episodesCache.length) {
+    return item.episodesCache.some(episode => !(item.watchedEpisodeIds || []).includes(episode.id));
+  }
+  const total = parseInt(item.totalEpisodes || item.totalChapters || item.totalVolumes, 10) || 0;
+  const done = parseInt(item.episodesDone || item.chaptersRead || item.volumesRead, 10) || 0;
+  return total > done || ["In Progress", "Playing", "Reading"].includes(item.status);
+}
+
+function dashboardFilterChips() {
+  return [
+    ["in-progress", "In Progress"], ["completed", "Completed"],
+    ["unwatched", "Unwatched episodes"], ["recentlyAdded", "Recently added"], ["rated", "Rating"]
+  ];
+}
+
+function renderDashboardFilterChips() {
+  const root = document.getElementById("dashboard-filter-chips");
+  if (!root) return;
+  root.innerHTML = dashboardFilterChips().map(([key, label]) => {
+    const active = key === "in-progress" || key === "completed"
+      ? state.dashboardFilters.status === key : Boolean(state.dashboardFilters[key]);
+    return `<button type="button" class="dashboard-filter-chip${active ? " active" : ""}" data-dashboard-filter="${key}">${label}</button>`;
+  }).join("");
+  root.querySelectorAll("[data-dashboard-filter]").forEach(button => button.addEventListener("click", () => {
+    const key = button.dataset.dashboardFilter;
+    if (key === "in-progress" || key === "completed") {
+      state.dashboardFilters.status = state.dashboardFilters.status === key ? "" : key;
+    } else {
+      state.dashboardFilters[key] = !state.dashboardFilters[key];
+    }
+    saveDashboardViewState();
+    renderDashboard();
+  }));
+}
+
+function openDashboardSortFilter() {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list) return;
+  if (titleEl) titleEl.textContent = "Sort dashboard";
+  const options = [
+    ["updated-desc", "Last updated"], ["progress-desc", "Progress"],
+    ["rating-desc", "Rating"], ["release-desc", "Release date"], ["alphabetical-asc", "Alphabetical"]
+  ];
+  list.innerHTML = options.map(([value, label]) => `<button type="button" class="picker-option${state.currentSort === value ? " active" : ""}" data-sort-value="${value}"><span class="choice-radio"></span><span>${label}</span></button>`).join("");
+  list.querySelectorAll("[data-sort-value]").forEach(button => button.addEventListener("click", () => {
+    state.currentSort = button.dataset.sortValue;
+    saveDashboardViewState();
+    closeSettingsPicker();
+    renderDashboard();
+  }));
+  modal.classList.add("active");
 }
 
 function openDashboardStatusFilter() {
@@ -1851,7 +2593,7 @@ function openDashboardStatusFilter() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `picker-option${current === value ? " active" : ""}`;
-    btn.innerHTML = `<i data-lucide="check" class="picker-option-check"></i><span>${value === "all" ? "All statuses" : value}</span>`;
+    btn.innerHTML = `<span class="choice-radio"></span><span>${value === "all" ? "All statuses" : value}</span>`;
     btn.addEventListener("click", () => {
       state.statusFilter = value;
       closeSettingsPicker();
@@ -1862,7 +2604,145 @@ function openDashboardStatusFilter() {
   });
 
   modal.classList.add("active");
-  lucide.createIcons();
+}
+
+function renderDashboardSkeleton() {
+  const container = document.getElementById("notes-container");
+  const emptyState = document.getElementById("dashboard-empty");
+  if (!container) return;
+  if (emptyState) emptyState.style.display = "none";
+  container.style.display = "flex";
+  container.classList.remove("notes-grid-view");
+  container.innerHTML = Array.from({ length: 5 }, () => `
+    <div class="dashboard-skeleton-card" aria-hidden="true">
+      <span class="dashboard-skeleton-thumb"></span>
+      <span class="dashboard-skeleton-lines"><i></i><i></i><i></i></span>
+    </div>
+  `).join("");
+}
+
+function dashboardCategoryItems() {
+  return state.items.filter(item => item.category === state.activeCategoryChip && state.preferences[item.category]);
+}
+
+function nextEpisodeForDashboardItem(item) {
+  const episodes = Array.isArray(item.episodesCache) ? item.episodesCache : [];
+  if (!episodes.length) return null;
+  const watched = new Set(item.watchedEpisodeIds || []);
+  return episodes
+    .filter(episode => !watched.has(episode.id))
+    .sort((a, b) => {
+      const season = (parseInt(a.season) || 0) - (parseInt(b.season) || 0);
+      return season || ((parseInt(a.number) || 0) - (parseInt(b.number) || 0));
+    })[0] || null;
+}
+
+function progressRingHTML(progress, className = "") {
+  const value = Math.max(0, Math.min(100, Number(progress) || 0));
+  return `<span class="dashboard-progress-ring ${className}" style="--progress:${value}%" aria-label="${value}% complete"><span>${value}%</span></span>`;
+}
+
+function dashboardInsightCard(item, label, extra = "") {
+  const progress = calculateProgress(item);
+  return `
+    <button type="button" class="dashboard-insight-card" data-id="${item.id}">
+      ${thumbnailOrPlaceholder(item.thumbnail, "dashboard-insight-thumb")}
+      <span class="dashboard-insight-body"><strong>${item.title}</strong><small>${label}${extra ? ` · ${extra}` : ""}</small></span>
+      ${progressRingHTML(progress)}
+    </button>
+  `;
+}
+
+function renderDashboardInsights() {
+  const root = document.getElementById("dashboard-insights");
+  if (!root) return;
+  root.dataset.view = state.preferences.dashboardView === "grid" ? "grid" : "list";
+  const items = dashboardCategoryItems();
+  const visible = !state.searchQuery && !dashboardStatusFilterActive() && !dashboardFiltersActive();
+  if (!visible || !items.length) {
+    root.innerHTML = "";
+    root.style.display = "none";
+    return;
+  }
+
+  const continueItems = items
+    .filter(item => item.status !== "Completed" && (calculateProgress(item) > 0 || ["In Progress", "Playing", "Reading"].includes(item.status)))
+    .sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0))
+    .slice(0, 4);
+  const continueIds = new Set(continueItems.map(item => item.id));
+  const completedItems = items
+    .filter(item => item.status === "Completed")
+    .sort((a, b) => String(b.completionDate || b.updated || "").localeCompare(String(a.completionDate || a.updated || "")))
+    .slice(0, 4);
+  const completedIds = new Set(completedItems.map(item => item.id));
+  const staleCutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  const staleItems = items
+    .filter(item => {
+      const lastUpdated = Number(item.updated || item.created || 0);
+      return !continueIds.has(item.id) && !completedIds.has(item.id) && lastUpdated > 0 && lastUpdated < staleCutoff;
+    })
+    .sort((a, b) => (Number(a.updated || a.created) || 0) - (Number(b.updated || b.created) || 0))
+    .slice(0, 4);
+
+  const staleLabel = item => {
+    const days = Math.max(1, Math.floor((Date.now() - Number(item.updated || item.created || Date.now())) / (24 * 60 * 60 * 1000)));
+    return `${days} days since update`;
+  };
+
+  const section = (title, content, className = "") => content ? `<section class="dashboard-insight-section ${className}"><h3>${title}</h3><div class="dashboard-insight-scroller">${content}</div></section>` : "";
+  root.innerHTML = [
+    section("Continue watching", continueItems.map(item => dashboardInsightCard(item, item.status, `${calculateProgress(item)}%`)).join(""), "continue"),
+    section("Haven't updated in a long time", staleItems.map(item => dashboardInsightCard(item, item.status, staleLabel(item))).join(""), "stale"),
+    section("Completed", completedItems.map(item => dashboardInsightCard(item, item.completionDate || "Completed")).join(""), "completed")
+  ].join("");
+  root.dataset.insightItemIds = JSON.stringify([...new Set([
+    ...continueItems.map(item => item.id),
+    ...staleItems.map(item => item.id),
+    ...completedItems.map(item => item.id)
+  ])]);
+  root.style.display = root.innerHTML ? "block" : "none";
+  root.querySelectorAll(".dashboard-insight-card").forEach(card => card.addEventListener("click", () => openItemForCategory(card.dataset.id)));
+  if (window.lucide) lucide.createIcons();
+}
+
+function setupDashboardPullToRefresh() {
+  const dashboard = document.getElementById("tab-dashboard");
+  const status = document.getElementById("dashboard-refresh-status");
+  if (!dashboard || dashboard.dataset.pullBound === "true") return;
+  dashboard.dataset.pullBound = "true";
+  let startY = 0;
+  let pulling = false;
+  dashboard.addEventListener("touchstart", event => {
+    if (window.scrollY > 2 || document.querySelector(".modal-overlay.active")) return;
+    startY = event.touches[0].clientY;
+    pulling = true;
+  }, { passive: true });
+  dashboard.addEventListener("touchmove", event => {
+    if (!pulling) return;
+    const distance = Math.max(0, Math.min(90, event.touches[0].clientY - startY));
+    dashboard.style.setProperty("--dashboard-pull-distance", `${distance}px`);
+    dashboard.classList.toggle("dashboard-pulling", distance > 0);
+  }, { passive: true });
+  dashboard.addEventListener("touchend", async event => {
+    if (!pulling) return;
+    pulling = false;
+    const distance = event.changedTouches[0].clientY - startY;
+    dashboard.classList.remove("dashboard-pulling");
+    dashboard.style.removeProperty("--dashboard-pull-distance");
+    if (distance < 64) return;
+    if (status) status.textContent = "Refreshing metadata and images…";
+    try {
+      if (window.SquashDBCache) {
+        await window.SquashDBCache.clearMetadata();
+        await window.SquashDBCache.clearImages();
+      }
+      renderDashboard();
+      if (status) status.textContent = "Dashboard refreshed";
+    } catch (err) {
+      if (status) status.textContent = "Refresh failed — your saved data is safe";
+    }
+    setTimeout(() => { if (status) status.textContent = ""; }, 1800);
+  }, { passive: true });
 }
 
 function renderDashboard() {
@@ -1870,6 +2750,8 @@ function renderDashboard() {
   const emptyState = document.getElementById("dashboard-empty");
   if (!container) return;
   updateDashboardFilterButton();
+  renderDashboardFilterChips();
+  renderDashboardInsights();
 
   container.innerHTML = "";
 
@@ -1878,12 +2760,28 @@ function renderDashboard() {
     if (firstEnabled) {
       state.activeCategoryChip = firstEnabled;
       saveData();
+      renderDashboardInsights();
     } else {
       emptyState.style.display = "flex";
       container.style.display = "none";
       return;
     }
   }
+
+  const insightRoot = document.getElementById("dashboard-insights");
+  let insightItemIds = new Set();
+  try {
+    const ids = JSON.parse(insightRoot?.dataset.insightItemIds || "[]");
+    insightItemIds = new Set(Array.isArray(ids) ? ids : []);
+  } catch (err) {
+    insightItemIds = new Set();
+  }
+  const insightsAreActive = Boolean(
+    insightRoot?.style.display !== "none"
+    && !state.searchQuery
+    && !dashboardStatusFilterActive()
+    && !dashboardFiltersActive()
+  );
 
   // 1. Filter items based on active preferences, quick filter chip, and search query
   let filtered = state.items.filter(item => {
@@ -1892,12 +2790,15 @@ function renderDashboard() {
     
     // Check quick filter chip selection
     if (item.category !== state.activeCategoryChip) return false;
+
+    // Insight cards are the primary view for these items. Keep the regular
+    // list/grid for anything not represented above so dashboard data is not
+    // shown twice.
+    if (insightsAreActive && insightItemIds.has(item.id)) return false;
     
     // Check search query matches Title or Notes
     if (state.searchQuery) {
-      const titleMatch = item.title.toLowerCase().includes(state.searchQuery);
-      const notesMatch = item.notes.toLowerCase().includes(state.searchQuery);
-      if (!titleMatch && !notesMatch) return false;
+      if (!searchIndexMatches(item, state.searchQuery)) return false;
     }
 
     // Status filter from the search-bar funnel button. A filter carried over
@@ -1905,6 +2806,13 @@ function renderDashboard() {
     if (state.statusFilter && state.statusFilter !== "all"
       && (CATEGORIES[state.activeCategoryChip]?.statuses || []).includes(state.statusFilter)
       && item.status !== state.statusFilter) return false;
+
+    const quick = state.dashboardFilters || {};
+    if (quick.status === "in-progress" && !["In Progress", "Playing", "Reading"].includes(item.status)) return false;
+    if (quick.status === "completed" && item.status !== "Completed") return false;
+    if (quick.unwatched && !dashboardHasUnwatched(item)) return false;
+    if (quick.recentlyAdded && (Date.now() - (Number(item.created) || 0)) > 30 * 24 * 60 * 60 * 1000) return false;
+    if (quick.rated && !(Number(item.rating) > 0)) return false;
 
     return true;
   });
@@ -1915,14 +2823,18 @@ function renderDashboard() {
       return a.title.localeCompare(b.title);
     } else if (state.currentSort === "alphabetical-desc") {
       return b.title.localeCompare(a.title);
-    } else if (state.currentSort === "created-desc") {
-      return b.created - a.created;
+    } else if (state.currentSort === "created-desc" || state.currentSort === "updated-desc") {
+      return (Number(b.updated || b.lastUpdated || b.created) || 0) - (Number(a.updated || a.lastUpdated || a.created) || 0);
     } else if (state.currentSort === "created-asc") {
       return a.created - b.created;
     } else if (state.currentSort === "progress-desc") {
       return calculateProgress(b) - calculateProgress(a);
     } else if (state.currentSort === "progress-asc") {
       return calculateProgress(a) - calculateProgress(b);
+    } else if (state.currentSort === "rating-desc") {
+      return (Number(b.rating) || 0) - (Number(a.rating) || 0);
+    } else if (state.currentSort === "release-desc") {
+      return dashboardReleaseTime(b) - dashboardReleaseTime(a);
     }
     return 0;
   });
@@ -1930,8 +2842,15 @@ function renderDashboard() {
   // 3. Render note elements incrementally: only a first batch is built up front,
   // more are appended as the user scrolls near the bottom (see setupDashboardLazyLoad).
   if (filtered.length === 0) {
+    if (insightsAreActive) {
+      emptyState.style.display = "none";
+      container.style.display = "none";
+      teardownDashboardLazyLoad();
+      return;
+    }
     emptyState.style.display = "flex";
     container.style.display = "none";
+    renderDashboardEmptyState();
     teardownDashboardLazyLoad();
   } else {
     emptyState.style.display = "none";
@@ -1945,6 +2864,36 @@ function renderDashboard() {
     updateGridSelectionBar();
     setupDashboardLazyLoad(container, filtered);
   }
+}
+
+function renderDashboardEmptyState() {
+  const title = document.getElementById("dashboard-empty-title");
+  const message = document.getElementById("dashboard-empty-message");
+  const suggestions = document.getElementById("dashboard-empty-suggestions");
+  if (!title || !message || !suggestions) return;
+  const search = Boolean(state.searchQuery);
+  const filters = dashboardFiltersActive() || dashboardStatusFilterActive();
+  title.textContent = search ? "No matching items" : filters ? "No items match these filters" : "No Items Found";
+  message.textContent = search
+    ? "Try a shorter search, a different spelling, or search by notes, tags, genre, or provider."
+    : filters ? "Clear a filter or choose another category to see more of your library."
+      : "Tap the floating \"+\" button to add games, movies, series, or books to your list.";
+  const actions = [];
+  if (search) actions.push(`<button type="button" class="btn btn-secondary" data-empty-action="search">Clear search</button>`);
+  if (filters) actions.push(`<button type="button" class="btn btn-secondary" data-empty-action="filters">Clear filters</button>`);
+  suggestions.innerHTML = actions.join("");
+  suggestions.querySelector('[data-empty-action="search"]')?.addEventListener("click", () => {
+    const input = document.getElementById("global-search");
+    if (input) input.value = "";
+    state.searchQuery = "";
+    renderDashboard();
+  });
+  suggestions.querySelector('[data-empty-action="filters"]')?.addEventListener("click", () => {
+    state.dashboardFilters = { status: "", unwatched: false, recentlyAdded: false, rated: false };
+    state.statusFilter = "all";
+    saveDashboardViewState();
+    renderDashboard();
+  });
 }
 
 const DASHBOARD_BATCH_SIZE = 30;
@@ -1965,7 +2914,6 @@ function buildGridCard(item) {
   const isCompleted = item.status === "Completed";
   const activeStatuses = new Set(["In Progress", "Playing", "Reading", "On Hold"]);
   const started = progress > 0 || activeStatuses.has(item.status);
-
   let barHTML = "";
   if (isCompleted) {
     barHTML = `<div class="grid-card-bar grid-card-bar-complete"></div>`;
@@ -1975,6 +2923,7 @@ function buildGridCard(item) {
 
   card.innerHTML = `
     ${thumbnailOrPlaceholder(item.thumbnail, "grid-card-thumb")}
+    <div class="grid-card-progress">${progressRingHTML(progress)}</div>
     ${barHTML ? `<div class="grid-card-bar-track">${barHTML}</div>` : ""}
     <div class="grid-card-select-overlay">
       <div class="grid-card-select-check"><i data-lucide="check"></i></div>
@@ -2011,9 +2960,18 @@ function buildNoteCard(item) {
   if (sourceName) metaParts.push(sourceName);
   const metaLineHTML = metaParts.length ? `<span class="note-meta-line">${metaParts.join(" · ")}</span>` : "";
 
-  const actionsHTML = rowActions === "menu"
-    ? `<button class="note-action-btn menu-btn" data-id="${item.id}" title="More"><i data-lucide="more-vertical"></i></button>`
-    : "";
+  const progressType = ["series", "kdrama", "cdrama", "anime"].includes(item.category)
+    ? "ep"
+    : ["manga", "novel"].includes(item.category)
+      ? (parseInt(item.totalChapters) > 0 ? "ch" : "vol")
+      : "";
+  const progressUnit = progressType === "ep" ? "episode" : progressType === "vol" ? "volume" : "chapter";
+  const quickProgressHTML = progressType ? `<button class="note-action-btn inc-btn" data-id="${item.id}" data-type="${progressType}" title="Mark next ${progressUnit} watched"><i data-lucide="plus"></i></button>` : "";
+  const actionsHTML = `<div class="note-quick-actions">
+      ${quickProgressHTML}
+      <button class="note-action-btn edit-btn" data-id="${item.id}" title="Edit"><i data-lucide="edit-2"></i></button>
+      <button class="note-action-btn delete-btn" data-id="${item.id}" title="Delete"><i data-lucide="trash-2"></i></button>
+    </div>`;
 
   const swipeActionsHTML = rowActions === "swipe" ? `
     <div class="note-row-swipe-actions">
@@ -2032,6 +2990,7 @@ function buildNoteCard(item) {
         <span class="note-subtitle">${subtitleParts.join(" · ")}</span>
         ${metaLineHTML}
       </div>
+      ${progressRingHTML(progress)}
       <span class="note-tag" style="--theme-color: ${CATEGORIES[item.category].color}">${CATEGORIES[item.category].label}</span>
       ${actionsHTML}
     </div>
@@ -2129,16 +3088,8 @@ function toggleGridSelection(id, forceSelect = null) {
 function deleteSelectedGridItems() {
   if (dashboardSelectedIds.size === 0) return;
   const ids = Array.from(dashboardSelectedIds);
-  if (!confirm(`Delete ${ids.length} selected item(s)? This cannot be undone.`)) return;
-  ids.forEach(id => {
-    const item = state.items.find(entry => entry.id === id);
-    state.items = state.items.filter(entry => entry.id !== id);
-    pruneDeletedItemFromFolderTree(item).catch(err => console.warn("Could not prune deleted item from folder tree", err));
-  });
-  saveData();
-  renderDashboard();
-  renderTimeline();
-  renderStats();
+  if (!confirm(`Delete ${ids.length} selected item(s)? You can undo this for a short time.`)) return;
+  deleteItemsWithUndo(ids);
   clearGridSelection();
 }
 
@@ -2524,31 +3475,11 @@ function renderStatsWatchCharts(activeItemIds) {
   if (!timeCard || !timeChart || !epCard || !epChart || !marathonsCard || !marathonsList) return;
 
   const log = (state.watchLog || []).filter(entry => activeItemIds.has(entry.itemId));
-  if (log.length === 0) {
-    timeCard.style.display = "none";
-    epCard.style.display = "none";
-    marathonsCard.style.display = "none";
-    return;
-  }
-
-  // Bucket into the last 8 ISO weeks (Mon-Sun), oldest first.
-  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-  const now = new Date();
-  const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Monday
-  const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek).getTime();
-
-  const weekBuckets = Array.from({ length: 8 }, (_, i) => {
-    const weekStart = startOfThisWeek - (7 - i) * msPerWeek;
-    return { weekStart, weekEnd: weekStart + msPerWeek, minutes: 0, episodes: 0 };
-  });
+  const hasWatchHistory = log.length > 0;
 
   const dayTotals = {}; // "itemId|YYYY-MM-DD" -> { title, count }
+  const now = new Date();
   log.forEach(entry => {
-    const bucket = weekBuckets.find(w => entry.watchedAt >= w.weekStart && entry.watchedAt < w.weekEnd);
-    if (bucket) {
-      bucket.minutes += entry.runtime || 0;
-      bucket.episodes += 1;
-    }
     const dayKey = `${entry.itemId}|${new Date(entry.watchedAt).toISOString().slice(0, 10)}`;
     if (!dayTotals[dayKey]) dayTotals[dayKey] = { title: entry.title, count: 0, minutes: 0 };
     dayTotals[dayKey].count += 1;
@@ -2557,27 +3488,75 @@ function renderStatsWatchCharts(activeItemIds) {
 
   timeCard.style.display = "flex";
   epCard.style.display = "flex";
-  const maxMinutes = Math.max(...weekBuckets.map(w => w.minutes), 1);
-  const maxEpisodes = Math.max(...weekBuckets.map(w => w.episodes), 1);
-
-  timeChart.innerHTML = weekBuckets.map(w => `
+  // Weekly graph: one bar per day for the current Monday-Sunday week.
+  const dayOfWeek = (now.getDay() + 6) % 7;
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+  const weekBuckets = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index);
+    return { date, minutes: 0, episodes: 0 };
+  });
+  log.forEach(entry => {
+    const watched = new Date(entry.watchedAt);
+    const day = Math.floor((new Date(watched.getFullYear(), watched.getMonth(), watched.getDate()) - weekStart) / (24 * 60 * 60 * 1000));
+    if (day >= 0 && day < 7) {
+      weekBuckets[day].minutes += Number(entry.runtime) || 0;
+      weekBuckets[day].episodes += 1;
+    }
+  });
+  const maxMinutes = Math.max(...weekBuckets.map(day => day.minutes), 1);
+  timeChart.innerHTML = weekBuckets.map(day => `
     <div class="column-chart-col">
-      <span class="column-chart-value">${w.minutes ? formatMinutesAsDuration(w.minutes) : ""}</span>
-      <div class="column-chart-bar" style="height:${Math.round((w.minutes / maxMinutes) * 100)}%"></div>
-      <span class="column-chart-label">${new Date(w.weekStart).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+      <span class="column-chart-value">${day.minutes ? formatMinutesAsDuration(day.minutes) : ""}</span>
+      <div class="column-chart-bar" style="height:${Math.max(day.minutes ? 8 : 2, Math.round((day.minutes / maxMinutes) * 100))}%" title="${day.episodes} episode${day.episodes === 1 ? "" : "s"}"></div>
+      <span class="column-chart-label">${day.date.toLocaleDateString(undefined, { weekday: "short" })}</span>
     </div>
   `).join("");
 
-  epChart.innerHTML = weekBuckets.map(w => `
+  // Monthly graph: selectable month, grouped into week-of-month bars.
+  const monthKeys = [...new Set([
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+    ...log.map(entry => {
+      const date = new Date(entry.watchedAt);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    })
+  ])].sort().reverse();
+  const monthSelect = document.getElementById("stats-month-select");
+  const savedMonth = localStorage.getItem("squashdb_stats_month") || monthKeys[0];
+  const selectedMonth = monthKeys.includes(savedMonth) ? savedMonth : monthKeys[0];
+  if (monthSelect) {
+    monthSelect.innerHTML = monthKeys.map(key => {
+      const [year, month] = key.split("-").map(Number);
+      const label = new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+      return `<option value="${key}" ${key === selectedMonth ? "selected" : ""}>${label}</option>`;
+    }).join("");
+    if (monthSelect.dataset.bound !== "true") {
+      monthSelect.dataset.bound = "true";
+      monthSelect.addEventListener("change", () => {
+        localStorage.setItem("squashdb_stats_month", monthSelect.value);
+        renderStats();
+      });
+    }
+  }
+  const [selectedYear, selectedMonthNumber] = selectedMonth.split("-").map(Number);
+  const monthBuckets = Array.from({ length: 5 }, (_, index) => ({ week: index + 1, minutes: 0, episodes: 0 }));
+  log.forEach(entry => {
+    const date = new Date(entry.watchedAt);
+    if (date.getFullYear() !== selectedYear || date.getMonth() + 1 !== selectedMonthNumber) return;
+    const bucket = monthBuckets[Math.min(4, Math.floor((date.getDate() - 1) / 7))];
+    bucket.minutes += Number(entry.runtime) || 0;
+    bucket.episodes += 1;
+  });
+  const maxMonthMinutes = Math.max(...monthBuckets.map(bucket => bucket.minutes), 1);
+  epChart.innerHTML = monthBuckets.map(bucket => `
     <div class="column-chart-col">
-      <span class="column-chart-value">${w.episodes || ""}</span>
-      <div class="column-chart-bar" style="height:${Math.round((w.episodes / maxEpisodes) * 100)}%"></div>
-      <span class="column-chart-label">${new Date(w.weekStart).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+      <span class="column-chart-value">${bucket.episodes ? `${bucket.episodes} ep` : ""}</span>
+      <div class="column-chart-bar monthly-chart-bar" style="height:${Math.max(bucket.minutes ? 8 : 2, Math.round((bucket.minutes / maxMonthMinutes) * 100))}%" title="${formatMinutesAsDuration(bucket.minutes)}"></div>
+      <span class="column-chart-label">Week ${bucket.week}</span>
     </div>
   `).join("");
 
   const marathons = Object.values(dayTotals).sort((a, b) => b.count - a.count).slice(0, 5);
-  if (marathons.length === 0) {
+  if (!hasWatchHistory || marathons.length === 0) {
     marathonsCard.style.display = "none";
   } else {
     marathonsCard.style.display = "flex";
@@ -2679,7 +3658,8 @@ function attachCardEvents() {
 
   // Increment Episode/Chapter progress actions
   bindOnce(".inc-btn", btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
       const id = btn.getAttribute("data-id");
       const type = btn.getAttribute("data-type");
       incrementProgress(id, type);
@@ -2692,7 +3672,14 @@ function attachCardEvents() {
     } else if (rowActions === "swipe") {
       bindSwipe(card);
     }
-    // "menu" mode: no row-tap handler — edit/delete only via the 3-dot menu
+    // The row itself always opens the detail page. Edit/delete remain available
+    // through the action buttons or the configured gesture/menu.
+    else {
+      card.addEventListener("click", event => {
+        if (event.target.closest("button, input, a, .note-quick-actions")) return;
+        openItemForCategory(card.dataset.id);
+      });
+    }
   });
 
   bindOnce(".grid-card", card => {
@@ -2924,17 +3911,25 @@ function incrementProgress(id, type) {
   if (type === "ep") {
     let currentEp = parseInt(item.episodesDone) || 0;
     let totalEp = parseInt(item.totalEpisodes) || getSeasonTotalEpisodes(item) || 0;
-    
-    currentEp += 1;
+    const nextEpisode = nextEpisodeForDashboardItem(item);
+    if (nextEpisode) {
+      const watched = new Set(item.watchedEpisodeIds || []);
+      watched.add(nextEpisode.id);
+      item.watchedEpisodeIds = Array.from(watched);
+      currentEp = item.watchedEpisodeIds.length;
+    } else {
+      currentEp += 1;
+    }
     if (totalEp > 0 && currentEp >= totalEp) {
       currentEp = totalEp;
       toggleCompletion(id, true);
       return;
     }
     item.episodesDone = currentEp;
-  } else if (type === "ch") {
-    let currentCh = parseInt(item.volumesRead) || 0;
-    let totalCh = parseInt(item.totalVolumes) || 0;
+  } else if (type === "ch" || type === "vol") {
+    const isChapter = type === "ch";
+    let currentCh = parseInt(item[isChapter ? "chaptersRead" : "volumesRead"]) || 0;
+    let totalCh = parseInt(item[isChapter ? "totalChapters" : "totalVolumes"]) || 0;
     
     currentCh += 1;
     if (totalCh > 0 && currentCh >= totalCh) {
@@ -2942,7 +3937,7 @@ function incrementProgress(id, type) {
       toggleCompletion(id, true);
       return;
     }
-    item.volumesRead = currentCh;
+    item[isChapter ? "chaptersRead" : "volumesRead"] = currentCh;
   }
 
   saveData();
@@ -2950,15 +3945,61 @@ function incrementProgress(id, type) {
   renderStats();
 }
 
-// Delete Tracking Entry
-function deleteEntry(id) {
-  const item = state.items.find(entry => entry.id === id);
-  state.items = state.items.filter(item => item.id !== id);
+let pendingDeleteUndo = null;
+
+function showDeleteUndoToast(count) {
+  let toast = document.getElementById("app-undo-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "app-undo-toast";
+    toast.className = "app-undo-toast";
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span>${count} item${count === 1 ? "" : "s"} deleted</span><button type="button" data-undo-delete>Undo</button>`;
+  toast.classList.add("active");
+  toast.querySelector("[data-undo-delete]").onclick = undoLastDelete;
+  clearTimeout(pendingDeleteUndo?.timer);
+  if (pendingDeleteUndo) pendingDeleteUndo.timer = setTimeout(() => {
+    pendingDeleteUndo = null;
+    toast.classList.remove("active");
+  }, 7000);
+}
+
+function deleteItemsWithUndo(ids) {
+  const deleted = ids.map(id => {
+    const index = state.items.findIndex(entry => entry.id === id);
+    return index === -1 ? null : { item: state.items[index], index };
+  }).filter(Boolean);
+  if (!deleted.length) return;
+  clearTimeout(pendingDeleteUndo?.timer);
+  pendingDeleteUndo = { deleted, timer: null };
+  state.items = state.items.filter(item => !ids.includes(item.id));
+  deleted.forEach(({ item }) => pruneDeletedItemFromFolderTree(item).catch(err => console.warn("Could not prune deleted item from folder tree", err)));
   saveData();
   renderDashboard();
   renderTimeline();
   renderStats();
-  pruneDeletedItemFromFolderTree(item).catch(err => console.warn("Could not prune deleted item from folder tree", err));
+  showDeleteUndoToast(deleted.length);
+}
+
+function undoLastDelete() {
+  if (!pendingDeleteUndo?.deleted?.length) return;
+  pendingDeleteUndo.deleted.sort((a, b) => a.index - b.index).forEach(({ item, index }) => {
+    if (state.items.some(existing => existing.id === item.id)) return;
+    state.items.splice(Math.min(index, state.items.length), 0, item);
+  });
+  clearTimeout(pendingDeleteUndo.timer);
+  pendingDeleteUndo = null;
+  document.getElementById("app-undo-toast")?.classList.remove("active");
+  saveData();
+  renderDashboard();
+  renderTimeline();
+  renderStats();
+}
+
+// Delete Tracking Entry
+function deleteEntry(id) {
+  deleteItemsWithUndo([id]);
 }
 
 // Opens the right editor for an existing item: the shared detail page for all
@@ -2976,6 +4017,89 @@ function openItemForCategory(id) {
 }
 
 // Open Form Modal (Add / Edit)
+const SQUASHDB_FORM_DRAFT_KEY = "squashdb_form_draft";
+let formDraftTimer = null;
+
+function readFormDraft() {
+  try {
+    const draft = JSON.parse(localStorage.getItem(SQUASHDB_FORM_DRAFT_KEY) || "null");
+    return draft && Date.now() - Number(draft.savedAt || 0) < 7 * 24 * 60 * 60 * 1000 ? draft : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function saveFormDraft() {
+  const modal = document.getElementById("item-modal");
+  const id = document.getElementById("entry-id")?.value;
+  if (!modal?.classList.contains("active") || id) return;
+  const title = document.getElementById("entry-title")?.value || "";
+  const notes = document.getElementById("entry-notes")?.value || "";
+  const category = document.getElementById("entry-category")?.value || "";
+  const status = document.getElementById("field-status")?.value || "";
+  if (!title.trim() && !notes.trim()) return;
+  localStorage.setItem(SQUASHDB_FORM_DRAFT_KEY, JSON.stringify({ title, notes, category, status, savedAt: Date.now() }));
+}
+
+function scheduleFormDraftSave() {
+  clearTimeout(formDraftTimer);
+  formDraftTimer = setTimeout(saveFormDraft, 350);
+}
+
+function clearFormDraft() {
+  clearTimeout(formDraftTimer);
+  localStorage.removeItem(SQUASHDB_FORM_DRAFT_KEY);
+}
+
+function applyRememberedStatus(category) {
+  const select = document.getElementById("field-status");
+  if (!select) return;
+  const remembered = state.lastEntryStatusByCategory?.[category];
+  if (remembered && Array.from(select.options).some(option => option.value === remembered)) {
+    select.value = remembered;
+  }
+  toggleCompletionDateVisibility(select.value);
+}
+
+async function scanBarcodeOrQr() {
+  const titleInput = document.getElementById("entry-title");
+  if (!titleInput) return;
+  const scanner = nativePlugin("BarcodeScanner") || nativePlugin("BarcodeReader");
+  try {
+    const result = scanner?.scan ? await scanner.scan() : scanner?.startScan ? await scanner.startScan() : null;
+    const value = String(result?.content || result?.text || result?.barcode?.rawValue || "").trim();
+    if (!value) {
+      if (!scanner) alert("Barcode scanning needs the Android Barcode Scanner plugin. You can still enter an ISBN or game code manually.");
+      return;
+    }
+    titleInput.value = value;
+    let category = document.getElementById("entry-category")?.value;
+    if (/^97[89]\d{10,13}$/.test(value)) {
+      const bookCategory = state.preferences.novel ? "novel" : (state.preferences.manga ? "manga" : category);
+      if (bookCategory && bookCategory !== category) {
+        category = bookCategory;
+        document.getElementById("entry-category").value = category;
+        document.getElementById("entry-category-label").textContent = CATEGORIES[category].label;
+        renderDynamicFormFields(category);
+        applyRememberedStatus(category);
+      }
+    } else if (category !== "game" && state.preferences.game && window.confirm("Use the scanned code for a game entry? Choose Cancel to keep the current category.")) {
+      category = "game";
+      document.getElementById("entry-category").value = category;
+      document.getElementById("entry-category-label").textContent = CATEGORIES[category].label;
+      renderDynamicFormFields(category);
+      applyRememberedStatus(category);
+    }
+    if (category === "manga" || category === "novel" || category === "game") {
+      if (state.preferences.metadataMode === "online") await fetchAndApplyMetadataFromTitle();
+    } else {
+      alert("Code captured. Choose Books or Games to use it for metadata lookup.");
+    }
+  } catch (err) {
+    console.warn("Barcode/QR scan failed", err);
+  }
+}
+
 function openModal(editId = null) {
   const modal = document.getElementById("item-modal");
   const modalTitle = document.getElementById("modal-title");
@@ -3091,7 +4215,23 @@ function openModal(editId = null) {
     if (categoryLabel) categoryLabel.textContent = CATEGORIES[preferredCat].label;
     state.lastEntryCategory = preferredCat;
     renderDynamicFormFields(preferredCat);
+    applyRememberedStatus(preferredCat);
     clearMetadataPreview();
+    const draft = readFormDraft();
+    if (draft && window.confirm("Restore your unfinished add-item draft?")) {
+      const draftCategory = state.preferences[draft.category] ? draft.category : preferredCat;
+      if (categoryField) categoryField.value = draftCategory;
+      if (categoryLabel) categoryLabel.textContent = CATEGORIES[draftCategory].label;
+      renderDynamicFormFields(draftCategory);
+      applyRememberedStatus(draftCategory);
+      document.getElementById("entry-title").value = draft.title || "";
+      document.getElementById("entry-notes").value = draft.notes || "";
+      if (draft.status && document.getElementById("field-status")?.querySelector(`option[value="${draft.status}"]`)) {
+        document.getElementById("field-status").value = draft.status;
+      }
+    } else if (draft) {
+      clearFormDraft();
+    }
   }
 
   modal.classList.add("active");
@@ -3311,8 +4451,12 @@ function renderDynamicFormFields(category) {
 
   // Attach status change watcher to toggle completion date input
   const statusSelect = document.getElementById("field-status");
+  applyRememberedStatus(category);
   statusSelect.addEventListener("change", (e) => {
+    state.lastEntryStatusByCategory[category] = e.target.value;
+    localStorage.setItem("squashdb_last_entry_statuses", JSON.stringify(state.lastEntryStatusByCategory));
     toggleCompletionDateVisibility(e.target.value);
+    scheduleFormDraftSave();
   });
 
   const metadataFetchBtn = document.getElementById("metadata-fetch-btn");
@@ -3510,6 +4654,14 @@ function handleFormSubmit(e) {
   const rating = parseInt(document.getElementById("field-rating-val").value) || 0;
   const completionDate = document.getElementById("field-completion-date") ? document.getElementById("field-completion-date").value : null;
 
+  const normalizedTitle = title.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const duplicate = state.items.find(item => item.id !== id
+    && item.category === category
+    && String(item.title || "").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim() === normalizedTitle);
+  if (duplicate && !window.confirm(`“${duplicate.title}” is already in your ${CATEGORIES[category]?.label || category} list. Save another copy anyway?`)) {
+    return;
+  }
+
   let extraData = {};
 
   if (category === "series" || category === "anime") {
@@ -3574,6 +4726,7 @@ function handleFormSubmit(e) {
         rating,
         completionDate,
         notes,
+        updated: Date.now(),
         thumbnail: thumbnailsEnabled() ? (fetchedMetadataDraft?.thumbnail || state.items[itemIndex].thumbnail || "") : "",
         ...extraData
       };
@@ -3589,6 +4742,7 @@ function handleFormSubmit(e) {
       completionDate,
       notes,
       created: Date.now(),
+      updated: Date.now(),
       thumbnail: thumbnailsEnabled() ? (fetchedMetadataDraft?.thumbnail || "") : "",
       ...extraData
     };
@@ -3596,6 +4750,9 @@ function handleFormSubmit(e) {
   }
 
   state.lastEntryCategory = category;
+  state.lastEntryStatusByCategory[category] = status;
+  localStorage.setItem("squashdb_last_entry_statuses", JSON.stringify(state.lastEntryStatusByCategory));
+  clearFormDraft();
   saveData();
   closeModal();
   renderDashboard();
@@ -3612,738 +4769,4 @@ function formatDate(dateStr) {
   // Format nicely (e.g., Jul 8, 2026) without local offset shift issues
   const date = new Date(parts[0], parts[1] - 1, parts[2]);
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function buildBackupPayload(includePreferences = true) {
-  const payload = {
-    version: "1.0",
-    appName: "SquashDB",
-    exportDate: new Date().toISOString(),
-    items: state.items
-  };
-
-  if (includePreferences) {
-    payload.preferences = state.preferences;
-    payload.lastEntryCategory = state.lastEntryCategory;
-    payload.activeCategoryChip = state.activeCategoryChip || "";
-  }
-
-  return payload;
-}
-
-function restoreBackupData(parsedData, includePreferences = true) {
-  if (!parsedData || parsedData.appName !== "SquashDB" || !Array.isArray(parsedData.items)) {
-    alert("Invalid file format. Please select a valid SquashDB JSON backup file.");
-    return false;
-  }
-
-  const currentIds = new Set(state.items.map(item => item.id));
-  parsedData.items.forEach(item => {
-    if (!currentIds.has(item.id)) {
-      state.items.push(item);
-    }
-  });
-
-  if (includePreferences && parsedData.preferences) {
-    state.preferences = { ...state.preferences, ...parsedData.preferences };
-  }
-
-  if (includePreferences && parsedData.lastEntryCategory) {
-    state.lastEntryCategory = parsedData.lastEntryCategory;
-  }
-
-  if (includePreferences && typeof parsedData.activeCategoryChip === "string") {
-    state.activeCategoryChip = parsedData.activeCategoryChip;
-  }
-
-  saveData();
-  renderCategoryChips();
-  renderCategorySelectOptions();
-  renderDashboard();
-  renderTimeline();
-  renderStats();
-  updateSettingsUI();
-  return true;
-}
-
-// Turns a title/key into a filesystem-safe folder name (lowercase, underscores,
-// no characters illegal in FAT/SAF paths).
-function slugifyForFolder(raw) {
-  return String(raw || "")
-    .toLowerCase()
-    .replace(/[/\\:*?"<>|]/g, "")
-    .trim()
-    .replace(/\s+/g, "_")
-    .replace(/_+/g, "_")
-    .slice(0, 80) || "untitled";
-}
-
-// Appends a short id suffix if another item already claimed this slug within the category.
-function uniqueItemSlug(item, usedSlugs) {
-  const base = slugifyForFolder(item.title);
-  if (!usedSlugs.has(base)) {
-    usedSlugs.add(base);
-    return base;
-  }
-  const suffixed = `${base}_${item.id.slice(0, 8)}`;
-  usedSlugs.add(suffixed);
-  return suffixed;
-}
-
-// Fetches a remote thumbnail URL and re-encodes it as WebP, returning base64
-// (without the data-URL prefix) ready for writeNestedBinaryFile. Returns null
-// on any failure (offline, broken URL, decode error) so sync can skip it.
-async function thumbnailUrlToWebpBase64(url) {
-  if (typeof url !== "string" || !url) return null;
-
-  try {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const blob = await response.blob();
-
-    const bitmap = await createImageBitmap(blob);
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    canvas.getContext("2d").drawImage(bitmap, 0, 0);
-
-    const webpBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/webp", 0.9));
-    if (!webpBlob) return null;
-
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(webpBlob);
-    });
-
-    const match = dataUrl.match(/^data:.*;base64,(.*)$/s);
-    return match ? match[1] : null;
-  } catch (err) {
-    console.warn("Could not convert thumbnail to WebP", url, err);
-    return null;
-  }
-}
-
-// Mirrors state.items into squash-db/<category>/<item_slug>/index.json (+ .thumbnail)
-// on the chosen backup folder. Additive only: never deletes or moves existing folders,
-// so items removed/recategorized in-app leave their old folder behind.
-async function syncFolderTreeMirror() {
-  if (!backupFolderPluginAvailable()) return;
-
-  const plugin = window.Capacitor.Plugins.BackupFolder;
-  let folderUri;
-  try {
-    folderUri = await getOrPickBackupFolderUri();
-  } catch (err) {
-    console.warn("Folder tree sync skipped: no backup folder selected", err);
-    return;
-  }
-
-  // Drop a .nomedia marker in squash-db/ so Android's media scanner skips every
-  // thumbnail.webp under it — otherwise each show/movie poster shows up in the
-  // device's photo gallery, which nobody wants for app-internal cache images.
-  if (!localStorage.getItem("squashdb_nomedia_written")) {
-    try {
-      await plugin.writeNestedFile({
-        uri: folderUri,
-        dirPath: ["squash-db"],
-        fileName: ".nomedia",
-        content: ""
-      });
-      localStorage.setItem("squashdb_nomedia_written", "true");
-    } catch (err) {
-      console.warn("Could not write .nomedia marker", err);
-    }
-  }
-
-  const syncedHashes = JSON.parse(localStorage.getItem("squashdb_synced_item_hashes") || "{}");
-  const usedSlugsByCategory = {};
-  const syncErrors = [];
-  let syncedCount = 0;
-  let skippedUnchangedCount = 0;
-
-  for (const item of state.items) {
-    const categorySlug = slugifyForFolder(item.category);
-    if (!usedSlugsByCategory[categorySlug]) usedSlugsByCategory[categorySlug] = new Set();
-
-    const itemHash = JSON.stringify(item);
-    if (syncedHashes[item.id] === itemHash) {
-      skippedUnchangedCount++;
-      continue;
-    }
-
-    const itemSlug = uniqueItemSlug(item, usedSlugsByCategory[categorySlug]);
-    const dirPath = ["squash-db", categorySlug, itemSlug];
-
-    try {
-      await plugin.writeNestedFile({
-        uri: folderUri,
-        dirPath,
-        fileName: "index.json",
-        content: JSON.stringify(item, null, 2)
-      });
-
-      const base64Thumb = await thumbnailUrlToWebpBase64(item.thumbnail);
-      if (base64Thumb) {
-        await plugin.writeNestedBinaryFile({
-          uri: folderUri,
-          dirPath,
-          fileName: "thumbnail.webp",
-          base64Content: base64Thumb
-        });
-      }
-
-      syncedHashes[item.id] = itemHash;
-      syncedCount++;
-    } catch (err) {
-      console.error(`Folder tree sync failed for item "${item.title}" (${item.id})`, err);
-      syncErrors.push(`${item.title || item.id}: ${err?.message || err}`);
-    }
-  }
-
-  localStorage.setItem("squashdb_synced_item_hashes", JSON.stringify(syncedHashes));
-
-  console.log(`Folder tree sync: ${syncedCount} written, ${skippedUnchangedCount} unchanged/skipped, ${syncErrors.length} failed (of ${state.items.length} total items)`);
-  if (syncErrors.length > 0) {
-    console.error("Folder tree sync errors:", syncErrors);
-  }
-
-  try {
-    normalizeMetadataSources();
-    const redactedSources = {
-      ...state.preferences.metadataSources,
-      custom: state.preferences.metadataSources.custom.map(src => ({
-        ...src,
-        apiKey: src.apiKey ? "***REDACTED***" : ""
-      }))
-    };
-    await plugin.writeNestedFile({
-      uri: folderUri,
-      dirPath: ["squash-db", "settings"],
-      fileName: "metadata-sources.json",
-      content: JSON.stringify(redactedSources, null, 2)
-    });
-  } catch (err) {
-    console.warn("Failed to sync metadata source settings to folder tree", err);
-  }
-
-  return { syncedCount, skippedUnchangedCount, syncErrors, totalItems: state.items.length };
-}
-
-// Removes a deleted item from the folder-tree mirror on Android. The mirror is
-// keyed by category/item slug, so we have to scan category folders and match the
-// stored index.json by item.id before deleting the row's folder contents.
-async function pruneDeletedItemFromFolderTree(item) {
-  if (!item || !backupFolderPluginAvailable()) return;
-  if (!localStorage.getItem("squashdb_backup_folder_uri")) return;
-
-  const plugin = window.Capacitor.Plugins.BackupFolder;
-  let folderUri;
-  try {
-    folderUri = await getOrPickBackupFolderUri();
-  } catch (err) {
-    return;
-  }
-
-  try {
-    const root = await plugin.listFiles({ uri: folderUri });
-    const squashDbFolder = (root?.files || []).find(f => f.name === "squash-db");
-    if (!squashDbFolder) return;
-
-    const categories = await plugin.listFiles({ uri: squashDbFolder.uri });
-    for (const categoryFolder of categories?.files || []) {
-      if (categoryFolder.name === "settings") continue;
-
-      const items = await plugin.listFiles({ uri: categoryFolder.uri });
-      for (const itemFolder of items?.files || []) {
-        try {
-          const files = await plugin.listFiles({ uri: itemFolder.uri });
-          const indexJson = (files?.files || []).find(f => f.name === "index.json");
-          if (!indexJson) continue;
-          const { content } = await plugin.readFile({ uri: indexJson.uri });
-          const storedItem = JSON.parse(content);
-          if (!storedItem || storedItem.id !== item.id) continue;
-
-          for (const file of files?.files || []) {
-            try {
-              await plugin.deleteFile({ uri: file.uri });
-            } catch (err) {
-              console.warn(`Could not delete mirror file "${file.name}" for item "${item.title}"`, err);
-            }
-          }
-
-          try {
-            await plugin.deleteFile({ uri: itemFolder.uri });
-          } catch (err) {
-            console.warn(`Could not delete mirror folder for item "${item.title}"`, err);
-          }
-
-          const syncedHashes = JSON.parse(localStorage.getItem("squashdb_synced_item_hashes") || "{}");
-          delete syncedHashes[item.id];
-          localStorage.setItem("squashdb_synced_item_hashes", JSON.stringify(syncedHashes));
-          return;
-        } catch (err) {
-          console.warn(`Could not inspect folder-tree mirror for item "${item.title}"`, err);
-        }
-      }
-    }
-  } catch (err) {
-    console.warn("Folder-tree prune skipped", err);
-  }
-}
-
-let folderSyncIdleTimer = null;
-function scheduleFolderTreeAutoSync() {
-  if (!backupFolderPluginAvailable()) return;
-  if (!localStorage.getItem("squashdb_backup_folder_uri")) return;
-  if (folderSyncIdleTimer) clearTimeout(folderSyncIdleTimer);
-
-  const delay = parseInt(state.preferences.folderSyncDelay, 10) || 0;
-  if (delay === 0) {
-    syncFolderTreeMirror();
-    return;
-  }
-  folderSyncIdleTimer = setTimeout(syncFolderTreeMirror, delay);
-}
-
-function backupFolderPluginAvailable() {
-  return isNativeApp() && window.Capacitor.Plugins && window.Capacitor.Plugins.BackupFolder;
-}
-
-// Silently checks the saved backup folder URI at app startup — never opens the
-// native picker. If it's missing or no longer valid (e.g. the folder was moved,
-// deleted, or its SAF grant was revoked), records that so Settings can show a
-// "Backup folder needs to be re-selected" notice without an intrusive popup.
-async function checkBackupFolderOnStartup() {
-  if (!backupFolderPluginAvailable()) return;
-
-  const savedUri = localStorage.getItem("squashdb_backup_folder_uri");
-  if (!savedUri) {
-    localStorage.setItem("squashdb_backup_folder_invalid", "true");
-    return;
-  }
-
-  let valid = false;
-  try {
-    const check = await window.Capacitor.Plugins.BackupFolder.hasPersistedFolder({ uri: savedUri });
-    valid = Boolean(check?.valid);
-    localStorage.setItem("squashdb_backup_folder_invalid", valid ? "false" : "true");
-  } catch (err) {
-    console.warn("Could not validate saved backup folder on startup", err);
-    localStorage.setItem("squashdb_backup_folder_invalid", "true");
-  }
-
-  updateBackupFolderStatusUI();
-
-  if (valid) runAutoBackupIfDue(savedUri);
-}
-
-const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const AUTO_BACKUP_KEEP_COUNT = 3;
-
-// Runs on every app launch (see checkBackupFolderOnStartup). There is no background
-// process while the app is closed, so "every 24 hours" means "on the next app open
-// that happens 24h+ after the last auto-backup" rather than a literal daily timer.
-async function runAutoBackupIfDue(folderUri) {
-  const lastRun = parseInt(localStorage.getItem("squashdb_last_auto_backup_at") || "0", 10);
-  if (Date.now() - lastRun < AUTO_BACKUP_INTERVAL_MS) return;
-  if (state.items.length === 0) return; // nothing worth backing up yet
-
-  try {
-    const dateStr = new Date().toISOString().split("T")[0];
-    await writeTarBackup(folderUri, dateStr);
-    localStorage.setItem("squashdb_last_auto_backup_at", String(Date.now()));
-    await pruneOldAutoBackups(folderUri);
-    console.log("Auto-backup completed:", dateStr);
-  } catch (err) {
-    console.warn("Auto-backup failed", err);
-  }
-}
-
-// Keeps only the newest AUTO_BACKUP_KEEP_COUNT squashdb_backup_*.tar files at the
-// folder root (plus their same-dated .json sibling, written alongside each tar),
-// deleting older ones. Only touches dated backup archives — never squash-db/
-// itself or anything else in the folder.
-async function pruneOldAutoBackups(folderUri) {
-  const plugin = window.Capacitor.Plugins.BackupFolder;
-  const { files } = await plugin.listFiles({ uri: folderUri });
-
-  const backupFileRe = /^squashdb_backup_(\d{4}-\d{2}-\d{2})\.(tar|json)$/;
-  const matched = (files || [])
-    .map(f => ({ ...f, match: f.name.match(backupFileRe) }))
-    .filter(f => f.match);
-
-  const distinctDates = [...new Set(matched.map(f => f.match[1]))].sort((a, b) => b.localeCompare(a));
-  const datesToDelete = new Set(distinctDates.slice(AUTO_BACKUP_KEEP_COUNT));
-
-  const toDelete = matched.filter(f => datesToDelete.has(f.match[1]));
-  for (const file of toDelete) {
-    try {
-      await plugin.deleteFile({ uri: file.uri });
-    } catch (err) {
-      console.warn(`Could not delete old auto-backup "${file.name}"`, err);
-    }
-  }
-}
-
-function updateBackupFolderStatusUI() {
-  const notice = document.getElementById("backup-folder-status-notice");
-  if (notice) {
-    const invalid = localStorage.getItem("squashdb_backup_folder_invalid") === "true";
-    notice.style.display = invalid ? "block" : "none";
-  }
-
-  const pathEl = document.getElementById("backup-folder-path-display");
-  if (pathEl) {
-    const uri = localStorage.getItem("squashdb_backup_folder_uri");
-    pathEl.textContent = uri ? `Current folder: ${friendlyFolderPathFromUri(uri)}` : "No backup folder selected yet.";
-  }
-}
-
-// Best-effort human-readable path from a SAF tree content:// URI, so the user can
-// visually confirm Sync/Export/Import are targeting the folder they expect —
-// e.g. "content://...tree/primary%3ADocuments%2FSquashBackups" -> "/Documents/SquashBackups".
-function friendlyFolderPathFromUri(uri) {
-  try {
-    const decoded = decodeURIComponent(uri);
-    const match = decoded.match(/\/tree\/(.+)$/);
-    if (!match) return uri;
-    return "/" + match[1].replace(/^primary:/, "").replace(/^[^:]+:/, "");
-  } catch (err) {
-    return uri;
-  }
-}
-
-// Resolves the SAF folder URI to store backups in, prompting the native folder
-// picker only if none is saved yet or the previously saved one is no longer valid.
-async function getOrPickBackupFolderUri() {
-  const plugin = window.Capacitor.Plugins.BackupFolder;
-  const savedUri = localStorage.getItem("squashdb_backup_folder_uri");
-
-  if (savedUri) {
-    try {
-      const check = await plugin.hasPersistedFolder({ uri: savedUri });
-      if (check && check.valid) return savedUri;
-    } catch (err) {
-      console.warn("Could not validate saved backup folder", err);
-    }
-  }
-
-  const picked = await plugin.pickFolder();
-  if (!picked || !picked.uri) throw new Error("No folder selected");
-  localStorage.setItem("squashdb_backup_folder_uri", picked.uri);
-  localStorage.setItem("squashdb_backup_folder_invalid", "false");
-  updateBackupFolderStatusUI();
-  await checkForExistingBackupToRestore(picked.uri);
-  return picked.uri;
-}
-
-// Writes a full tar snapshot (squash-db/ tree + the current state JSON) into
-// folderUri, named squashdb_backup_<YYYY-MM-DD>.tar / .json. Shared by the manual
-// Export button and the daily auto-backup, so both produce identical archives.
-async function writeTarBackup(folderUri, dateStr) {
-  const dataStr = JSON.stringify(buildBackupPayload(true), null, 2);
-  const jsonName = `squashdb_backup_${dateStr}.json`;
-  const tarName = `squashdb_backup_${dateStr}.tar`;
-
-  await syncFolderTreeMirror();
-  await window.Capacitor.Plugins.BackupFolder.exportTarArchive({
-    uri: folderUri,
-    sourceDirPath: ["squash-db"],
-    tarFileName: tarName,
-    extraJsonFileName: jsonName,
-    extraJsonContent: dataStr
-  });
-  return tarName;
-}
-
-async function exportData() {
-  const dateStr = new Date().toISOString().split("T")[0];
-
-  if (backupFolderPluginAvailable()) {
-    try {
-      const folderUri = await getOrPickBackupFolderUri();
-      await writeTarBackup(folderUri, dateStr);
-      alert("Backup saved successfully!");
-    } catch (err) {
-      console.warn("Backup export failed", err);
-      alert("Could not save backup. Please choose a folder and try again.");
-    }
-    return;
-  }
-
-  const dataStr = JSON.stringify(buildBackupPayload(true), null, 2);
-  const exportFileDefaultName = `squashdb_backup_${dateStr}.json`;
-
-  if (window.showSaveFilePicker) {
-    try {
-      const fileHandle = await window.showSaveFilePicker({
-        suggestedName: exportFileDefaultName,
-        types: [
-          {
-            description: "JSON Backup",
-            accept: { "application/json": [".json"] }
-          }
-        ]
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(dataStr);
-      await writable.close();
-      alert("Backup saved successfully!");
-      return;
-    } catch (err) {
-      if (err && err.name === "AbortError") return;
-    }
-  }
-
-  const blob = new Blob([dataStr], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const linkElement = document.createElement("a");
-  linkElement.href = url;
-  linkElement.download = exportFileDefaultName;
-  linkElement.click();
-  URL.revokeObjectURL(url);
-}
-
-// Lets the user pick (or re-pick) the folder backups are saved to on native platforms.
-async function chooseBackupFolder() {
-  if (!backupFolderPluginAvailable()) return;
-  try {
-    const picked = await window.Capacitor.Plugins.BackupFolder.pickFolder();
-    if (picked && picked.uri) {
-      localStorage.setItem("squashdb_backup_folder_uri", picked.uri);
-      localStorage.setItem("squashdb_backup_folder_invalid", "false");
-      updateBackupFolderStatusUI();
-      await checkForExistingBackupToRestore(picked.uri);
-      alert("Backup folder updated.");
-    }
-  } catch (err) {
-    console.warn("Could not change backup folder", err);
-  }
-}
-
-// Backup Import Database (JSON file upload)
-// Parses a minimal POSIX (ustar) tar buffer and returns its top-level entries
-// as { name, content: Uint8Array }[]. Mirrors the layout written natively by
-// BackupFolderPlugin.TarWriter: 512-byte header, size as octal ASCII at offset
-// 124/12 bytes, content padded to a 512-byte boundary, trailing zero blocks.
-function base64ToArrayBuffer(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-// If the app has no items yet (fresh install, or a chosen folder was never used
-// before) and the just-picked SAF folder already contains backup files — from a
-// previous install that used this same folder — offer to restore from the newest
-// one instead of silently starting empty. Prefers a .tar (full snapshot) over a
-// bare .json export if both exist, since the tar is the more complete source.
-async function checkForExistingBackupToRestore(folderUri) {
-  if (state.items.length > 0) return;
-  if (!backupFolderPluginAvailable()) return;
-
-  const plugin = window.Capacitor.Plugins.BackupFolder;
-  let files;
-  try {
-    const result = await plugin.listFiles({ uri: folderUri });
-    files = result?.files || [];
-  } catch (err) {
-    console.warn("Could not list backup folder contents for auto-restore check", err);
-    return;
-  }
-
-  const backupFileRe = /^squashdb_backup_(\d{4}-\d{2}-\d{2})\.(tar|json)$/;
-  const candidates = files
-    .map(f => ({ ...f, match: f.name.match(backupFileRe) }))
-    .filter(f => f.match)
-    .sort((a, b) => {
-      // Newest date first; prefer .tar over .json on the same date (fuller snapshot).
-      if (a.match[1] !== b.match[1]) return b.match[1].localeCompare(a.match[1]);
-      return a.match[2] === "tar" ? -1 : 1;
-    });
-
-  if (candidates.length > 0) {
-    const newest = candidates[0];
-
-    if (!confirm(
-      `Found an existing backup in this folder: "${newest.name}".\n\n` +
-      `Your app has no items yet — restore from this backup now?`
-    )) {
-      return;
-    }
-
-    try {
-      if (newest.match[2] === "tar") {
-        const { base64Content } = await plugin.readBinaryFile({ uri: newest.uri });
-        const entries = parseTarArchive(base64ToArrayBuffer(base64Content));
-        const jsonEntry = entries.find(entry => !entry.name.includes("/") && entry.name.endsWith(".json"));
-        if (!jsonEntry) {
-          alert("Could not find backup data inside that tar file.");
-          return;
-        }
-        applyImportedBackupJson(JSON.parse(new TextDecoder("utf-8").decode(jsonEntry.content)));
-      } else {
-        const { content } = await plugin.readFile({ uri: newest.uri });
-        applyImportedBackupJson(JSON.parse(content));
-      }
-    } catch (err) {
-      console.warn("Auto-restore from existing backup failed", err);
-      alert("Could not restore from the existing backup. You can try importing it manually from Backups & Restore.");
-    }
-    return;
-  }
-
-  // No dated backup archive at the folder root — fall back to reconstructing
-  // items directly from an existing squash-db/<category>/<item>/index.json tree
-  // (e.g. left behind by a previous install that only ever auto-synced, and
-  // never had a manual Export produce a .tar/.json file).
-  const squashDbFolder = files.find(f => f.name === "squash-db");
-  if (!squashDbFolder) return;
-
-  let reconstructedItems;
-  try {
-    reconstructedItems = await reconstructItemsFromFolderTree(squashDbFolder.uri);
-  } catch (err) {
-    console.warn("Could not read squash-db/ tree for auto-restore check", err);
-    return;
-  }
-
-  if (reconstructedItems.length === 0) return;
-
-  if (!confirm(
-    `Found ${reconstructedItems.length} item(s) synced from a previous install in this folder's squash-db/ tree.\n\n` +
-    `Your app has no items yet — restore them now?`
-  )) {
-    return;
-  }
-
-  applyImportedBackupJson({ appName: "SquashDB", items: reconstructedItems });
-}
-
-// Walks squash-db/<category>/<item>/index.json (2 levels deep under the given
-// squash-db/ folder URI) and returns every parsed Item found. Best-effort: a
-// single unreadable/corrupt index.json is skipped, not fatal to the whole scan.
-async function reconstructItemsFromFolderTree(squashDbUri) {
-  const plugin = window.Capacitor.Plugins.BackupFolder;
-  const items = [];
-
-  const { files: categoryFolders } = await plugin.listFiles({ uri: squashDbUri });
-  for (const categoryFolder of categoryFolders || []) {
-    if (categoryFolder.name === "settings") continue; // metadata-sources.json lives here, not items
-
-    let itemFolders;
-    try {
-      const result = await plugin.listFiles({ uri: categoryFolder.uri });
-      itemFolders = result?.files || [];
-    } catch (err) {
-      continue;
-    }
-
-    for (const itemFolder of itemFolders) {
-      try {
-        const { files: itemFiles } = await plugin.listFiles({ uri: itemFolder.uri });
-        const indexJsonFile = (itemFiles || []).find(f => f.name === "index.json");
-        if (!indexJsonFile) continue;
-        const { content } = await plugin.readFile({ uri: indexJsonFile.uri });
-        const item = JSON.parse(content);
-        if (item && item.id && item.title) items.push(item);
-      } catch (err) {
-        console.warn(`Skipping unreadable item folder during auto-restore: ${itemFolder.name}`, err);
-      }
-    }
-  }
-
-  return items;
-}
-
-function parseTarArchive(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const entries = [];
-  let offset = 0;
-
-  const readString = (start, length) => {
-    let end = start;
-    while (end < start + length && bytes[end] !== 0) end++;
-    return new TextDecoder("utf-8").decode(bytes.subarray(start, end));
-  };
-  const readOctal = (start, length) => {
-    const str = readString(start, length).trim();
-    return str ? parseInt(str, 8) : 0;
-  };
-
-  while (offset + 512 <= bytes.length) {
-    const header = bytes.subarray(offset, offset + 512);
-    if (header.every(b => b === 0)) break; // zero block: end of archive
-
-    const name = readString(offset, 100);
-    const size = readOctal(offset + 124, 12);
-    offset += 512;
-
-    if (name) {
-      entries.push({ name, content: bytes.slice(offset, offset + size) });
-    }
-
-    offset += Math.ceil(size / 512) * 512;
-  }
-
-  return entries;
-}
-
-function applyImportedBackupJson(parsedData) {
-  if (!parsedData || parsedData.appName !== "SquashDB" || !Array.isArray(parsedData.items)) {
-    alert("Invalid file format. Please select a valid SquashDB backup file.");
-    return;
-  }
-
-  if (confirm(`Do you want to restore ${parsedData.items.length} items? This will merge with your current watchlist.`)) {
-    const includePreferences = parsedData.preferences ? window.confirm(
-      "This backup also contains system settings.\n\nChoose OK to restore settings too.\nChoose Cancel to restore app data only."
-    ) : false;
-
-    if (restoreBackupData(parsedData, includePreferences)) {
-      alert("Backup restored successfully!");
-    }
-  }
-}
-
-function importData(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const isTar = file.name.toLowerCase().endsWith(".tar");
-
-  if (isTar) {
-    const fileReader = new FileReader();
-    fileReader.onload = function (event) {
-      try {
-        const entries = parseTarArchive(event.target.result);
-        // The writer places the state JSON at the tar root (e.g. squashdb_backup_2026-07-09.json),
-        // separate from the squash-db/ folder tree entries.
-        const jsonEntry = entries.find(entry => !entry.name.includes("/") && entry.name.endsWith(".json"));
-        if (!jsonEntry) {
-          alert("Could not find a SquashDB backup JSON inside this tar file.");
-          return;
-        }
-        const jsonText = new TextDecoder("utf-8").decode(jsonEntry.content);
-        applyImportedBackupJson(JSON.parse(jsonText));
-      } catch (err) {
-        console.warn("Failed to read tar backup", err);
-        alert("Error reading tar file. Make sure it's not corrupted.");
-      }
-    };
-    fileReader.readAsArrayBuffer(file);
-    return;
-  }
-
-  const fileReader = new FileReader();
-  fileReader.onload = function (event) {
-    try {
-      applyImportedBackupJson(JSON.parse(event.target.result));
-    } catch (err) {
-      alert("Error reading JSON file. Make sure it's not corrupted.");
-    }
-  };
-  fileReader.readAsText(file);
 }

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Show Details</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="index.css"><script src="logcat.js"></script><script src="lucide.min.js"></script></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Show Details</title><link rel="manifest" href="manifest.json"><link rel="icon" href="squashdb-logo.svg" type="image/svg+xml"><link rel="stylesheet" href="index.css"><script src="logcat.js"></script><script src="lucide.min.js"></script></head>
 <body><div id="app-container">
 <main><section class="tab-content active">
 
@@ -17,9 +17,20 @@
     <div class="show-detail-badge-row">
       <span id="show-detail-production-badge" class="show-detail-production-badge" style="display:none;"></span>
       <span id="show-detail-source-badge" class="discover-result-source" style="display:none;"></span>
+      <span id="show-detail-cache-badge" class="show-detail-cache-badge" style="display:none;"><i data-lucide="wifi-off"></i> Offline cache</span>
     </div>
     <p id="show-detail-meta" class="show-detail-meta"></p>
+    <div class="show-detail-progress-wrap" aria-label="Progress">
+      <div class="show-detail-progress-track"><span id="show-detail-progress-bar"></span></div>
+      <span id="show-detail-progress-label" class="show-detail-progress-label"></span>
+    </div>
   </div>
+</div>
+
+<div class="show-detail-primary-actions" id="show-detail-primary-actions" style="display:none;">
+  <button type="button" class="btn btn-primary" id="show-detail-next-episode-btn"><i data-lucide="play"></i><span>Next episode</span></button>
+  <button type="button" class="btn btn-secondary" id="show-detail-mark-previous-btn"><i data-lucide="check-check"></i><span>Mark previous watched</span></button>
+  <button type="button" class="btn btn-secondary" id="show-detail-offline-download-btn"><i data-lucide="download-cloud"></i><span>Download for offline</span></button>
 </div>
 
 <p class="show-detail-summary" id="show-detail-summary" style="display:none;"></p>
@@ -80,6 +91,14 @@
     <span id="show-detail-season-btn-label">Season</span>
     <span class="show-detail-season-btn-caret">▼</span>
   </button>
+  <div class="show-detail-episode-filters" id="show-detail-episode-filters" aria-label="Episode filters">
+    <button type="button" class="show-detail-episode-filter active" data-episode-filter="all">All</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="watched">Watched</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="unwatched">Unwatched</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="upcoming">Upcoming</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="filler">Filler</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="recap">Recap</button>
+  </div>
   <div id="show-detail-episode-list" class="show-detail-episode-list"></div>
 </div>
 
@@ -90,7 +109,13 @@
 
 <div class="show-detail-section-title" id="show-detail-notes-title" style="display:none;">Notes / Thoughts</div>
 <div class="show-detail-menu-group show-detail-inline-group" id="show-detail-notes-group" style="display:none;">
+  <button type="button" class="show-detail-notes-toggle" id="show-detail-notes-toggle"><span>Expand notes</span><i data-lucide="chevron-down"></i></button>
   <textarea id="show-detail-notes" class="show-detail-notes-textarea" rows="3" placeholder="Add optional details, links, or comments..."></textarea>
+</div>
+
+<div class="show-detail-related-section" id="show-detail-related-section" style="display:none;">
+  <div class="show-detail-section-title">Related titles &amp; recommendations</div>
+  <div id="show-detail-related-list" class="show-detail-related-list"></div>
 </div>
 
 <div class="page-back-actions">
@@ -112,5 +137,5 @@
   <img id="episode-image-modal-img" class="image-modal-img" src="" alt="Episode still">
 </div>
 </div>
-<script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script><script src="show-detail.js"></script>
+<script src="applock.js"></script><script src="metadata.js"></script><script src="cache-manager.js"></script><script src="app-navigation.js"></script><script src="app-backups.js"></script><script src="app-search.js"></script><script src="app.js"></script><script src="fonts.js"></script><script src="show-detail.js"></script>
 </body></html>
