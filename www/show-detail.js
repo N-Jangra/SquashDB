@@ -1601,7 +1601,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof state === "undefined") {
         setTimeout(waitForState, 10);
       } else {
-        initShowDetail();
+        // app.js declares state before restoring the encrypted/local database.
+        // Wait for that restore to finish or a local item can appear missing
+        // briefly and incorrectly redirect this page to Dashboard.
+        Promise.resolve(window.squashDbAppReady)
+          .then(() => initShowDetail())
+          .catch(err => {
+            console.error("Could not initialize show details", err);
+            initShowDetail();
+          });
       }
     };
     waitForState();

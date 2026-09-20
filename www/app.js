@@ -19,6 +19,11 @@ function loadAppFeatureModule(src) {
 // where dynamically injected scripts may be rejected before app initialization.
 const appFeatureModulesReady = Promise.resolve();
 
+// Full-page detail screens load their own scripts while this app bootstrap is
+// still restoring encrypted/local data. Expose the restore promise so those
+// screens never inspect an empty state and redirect back to Dashboard.
+window.squashDbAppReady = Promise.resolve();
+
 function nativePlugin(name) {
   return window.Capacitor?.Plugins?.[name] || null;
 }
@@ -397,7 +402,8 @@ function itemSourceName(item) {
 document.addEventListener("DOMContentLoaded", async () => {
   await appFeatureModulesReady;
   renderDashboardSkeleton();
-  await loadData();
+  window.squashDbAppReady = loadData();
+  await window.squashDbAppReady;
 
   // If a lock method is set and this session hasn't been unlocked yet, block all
   // further rendering until a correct PIN/pattern/password (or a security-question
