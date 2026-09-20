@@ -357,6 +357,32 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity-alias
+            android:name=".Look_controller"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_controller"
+            android:roundIcon="@drawable/ic_launcher_controller"
+            android:label="@string/look_name_controller"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".Look_gear"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_gear"
+            android:roundIcon="@drawable/ic_launcher_gear"
+            android:label="@string/look_name_gear"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

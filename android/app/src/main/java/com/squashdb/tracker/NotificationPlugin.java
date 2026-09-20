@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 
-import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
@@ -19,11 +18,17 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
-@CapacitorPlugin(name = "Notifications")
+@CapacitorPlugin(
+    name = "Notifications",
+    permissions = {
+        @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS })
+    }
+)
 public class NotificationPlugin extends Plugin {
     public static final String CHANNEL_ID = "squashdb-reminders";
-    private static final int NOTIFICATION_PERMISSION_REQUEST = 7401;
     public static final String ACTION_NOTIFICATION = "com.squashdb.tracker.NOTIFICATION_ACTION";
     private static Intent pendingAction;
 
@@ -48,10 +53,12 @@ public class NotificationPlugin extends Plugin {
             resolvePermission(call, true);
             return;
         }
-        ActivityCompat.requestPermissions(getActivity(),
-            new String[] { Manifest.permission.POST_NOTIFICATIONS },
-            NOTIFICATION_PERMISSION_REQUEST);
-        resolvePermission(call, false);
+        requestPermissionForAlias("notifications", call, "notificationPermissionCallback");
+    }
+
+    @PermissionCallback
+    private void notificationPermissionCallback(PluginCall call) {
+        resolvePermission(call, canNotify());
     }
 
     @PluginMethod

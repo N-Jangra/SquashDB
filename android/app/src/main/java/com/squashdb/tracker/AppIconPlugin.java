@@ -41,7 +41,9 @@ public class AppIconPlugin extends Plugin {
         "capacitor",
         "calculator",
         "freeotp",
-        "termux"
+        "termux",
+        "controller",
+        "gear"
     };
 
     // Must match the key of the alias with android:enabled="true" in AndroidManifest.xml

@@ -15,7 +15,10 @@ public class CacheManagerPlugin extends Plugin {
             getBridge().getWebView().clearCache(true);
             call.resolve();
         } catch (Exception e) {
-            call.reject("Could not clear image cache", e);
+            // WebView cache clearing is best-effort. Cache Storage and the
+            // thumbnail data kept in app state must remain usable even when
+            // Android has no WebView cache directory to clear.
+            call.resolve();
         }
     }
 }
