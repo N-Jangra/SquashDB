@@ -5462,3 +5462,133 @@ input:checked + .slider:before {
 .steam-gallery-arrow { position: absolute; top: 50%; transform: translateY(-50%); border: 0; background: rgba(0,0,0,.55); color: white; font-size: 3rem; line-height: 1; width: 48px; height: 64px; border-radius: 8px; z-index: 2; }
 .steam-gallery-prev { left: 12px; }
 .steam-gallery-next { right: 12px; }
+
+/* =====================================================================
+   Desktop shell (>= 900px): left sidebar + wide content area.
+   Injected by core/desktop-shell.js; phones keep the mobile bottom-nav UI.
+   ===================================================================== */
+.desktop-sidebar { display: none; }
+
+body.desktop-shell {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Sidebar */
+body.desktop-shell .desktop-sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 260px;
+  padding: 24px 16px;
+  background: var(--bg-color);
+  border-right: 1px solid var(--card-border);
+  z-index: 40;
+}
+
+body.desktop-shell .desktop-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  margin-bottom: 28px;
+  font-family: var(--font-heading, inherit);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+body.desktop-shell .desktop-brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-sm, 8px);
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover, #4f46e5));
+  box-shadow: 0 4px 12px var(--primary-glow, rgba(99,102,241,.3));
+}
+
+body.desktop-shell .desktop-brand-icon img { display: block; }
+
+body.desktop-shell .desktop-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 28px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--border-radius-md, 10px);
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .2s ease, transform .2s ease;
+}
+body.desktop-shell .desktop-add-btn:hover { background: var(--primary-hover, var(--primary)); transform: translateY(-1px); }
+body.desktop-shell .desktop-add-btn i { width: 18px; height: 18px; }
+
+body.desktop-shell .desktop-nav { display: flex; flex-direction: column; gap: 4px; }
+body.desktop-shell .desktop-sidebar-footer { margin-top: auto; padding-top: 16px; }
+
+body.desktop-shell .desktop-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: var(--border-radius-md, 10px);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color .18s ease, color .18s ease;
+}
+body.desktop-shell .desktop-nav-item:hover { background: rgba(255,255,255,.04); color: var(--text-primary); }
+body.desktop-shell .desktop-nav-item.active { background: var(--primary-glow); color: var(--primary); }
+body.desktop-shell .desktop-nav-icon { width: 20px; height: 20px; flex: none; }
+
+/* Content column takes the remaining width; no mobile 480px cap or borders. */
+body.desktop-shell #app-container {
+  max-width: none;
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  border-left: 0;
+  border-right: 0;
+  box-shadow: none;
+  padding-bottom: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Hide the mobile bottom nav and any FAB (New Entry lives in the sidebar). */
+body.desktop-shell .bottom-nav { display: none !important; }
+body.desktop-shell .fab { display: none !important; }
+
+/* Give page content room to breathe on wide screens. */
+body.desktop-shell main { padding: 24px 40px 60px; }
+body.desktop-shell .chips-container { padding-left: 40px; padding-right: 40px; }
+
+/* Wider search bar + content column, capped for readability. */
+body.desktop-shell #search-container { max-width: 640px; }
+body.desktop-shell #notes-container,
+body.desktop-shell .dashboard-insights,
+body.desktop-shell .stats-grid,
+body.desktop-shell .settings-section,
+body.desktop-shell .timeline { max-width: 1100px; }
+
+/* The iOS sub-page header (Back / title) is redundant beside the sidebar on
+   desktop for top-level tabs, but harmless; keep it for sub-pages. Center the
+   content block so it doesn't stretch edge-to-edge on very wide monitors. */
+body.desktop-shell .content-max { max-width: 1100px; margin-inline: auto; }

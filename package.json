@@ -2,23 +2,56 @@
   "name": "squashdb",
   "version": "1.0.0",
   "description": "SquashDB - Watchlist & Media Progress Tracker",
-  "main": "app.js",
+  "main": "electron/main.js",
   "scripts": {
     "build": "cp CHANGELOG.md www/CHANGELOG.md && echo \"Building static web assets...\"",
     "build:production": "cp CHANGELOG.md www/CHANGELOG.md && NODE_ENV=production echo \"Production assets prepared; serve with NODE_ENV=production npm run serve\"",
     "serve": "node dev-server.js",
     "cap:sync": "cap sync",
     "cap:add": "cap add android",
-    "cap:open": "cap open android"
+    "cap:open": "cap open android",
+    "electron": "electron .",
+    "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
+    "dist": "npm run build && electron-builder",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
     "@capacitor/app": "^6.0.3",
     "@capacitor/android": "^6.2.1",
-    "@capacitor/core": "^6.2.1"
+    "@capacitor/core": "^6.2.1",
+    "better-sqlite3": "^11.8.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.2.1"
+    "@capacitor/cli": "^6.2.1",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "@electron/rebuild": "^3.7.1"
   },
   "author": "SquashDB Team",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "build": {
+    "appId": "com.squashdb.tracker",
+    "productName": "SquashDB",
+    "files": [
+      "electron/**/*",
+      "www/**/*",
+      "!www/**/*.map"
+    ],
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  }
 }

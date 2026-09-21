@@ -488,6 +488,25 @@ async function loadData() {
   let encryptedState = null;
   let encryptedItems = null;
   let encryptedMeta = null;
+
+  // Desktop (Electron): SQLite in the main process is the durable store. Read it
+  // first and refresh the localStorage mirror so the rest of loadData (and fast
+  // subsequent startups) can use the mirror exactly as on Android/browser.
+  if (typeof desktopDbAvailable === "function" && desktopDbAvailable()) {
+    const desktopData = await desktopDbLoad();
+    if (desktopData) {
+      if (Array.isArray(desktopData.items) && desktopData.items.length) {
+        localStorage.setItem("squashdb_items", JSON.stringify(desktopData.items));
+      }
+      if (Array.isArray(desktopData.watchLog) && desktopData.watchLog.length) {
+        localStorage.setItem("squashdb_watch_log", JSON.stringify(desktopData.watchLog));
+      }
+      if (desktopData.preferences && typeof desktopData.preferences === "object") {
+        localStorage.setItem("squashdb_prefs", JSON.stringify(desktopData.preferences));
+      }
+    }
+  }
+
   // The readable local mirror is intentionally the fast startup path. On
   // Android it lets the dashboard render immediately instead of waiting for
   // Keystore decryption before any cards can be shown.
@@ -843,6 +862,16 @@ function flushPendingSave() {
   localStorage.setItem("squashdb_main_color", state.preferences.mainColor);
   localStorage.setItem("squashdb_rating_format", state.preferences.ratingFormat);
   rebuildSearchIndex();
+
+  // Desktop (Electron): persist the changed domains to SQLite (per-item item
+  // writes; watch log / prefs written when dirty). Fire-and-forget — the
+  // localStorage mirror above already covers the in-session read path.
+  if (typeof desktopDbAvailable === "function" && desktopDbAvailable()) {
+    if (persistenceDirtyDomains.has("items")) desktopDbSaveItems(state.items);
+    if (persistenceDirtyDomains.has("watchLog")) desktopDbSaveWatchLog(state.watchLog || []);
+    if (persistenceDirtyDomains.has("preferences")) desktopDbSavePreferences(state.preferences);
+  }
+
   const encryptedStore = nativePlugin("EncryptedStore");
   if (encryptedStore?.setItem) {
     const writes = [];
@@ -1255,7 +1284,10 @@ function setupEventListeners() {
     dbReset.addEventListener("click", () => {
       if (confirm("Are you absolutely sure you want to delete all entries? This action cannot be undone.")) {
         state.items = [];
+        persistenceDirtyDomains.add("items");
         saveData();
+        // Desktop: also clear the SQLite store outright so no orphan rows remain.
+        if (typeof desktopDbAvailable === "function" && desktopDbAvailable()) desktopDbWipe();
         renderDashboard();
         renderTimeline();
         renderStats();
