@@ -20,6 +20,9 @@ import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.util.Calendar;
+import java.util.Map;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import javax.crypto.KeyGenerator;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.x500.X500Principal;
@@ -32,6 +35,8 @@ import javax.crypto.spec.GCMParameterSpec;
 public class EncryptedStorePlugin extends Plugin {
     private static final String PREFS = "squashdb_encrypted_store";
     private static final String VALUE = "state";
+    private static final String ITEM_PREFIX = "item_";
+    private static final String META_VALUE = "meta";
     private static final String KEY_ALIAS = "squashdb_state_key";
     private static final String LEGACY_RSA_ALIAS = "squashdb_state_rsa_key";
     private static final String LEGACY_WRAPPED_KEY = "legacy_wrapped_key";
@@ -68,6 +73,99 @@ public class EncryptedStorePlugin extends Plugin {
         } catch (Exception e) {
             call.reject("Could not encrypt local database", e);
         }
+    }
+
+    /** Reads the item-level store used by current app versions. */
+    @PluginMethod
+    public void getItems(PluginCall call) {
+        try {
+            SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            JSONArray items = new JSONArray();
+            for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+                if (!entry.getKey().startsWith(ITEM_PREFIX) || !(entry.getValue() instanceof String)) continue;
+                try {
+                    items.put(new JSONObject(decrypt((String) entry.getValue())));
+                } catch (Exception ignored) {
+                    // A damaged item should not prevent the rest of the library from opening.
+                }
+            }
+            JSObject result = new JSObject();
+            result.put("exists", items.length() > 0);
+            result.put("data", items.toString());
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("Could not read encrypted items", e);
+        }
+    }
+
+    @PluginMethod
+    public void setItem(PluginCall call) {
+        String id = call.getString("id");
+        String data = call.getString("data");
+        if (id == null || id.isEmpty() || data == null) {
+            call.reject("Missing item data");
+            return;
+        }
+        try {
+            // Validate before writing so malformed calls cannot create unusable records.
+            new JSONObject(data);
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(ITEM_PREFIX + id, encrypt(data)).apply();
+            call.resolve(new JSObject().put("success", true));
+        } catch (Exception e) {
+            call.reject("Could not encrypt item", e);
+        }
+    }
+
+    @PluginMethod
+    public void deleteItem(PluginCall call) {
+        String id = call.getString("id");
+        if (id == null || id.isEmpty()) {
+            call.reject("Missing item id");
+            return;
+        }
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().remove(ITEM_PREFIX + id).apply();
+        call.resolve(new JSObject().put("success", true));
+    }
+
+    @PluginMethod
+    public void getMeta(PluginCall call) {
+        try {
+            SharedPreferences prefs = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            String packed = prefs.getString(META_VALUE, null);
+            JSObject result = new JSObject();
+            result.put("exists", packed != null && !packed.isEmpty());
+            if (packed != null && !packed.isEmpty()) result.put("data", decrypt(packed));
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("Could not read encrypted metadata", e);
+        }
+    }
+
+    @PluginMethod
+    public void setMeta(PluginCall call) {
+        String data = call.getString("data");
+        if (data == null) {
+            call.reject("Missing metadata");
+            return;
+        }
+        try {
+            new JSONObject(data);
+            getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(META_VALUE, encrypt(data)).apply();
+            call.resolve(new JSObject().put("success", true));
+        } catch (Exception e) {
+            call.reject("Could not encrypt metadata", e);
+        }
+    }
+
+    /** Removes only the pre-item-level snapshot after a verified migration. */
+    @PluginMethod
+    public void clearLegacyState(PluginCall call) {
+        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().remove(VALUE).apply();
+        call.resolve(new JSObject().put("success", true));
     }
 
     @PluginMethod

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base href="../../../">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SquashDB - App Info</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="static/index.css">
+  <script defer src="core/logcat.js"></script>
+  <script defer src="lucide.min.js"></script>
+</head>
+<body class="info-screen">
+  <div id="app-container">
+    <header class="settings-ios-header">
+      <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+      <h1>App Info</h1>
+      <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+    </header>
+    <main>
+      <section class="tab-content active">
+        <p class="info-intro">What SquashDB is, and how it works.</p>
+
+        <h4 class="settings-section-title info-group-title">What it does</h4>
+        <div class="settings-section info-card">
+          <p class="settings-note">
+            SquashDB is a personal watchlist and progress tracker for TV series, K-dramas, C-dramas, anime, movies,
+            manga, novels, and games. You track what you're watching, reading, or playing — status, ratings, notes,
+            episode/volume progress — and browse online metadata sources to look up new titles without leaving the app.
+          </p>
+        </div>
+
+        <h4 class="settings-section-title info-group-title">How it works</h4>
+        <div class="settings-section info-card">
+          <p class="settings-note">
+            Everything you track lives locally on your device — nothing is sent to a remote server. Data is stored
+            in the app's encrypted Android storage (or browser local storage on web), and, if you've chosen a backup folder in Settings → Backups, mirrored
+            as a plain folder tree (<code>squash-db/&lt;category&gt;/&lt;title&gt;/index.json</code> + a poster
+            thumbnail) that you can back up, sync, or inspect yourself.
+          </p>
+          <p class="settings-note">
+            Discovering new titles is optional and online-only: SquashDB calls public metadata APIs (TVmaze,
+            Wikidata, Open Library, AniList, and others you enable in Settings → Metadata Sources) directly from
+            the app. A title only gets saved to your list once you open it and change something — status, rating,
+            an episode tick, a note.
+          </p>
+        </div>
+
+        <h4 class="settings-section-title info-group-title">Offline-first</h4>
+        <div class="settings-section info-card">
+          <p class="settings-note">
+            You can track everything by hand with Metadata Mode set to Offline — no internet connection needed.
+            Switching it to Online adds the ability to search and auto-fill details, but tracking itself never
+            requires a connection.
+          </p>
+        </div>
+
+        <h4 class="settings-section-title info-group-title">Want the details?</h4>
+        <div class="settings-section">
+          <div class="settings-list">
+            <a class="settings-row settings-row-link" href="static/pages/info/usage-guide.html">
+              <div class="settings-row-icon"><i data-lucide="book-open-check"></i></div>
+              <div class="settings-row-body">
+                <label>Usage Guide</label>
+                <span>Walkthroughs for every tab and setting.</span>
+              </div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+            <a class="settings-row settings-row-link" href="static/pages/info/changelog.html">
+              <div class="settings-row-icon"><i data-lucide="history"></i></div>
+              <div class="settings-row-body">
+                <label>Changelog</label>
+                <span>What's new in each version.</span>
+              </div>
+              <i data-lucide="chevron-right" class="settings-row-chevron"></i>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script defer src="core/applock.js"></script><script defer src="features/metadata.js"></script><script defer src="core/app-navigation.js"></script><script defer src="core/app-backups.js"></script><script defer src="core/app-search.js"></script><script defer src="app.js"></script><script defer src="core/fonts.js"></script>
+</body>
+</html>

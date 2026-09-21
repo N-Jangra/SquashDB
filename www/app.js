@@ -215,6 +215,41 @@ function deleteCustomCategory(key) {
 }
 
 // Application State
+const persistenceDirtyDomains = new Set(["items", "watchLog", "preferences"]);
+const persistedJson = { items: null, watchLog: null, preferences: null };
+const persistedItemJson = new Map();
+let forceEncryptedItemMigration = false;
+
+function trackStateMutations(root) {
+  const proxies = new WeakMap();
+  function wrap(value, domain) {
+    if (!value || typeof value !== "object") return value;
+    if (proxies.has(value)) return proxies.get(value);
+    const proxy = new Proxy(value, {
+      get(target, property, receiver) {
+        const result = Reflect.get(target, property, receiver);
+        return wrap(result, target === root ? String(property) : domain);
+      },
+      set(target, property, next, receiver) {
+        const previous = target[property];
+        const changed = previous !== next;
+        const result = Reflect.set(target, property, next, receiver);
+        if (changed) persistenceDirtyDomains.add(target === root ? String(property) : domain);
+        return result;
+      },
+      deleteProperty(target, property) {
+        const existed = property in target;
+        const result = Reflect.deleteProperty(target, property);
+        if (existed) persistenceDirtyDomains.add(target === root ? String(property) : domain);
+        return result;
+      }
+    });
+    proxies.set(value, proxy);
+    return proxy;
+  }
+  return wrap(root, "state");
+}
+
 let state = {
   items: [],
   watchLog: [],
@@ -239,7 +274,6 @@ let state = {
     reducedMotion: false,
     dashboardRowActions: "menu",
     dashboardView: "list",
-    navigationSheet: false,
     oneHandedMode: "off",
     tabletTwoColumn: true,
     compactMode: false,
@@ -302,6 +336,7 @@ let state = {
   timelineYear: "",
   activeRating: 0 // temp rating state for form
 };
+state = trackStateMutations(state);
 
 function thumbnailsEnabled() {
   return Boolean(state.preferences.metadataThumbnails);
@@ -451,17 +486,44 @@ document.addEventListener("visibilitychange", () => {
 // Load data from LocalStorage
 async function loadData() {
   let encryptedState = null;
+  let encryptedItems = null;
+  let encryptedMeta = null;
+  // The readable local mirror is intentionally the fast startup path. On
+  // Android it lets the dashboard render immediately instead of waiting for
+  // Keystore decryption before any cards can be shown.
+  const localItems = localStorage.getItem("squashdb_items");
+  const localWatchLog = localStorage.getItem("squashdb_watch_log");
+  const localPrefs = localStorage.getItem("squashdb_prefs");
   const encryptedStore = nativePlugin("EncryptedStore");
-  if (encryptedStore?.getState) {
+  const hasLocalMirror = Boolean(localItems || localWatchLog || localPrefs);
+  if (encryptedStore?.getItems && !hasLocalMirror) {
+    try {
+      const result = await encryptedStore.getItems();
+      if (result?.exists && result.data) encryptedItems = JSON.parse(result.data);
+      if (encryptedStore.getMeta) {
+        const metaResult = await encryptedStore.getMeta();
+        if (metaResult?.exists && metaResult.data) encryptedMeta = JSON.parse(metaResult.data);
+      }
+    } catch (err) {
+      console.error("Encrypted item database could not be opened", err);
+    }
+  }
+  // Older versions stored one encrypted JSON blob. Read it only when the new
+  // item store has no records, then the first save migrates it item by item.
+  if (encryptedStore?.getState && !hasLocalMirror && !encryptedItems) {
     try {
       const result = await encryptedStore.getState();
-      if (result?.exists && result.data) encryptedState = JSON.parse(result.data);
+      if (result?.exists && result.data) {
+        encryptedState = JSON.parse(result.data);
+        forceEncryptedItemMigration = true;
+      }
     } catch (err) {
       console.error("Encrypted local database could not be opened", err);
     }
   }
 
-  const savedItems = encryptedState?.items ? JSON.stringify(encryptedState.items) : localStorage.getItem("squashdb_items");
+  const savedItems = encryptedItems ? JSON.stringify(encryptedItems)
+    : (encryptedState?.items ? JSON.stringify(encryptedState.items) : localItems);
   if (savedItems) {
     try {
       state.items = JSON.parse(savedItems);
@@ -471,7 +533,8 @@ async function loadData() {
     }
   }
 
-  const savedWatchLog = encryptedState?.watchLog ? JSON.stringify(encryptedState.watchLog) : localStorage.getItem("squashdb_watch_log");
+  const savedWatchLog = encryptedMeta?.watchLog ? JSON.stringify(encryptedMeta.watchLog)
+    : (encryptedState?.watchLog ? JSON.stringify(encryptedState.watchLog) : localWatchLog);
   if (savedWatchLog) {
     try {
       state.watchLog = JSON.parse(savedWatchLog);
@@ -481,7 +544,8 @@ async function loadData() {
     }
   }
 
-  const savedPrefs = encryptedState?.preferences ? JSON.stringify(encryptedState.preferences) : localStorage.getItem("squashdb_prefs");
+  const savedPrefs = encryptedMeta?.preferences ? JSON.stringify(encryptedMeta.preferences)
+    : (encryptedState?.preferences ? JSON.stringify(encryptedState.preferences) : localPrefs);
   if (savedPrefs) {
     try {
       state.preferences = { ...state.preferences, ...JSON.parse(savedPrefs) };
@@ -515,12 +579,6 @@ async function loadData() {
   if (typeof state.preferences.reducedMotion !== "boolean") state.preferences.reducedMotion = false;
   if (!state.preferences.dashboardRowActions) state.preferences.dashboardRowActions = "menu";
   if (!["list", "grid"].includes(state.preferences.dashboardView)) state.preferences.dashboardView = "list";
-  if (typeof state.preferences.navigationSheet !== "boolean") state.preferences.navigationSheet = false;
-  if (state.preferences.navigationSheetDefaultApplied !== true) {
-    state.preferences.navigationSheet = false;
-    state.preferences.navigationSheetDefaultApplied = true;
-    saveData();
-  }
   if (!["off", "left", "right"].includes(state.preferences.oneHandedMode)) state.preferences.oneHandedMode = "off";
   if (typeof state.preferences.tabletTwoColumn !== "boolean") state.preferences.tabletTwoColumn = true;
   if (typeof state.preferences.compactMode !== "boolean") state.preferences.compactMode = false;
@@ -672,13 +730,26 @@ async function loadData() {
 
   rebuildSearchIndex();
 
-  // Migrate existing plaintext records into the Android Keystore-backed store
-  // before deleting the large localStorage copies.
-  if (encryptedStore?.setState && !encryptedState && (savedItems || savedWatchLog || savedPrefs)) {
+  // Migrate existing records into Android Keystore-backed item storage once.
+  // This also covers data created in the browser before the Android app was
+  // installed. The readable mirror is intentionally retained for fast startup.
+  const needsItemMigration = encryptedStore?.setItem
+    && (forceEncryptedItemMigration || (!encryptedState && !encryptedItems))
+    && (savedItems || savedWatchLog || savedPrefs)
+    && localStorage.getItem("squashdb_encrypted_items_migrated") !== "1";
+  if (needsItemMigration) {
     try {
-      await encryptedStore.setState({
-        data: JSON.stringify({ items: state.items, watchLog: state.watchLog || [], preferences: state.preferences })
-      });
+      await Promise.all(state.items.map(item => encryptedStore.setItem({
+        id: String(item.id), data: JSON.stringify(item)
+      })));
+      if (encryptedStore.setMeta) {
+        await encryptedStore.setMeta({
+          data: JSON.stringify({ watchLog: state.watchLog || [], preferences: state.preferences })
+        });
+      }
+      if (encryptedStore.clearLegacyState) await encryptedStore.clearLegacyState();
+      localStorage.setItem("squashdb_encrypted_items_migrated", "1");
+      forceEncryptedItemMigration = false;
     } catch (err) {
       console.warn("Could not migrate local data into encrypted storage", err);
     }
@@ -693,6 +764,22 @@ async function loadData() {
     localStorage.setItem("squashdb_watch_log", JSON.stringify(state.watchLog || []));
     localStorage.setItem("squashdb_prefs", JSON.stringify(state.preferences));
   }
+  if (encryptedItems) {
+    // The item-level store is already current; use the readable mirror for
+    // fast subsequent WebView starts and never run the migration again.
+    localStorage.setItem("squashdb_items", JSON.stringify(state.items));
+    localStorage.setItem("squashdb_watch_log", JSON.stringify(state.watchLog || []));
+    localStorage.setItem("squashdb_prefs", JSON.stringify(state.preferences));
+    localStorage.setItem("squashdb_encrypted_items_migrated", "1");
+  }
+
+  // Seed the in-memory comparison cache without serializing the complete
+  // collection again during the first save on every page.
+  state.items.forEach(item => {
+    if (item?.id != null) persistedItemJson.set(String(item.id), JSON.stringify(item));
+  });
+  persistedJson.watchLog = JSON.stringify(state.watchLog || []);
+  persistedJson.preferences = JSON.stringify(state.preferences);
 
 }
 
@@ -723,6 +810,7 @@ function initializePage() {
 // Save data to LocalStorage
 let saveTimer = null;
 let saveQueued = false;
+let dashboardDataVersion = 0;
 
 function flushPendingSave() {
   if (!saveQueued) return;
@@ -731,9 +819,18 @@ function flushPendingSave() {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  localStorage.setItem("squashdb_items", JSON.stringify(state.items));
-  localStorage.setItem("squashdb_watch_log", JSON.stringify(state.watchLog || []));
-  localStorage.setItem("squashdb_prefs", JSON.stringify(state.preferences));
+  if (persistenceDirtyDomains.has("items") || !persistedJson.items) {
+    persistedJson.items = JSON.stringify(state.items);
+    localStorage.setItem("squashdb_items", persistedJson.items);
+  }
+  if (persistenceDirtyDomains.has("watchLog") || !persistedJson.watchLog) {
+    persistedJson.watchLog = JSON.stringify(state.watchLog || []);
+    localStorage.setItem("squashdb_watch_log", persistedJson.watchLog);
+  }
+  if (persistenceDirtyDomains.has("preferences") || !persistedJson.preferences) {
+    persistedJson.preferences = JSON.stringify(state.preferences);
+    localStorage.setItem("squashdb_prefs", persistedJson.preferences);
+  }
   localStorage.setItem("squashdb_theme", state.theme);
   localStorage.setItem("squashdb_sort", state.currentSort);
   localStorage.setItem("squashdb_search_history", JSON.stringify(state.searchHistory || []));
@@ -747,16 +844,50 @@ function flushPendingSave() {
   localStorage.setItem("squashdb_rating_format", state.preferences.ratingFormat);
   rebuildSearchIndex();
   const encryptedStore = nativePlugin("EncryptedStore");
-  if (encryptedStore?.setState) {
+  if (encryptedStore?.setItem) {
+    const writes = [];
+    if (persistenceDirtyDomains.has("items") || forceEncryptedItemMigration) {
+      const currentIds = new Set();
+      state.items.forEach(item => {
+        if (item?.id == null) return;
+        const id = String(item.id);
+        const itemJson = JSON.stringify(item);
+        currentIds.add(id);
+        if (forceEncryptedItemMigration || persistedItemJson.get(id) !== itemJson) {
+          writes.push(encryptedStore.setItem({ id, data: itemJson }));
+          persistedItemJson.set(id, itemJson);
+        }
+      });
+      persistedItemJson.forEach((itemJson, id) => {
+        if (!currentIds.has(id) && encryptedStore.deleteItem) {
+          writes.push(encryptedStore.deleteItem({ id }));
+          persistedItemJson.delete(id);
+        }
+      });
+      forceEncryptedItemMigration = false;
+    }
+    if (persistenceDirtyDomains.has("watchLog") || persistenceDirtyDomains.has("preferences")) {
+      if (encryptedStore.setMeta) {
+        writes.push(encryptedStore.setMeta({
+          data: `{"watchLog":${persistedJson.watchLog},"preferences":${persistedJson.preferences}}`
+        }));
+      }
+    }
+    Promise.all(writes).catch(err => console.warn("Encrypted local database save failed", err));
+  } else if (encryptedStore?.setState) {
+    // Compatibility path for an older native plugin that has not yet been
+    // replaced. New Android builds never take this full-state path.
     encryptedStore.setState({
-      data: JSON.stringify({ items: state.items, watchLog: state.watchLog || [], preferences: state.preferences })
+      data: `{"items":${persistedJson.items},"watchLog":${persistedJson.watchLog},"preferences":${persistedJson.preferences}}`
     }).catch(err => console.warn("Encrypted local database save failed", err));
   }
+  persistenceDirtyDomains.clear();
   applyPreferenceAttributes();
   updateProgressWidget();
 }
 
 function saveData() {
+  dashboardDataVersion += 1;
   saveQueued = true;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(flushPendingSave, 120);
@@ -834,6 +965,8 @@ function applyPreferenceAttributes() {
   document.body.setAttribute("data-tablet-layout", state.preferences.tabletTwoColumn ? "two-column" : "single-column");
   document.body.setAttribute("data-contrast", state.preferences.highContrast ? "high" : "normal");
   document.body.classList.toggle("reduced-motion", Boolean(state.preferences.reducedMotion));
+  const lowEndDevice = Number(navigator.deviceMemory || 0) > 0 && Number(navigator.deviceMemory) <= 2;
+  document.body.classList.toggle("low-end-device", lowEndDevice);
   Object.keys(CATEGORIES).forEach(key => {
     CATEGORIES[key].color = state.preferences.categoryColors?.[key]
       || BUILTIN_CATEGORIES[key]?.color
@@ -857,7 +990,10 @@ function applyPreferenceAttributes() {
 
 function applyAnimationSpeed() {
   const speed = state.preferences.animationSpeed || "normal";
-  const multiplier = ANIMATION_SPEED_MULTIPLIERS[speed] ?? 1;
+  const lowEndDevice = Number(navigator.deviceMemory || 0) > 0 && Number(navigator.deviceMemory) <= 2;
+  const multiplier = state.preferences.reducedMotion || lowEndDevice
+    ? 0.001
+    : (ANIMATION_SPEED_MULTIPLIERS[speed] ?? 1);
   document.documentElement.style.setProperty("--anim-speed", multiplier);
 }
 
@@ -883,10 +1019,12 @@ function setupEventListeners() {
   // Global Search
   const globalSearch = document.getElementById("global-search");
   if (globalSearch) {
+    let searchRenderTimer = null;
     globalSearch.addEventListener("input", (e) => {
       state.searchQuery = e.target.value.toLowerCase().trim();
       renderSearchHistory();
-      renderDashboard();
+      clearTimeout(searchRenderTimer);
+      searchRenderTimer = setTimeout(() => renderDashboard(), 200);
     });
     globalSearch.addEventListener("focus", renderSearchHistory);
     globalSearch.addEventListener("keydown", (e) => {
@@ -915,14 +1053,14 @@ function setupEventListeners() {
   if (statsFab) {
     statsFab.addEventListener("click", () => {
       recordCurrentPage();
-      window.location.href = "statistics.html";
+      window.location.href = "static/pages/main/statistics.html";
     });
   }
   const timelineFab = document.getElementById("timeline-fab");
   if (timelineFab) {
     timelineFab.addEventListener("click", () => {
       recordCurrentPage();
-      window.location.href = "timeline.html";
+      window.location.href = "static/pages/main/timeline.html";
     });
   }
 
@@ -1179,17 +1317,12 @@ function setupEventListeners() {
   const backgroundBackupStatus = document.getElementById("background-backups-status");
   const updateBackgroundBackupStatus = () => {
     if (backgroundBackupStatus) backgroundBackupStatus.textContent = state.preferences.backgroundBackups ? "On" : "Off";
+    if (backgroundBackups) backgroundBackups.dataset.toggleOn = state.preferences.backgroundBackups ? "true" : "false";
   };
   updateBackgroundBackupStatus();
-  if (backgroundBackups) backgroundBackups.addEventListener("click", () => openChoicePopup(
-    "Background Encrypted Backups",
-    "Android WorkManager will create an encrypted snapshot about once per day.",
-    [
-      { value: "on", label: "On" },
-      { value: "off", label: "Off" }
-    ],
-    state.preferences.backgroundBackups ? "on" : "off",
-    async value => {
+  if (backgroundBackups) backgroundBackups.addEventListener("click", async () => {
+    const value = state.preferences.backgroundBackups ? "off" : "on";
+    try {
       const scheduler = nativePlugin("BackupScheduler");
       if (value === "on" && (!scheduler?.schedule || !backupFolderPluginAvailable())) {
         throw new Error("Select a backup folder in the Android app first.");
@@ -1201,19 +1334,23 @@ function setupEventListeners() {
         else if (scheduler?.cancel) await scheduler.cancel();
         saveData();
         updateBackgroundBackupStatus();
-    } catch (err) {
+        backgroundBackups.dataset.toggleOn = state.preferences.backgroundBackups ? "true" : "false";
+      } catch (err) {
       state.preferences.backgroundBackups = previous;
       updateBackgroundBackupStatus();
       sendConfiguredNotification("notificationBackupReminders", "Backup setup needs attention", err.message || "Encrypted background backup could not be scheduled.");
       throw err;
+      }
+    } catch (err) {
+      console.warn("Background backup toggle failed", err);
     }
-    }
-  ));
+  });
 
   const notificationPermission = document.getElementById("notification-permission");
   const notificationPermissionStatus = document.getElementById("notification-permission-status");
   const updateNotificationStatus = () => {
     if (notificationPermissionStatus) notificationPermissionStatus.textContent = state.preferences.notificationsEnabled ? "On" : "Off";
+    if (notificationPermission) notificationPermission.dataset.toggleOn = state.preferences.notificationsEnabled ? "true" : "false";
   };
   updateNotificationStatus();
   const refreshNotificationPermission = async () => {
@@ -1230,15 +1367,9 @@ function setupEventListeners() {
   };
   refreshNotificationPermission();
   if (notificationPermission) {
-    notificationPermission.addEventListener("click", () => openChoicePopup(
-      "Notifications",
-      "Turn SquashDB reminders on or off. Android permission may still need to be allowed in system settings.",
-      [
-        { value: "on", label: "On" },
-        { value: "off", label: "Off" }
-      ],
-      state.preferences.notificationsEnabled ? "on" : "off",
-      async value => {
+    notificationPermission.addEventListener("click", async () => {
+      const value = state.preferences.notificationsEnabled ? "off" : "on";
+      try {
         if (value === "on") {
           const notifications = nativePlugin("Notifications");
           if (!notifications?.requestPermission) throw new Error("Notifications are available in the installed Android app only.");
@@ -1248,8 +1379,11 @@ function setupEventListeners() {
         state.preferences.notificationsEnabled = value === "on";
         saveData();
         updateNotificationStatus();
+        notificationPermission.dataset.toggleOn = state.preferences.notificationsEnabled ? "true" : "false";
+      } catch (err) {
+        console.warn("Notification toggle failed", err);
       }
-    ));
+    });
   }
 
   const notificationTest = document.getElementById("notification-test");
@@ -1280,15 +1414,18 @@ function setupEventListeners() {
   notificationToggleRows.forEach(([id, key, statusId]) => {
     const row = document.getElementById(id);
     const status = document.getElementById(statusId);
-    const update = () => { if (status) status.textContent = state.preferences[key] ? "On" : "Off"; };
+    const update = () => {
+      if (status) status.textContent = state.preferences[key] ? "On" : "Off";
+      if (row) row.dataset.toggleOn = state.preferences[key] ? "true" : "false";
+    };
     update();
-    row?.addEventListener("click", () => openChoicePopup(
-      row.querySelector("label")?.textContent || "Notification setting",
-      "Choose whether SquashDB may send this type of reminder.",
-      [{ value: "on", label: "On" }, { value: "off", label: "Off" }],
-      state.preferences[key] ? "on" : "off",
-      async value => { state.preferences[key] = value === "on"; if (key === "notificationEpisodeReminders") state.preferences.episodeReminders = state.preferences[key]; saveData(); update(); }
-    ));
+    row?.addEventListener("click", () => {
+      state.preferences[key] = !state.preferences[key];
+      if (key === "notificationEpisodeReminders") state.preferences.episodeReminders = state.preferences[key];
+      saveData();
+      update();
+      row.dataset.toggleOn = state.preferences[key] ? "true" : "false";
+    });
   });
 
   const snoozeRow = document.getElementById("notification-snooze");
@@ -1308,7 +1445,7 @@ function setupEventListeners() {
     const titleEl = document.getElementById("picker-modal-title");
     if (!modal || !list || !titleEl) return;
     titleEl.textContent = title;
-    list.innerHTML = `<p class="settings-row-note action-popup-message">Select a local device time.</p><input type="time" class="form-control notification-time-input" value="${state.preferences[key]}"><button type="button" class="picker-option active" data-save-notification-time><span class="choice-radio"></span><span>Save time</span></button>`;
+    list.innerHTML = `<p class="settings-row-note action-popup-message">Select a local device time.</p><input type="time" class="form-control notification-time-input" value="${state.preferences[key]}"><button type="button" class="btn btn-primary notification-time-save" data-save-notification-time>Save time</button>`;
     list.querySelector("[data-save-notification-time]").addEventListener("click", () => {
       const value = list.querySelector("input").value || state.preferences[key];
       state.preferences[key] = value;
@@ -1325,9 +1462,17 @@ function setupEventListeners() {
 
   const quietRow = document.getElementById("notification-quiet-hours");
   const quietStatus = document.getElementById("notification-quiet-hours-status");
-  const updateQuietStatus = () => { if (quietStatus) quietStatus.textContent = state.preferences.notificationQuietHours ? `${state.preferences.notificationQuietStart}–${state.preferences.notificationQuietEnd}` : "Off"; };
+  const updateQuietStatus = () => {
+    if (quietStatus) quietStatus.textContent = state.preferences.notificationQuietHours ? `${state.preferences.notificationQuietStart}–${state.preferences.notificationQuietEnd}` : "Off";
+    if (quietRow) quietRow.dataset.toggleOn = state.preferences.notificationQuietHours ? "true" : "false";
+  };
   updateQuietStatus();
-  quietRow?.addEventListener("click", () => openNotificationQuietHoursPopup(updateQuietStatus));
+  quietRow?.addEventListener("click", () => {
+    state.preferences.notificationQuietHours = !state.preferences.notificationQuietHours;
+    saveData();
+    updateQuietStatus();
+    quietRow.dataset.toggleOn = state.preferences.notificationQuietHours ? "true" : "false";
+  });
 }
 
 function openNotificationQuietHoursPopup(updateStatus) {
@@ -1336,7 +1481,7 @@ function openNotificationQuietHoursPopup(updateStatus) {
   const title = document.getElementById("picker-modal-title");
   if (!modal || !list || !title) return;
   title.textContent = "Quiet Hours";
-  list.innerHTML = `<p class="settings-row-note action-popup-message">Reminders will be skipped during this time window.</p><label class="notification-time-label">Quiet hours <input type="checkbox" id="quiet-hours-enabled" ${state.preferences.notificationQuietHours ? "checked" : ""}></label><div class="notification-time-pair"><label>From<input type="time" id="quiet-hours-start" class="form-control" value="${state.preferences.notificationQuietStart}"></label><label>Until<input type="time" id="quiet-hours-end" class="form-control" value="${state.preferences.notificationQuietEnd}"></label></div><button type="button" class="picker-option active" id="quiet-hours-save"><span class="choice-radio"></span><span>Save</span></button>`;
+  list.innerHTML = `<p class="settings-row-note action-popup-message">Reminders will be skipped during this time window.</p><label class="notification-time-label">Quiet hours <input type="checkbox" id="quiet-hours-enabled" ${state.preferences.notificationQuietHours ? "checked" : ""}></label><div class="notification-time-pair"><label>From<input type="time" id="quiet-hours-start" class="form-control" value="${state.preferences.notificationQuietStart}"></label><label>Until<input type="time" id="quiet-hours-end" class="form-control" value="${state.preferences.notificationQuietEnd}"></label></div><button type="button" class="btn btn-primary notification-time-save" id="quiet-hours-save">Save</button>`;
   list.querySelector("#quiet-hours-save").addEventListener("click", () => {
     state.preferences.notificationQuietHours = list.querySelector("#quiet-hours-enabled").checked;
     state.preferences.notificationQuietStart = list.querySelector("#quiet-hours-start").value || "22:00";
@@ -1369,7 +1514,7 @@ async function sendConfiguredNotification(key, title, body, itemId = "") {
   await notifications.notify({
     id: Math.abs([...`${key}:${itemId}:${title}`].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)) || 1,
     title, body, itemId,
-    actionUrl: itemId ? `show-detail.html?source=local&itemId=${encodeURIComponent(itemId)}` : "",
+    actionUrl: itemId ? `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(itemId)}` : "",
     snoozeMinutes: state.preferences.notificationSnoozeMinutes || 60
   });
   return true;
@@ -1393,7 +1538,7 @@ async function scheduleUnfinishedItemReminder() {
       title: "Continue your list",
       body: `${item.title} is still unfinished.`,
       itemId: item.id,
-      actionUrl: `show-detail.html?source=local&itemId=${encodeURIComponent(item.id)}`,
+      actionUrl: `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(item.id)}`,
       snoozeMinutes: state.preferences.notificationSnoozeMinutes || 60
     });
   } catch (err) {
@@ -1566,27 +1711,15 @@ function renderNavBarSettings() {
     list.appendChild(row);
   });
 
-  let dragged = null;
-  list.querySelectorAll(".sortable-item").forEach(item => {
-    item.addEventListener("dragstart", () => {
-      dragged = item;
-      item.classList.add("dragging");
-    });
-    item.addEventListener("dragend", () => {
-      item.classList.remove("dragging");
-      dragged = null;
-      state.preferences.navBar.order = Array.from(list.querySelectorAll(".sortable-item")).map(el => el.dataset.navKey);
+  bindMetadataSourceSorting(
+    list,
+    item => item.dataset.navKey,
+    newOrder => {
+      state.preferences.navBar.order = newOrder;
       saveData();
       applyNavBarConfig();
-    });
-    item.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      if (!dragged || dragged === item) return;
-      const rect = item.getBoundingClientRect();
-      const after = e.clientY > rect.top + rect.height / 2;
-      list.insertBefore(dragged, after ? item.nextSibling : item);
-    });
-  });
+    }
+  );
 
   list.querySelectorAll("input[data-nav-visible]").forEach(checkbox => {
     checkbox.addEventListener("change", (e) => {
@@ -1859,7 +1992,7 @@ const SETTINGS_PICKERS = {
     default: "menu",
     options: [
       { value: "menu", label: "3-dot menu" },
-      { value: "tap-hold", label: "Tap to edit, long-press to delete" },
+      { value: "tap-hold", label: "Tap + hold" },
       { value: "swipe", label: "Swipe to edit/delete" }
     ]
   },
@@ -1868,13 +2001,6 @@ const SETTINGS_PICKERS = {
     options: [
       { value: "list", label: "List" },
       { value: "grid", label: "Grid" }
-    ]
-  },
-  navigationSheet: {
-    default: "true",
-    options: [
-      { value: "true", label: "Bottom sheet" },
-      { value: "false", label: "Direct navigation" }
     ]
   },
   oneHandedMode: {
@@ -1961,6 +2087,7 @@ function updatePickerRowValues() {
     const current = getPickerValue(pref);
     const match = picker.options.find(o => o.value === current);
     if (valueEl) valueEl.textContent = match ? match.label : current;
+    if (row.dataset.directToggle === "true") row.dataset.toggleOn = current === "true" ? "true" : "false";
   });
 }
 
@@ -1971,6 +2098,16 @@ function setupSettingsPickers() {
     if (!row.dataset.pref) return;
     if (row.dataset.bound === "true") return;
     row.dataset.bound = "true";
+    if (row.dataset.directToggle === "true") {
+      row.addEventListener("click", () => {
+        const current = getPickerValue(row.dataset.pref) === "true";
+        setPickerValue(row.dataset.pref, String(!current));
+        saveData();
+        applyPreferenceAttributes();
+        updatePickerRowValues();
+      });
+      return;
+    }
     row.addEventListener("click", () => {
       openSettingsPicker(row.dataset.pref, row.closest(".settings-row-picker").querySelector("label").textContent);
     });
@@ -2409,39 +2546,54 @@ function renderCategorySelectOptions() {
   }
 }
 
-// Compute progress percentage
-function calculateProgress(item) {
-  const { category, status, seasonsDone, totalSeasons, episodesDone, totalEpisodes, chaptersRead, totalChapters } = item;
-  
-  if (status === "Completed") return 100;
+const progressCache = new WeakMap();
 
-  if (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime") {
-    const totalEp = parseInt(totalEpisodes) || getSeasonTotalEpisodes(item) || 0;
-    const doneEp = parseInt(episodesDone) || 0;
-    
-    if (totalEp > 0) {
-      return Math.min(100, Math.round((doneEp / totalEp) * 100));
-    }
-    
-    const totalS = parseInt(totalSeasons) || 0;
-    const doneS = parseInt(seasonsDone) || 0;
-    if (totalS > 0) {
-      return Math.min(100, Math.round((doneS / totalS) * 100));
+// Compute progress percentage, reusing the result while progress inputs are unchanged.
+function calculateProgress(item) {
+  if (!item || typeof item !== "object") return 0;
+  const signature = [item.category, item.status, item.seasonsDone, item.totalSeasons,
+    item.episodesDone, item.totalEpisodes, item.seasonEpisodes, item.chaptersRead,
+    item.totalChapters].join("|");
+  const cached = progressCache.get(item);
+  if (cached?.signature === signature) return cached.value;
+  const { category, status, seasonsDone, totalSeasons, episodesDone, totalEpisodes, chaptersRead, totalChapters } = item;
+  let result = 0;
+  
+  if (status === "Completed") result = 100;
+
+  if (!result && (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime")) {
+    // Prefer the true per-season episode counts (watched vs total across all
+    // seasons); they reflect where the user actually is. Fall back to the flat
+    // episodesDone/totalEpisodes counters, and only use the coarse
+    // seasons-done/total-seasons ratio when there is no episode data at all.
+    const seasonTotalEp = getSeasonTotalEpisodes(item);
+    const seasonWatchedEp = getSeasonWatchedEpisodes(item);
+
+    if (seasonTotalEp > 0) {
+      result = Math.min(100, Math.round((seasonWatchedEp / seasonTotalEp) * 100));
+    } else {
+      const totalEp = parseInt(totalEpisodes) || 0;
+      const doneEp = parseInt(episodesDone) || 0;
+      if (totalEp > 0) {
+        result = Math.min(100, Math.round((doneEp / totalEp) * 100));
+      } else {
+        const totalS = parseInt(totalSeasons) || 0;
+        const doneS = parseInt(seasonsDone) || 0;
+        if (totalS > 0) {
+          result = Math.min(100, Math.round((doneS / totalS) * 100));
+        }
+      }
     }
   } else if (category === "manga" || category === "novel") {
     const totalCh = parseInt(totalChapters) || 0;
     const doneCh = parseInt(chaptersRead) || 0;
-    if (totalCh > 0) {
-      return Math.min(100, Math.round((doneCh / totalCh) * 100));
-    }
+    if (totalCh > 0) result = Math.min(100, Math.round((doneCh / totalCh) * 100));
   }
 
   // Games / Movies with no numerical steps
-  if (status === "Playing" || status === "In Progress" || status === "Reading") {
-    return 50;
-  }
-
-  return 0;
+  if (!result && (status === "Playing" || status === "In Progress" || status === "Reading")) result = 50;
+  progressCache.set(item, { signature, value: result });
+  return result;
 }
 
 // Estimated time to finish an item, in minutes. Returns { total, remaining } or
@@ -2745,15 +2897,28 @@ function renderDashboardInsights() {
   const notStartedItems = items
     .filter(item => item.status !== "Completed"
       && calculateProgress(item) <= 0
+      && !["Dropped", "On Hold"].includes(item.status)
       && !["In Progress", "Playing", "Reading"].includes(item.status))
     .sort((a, b) => (Number(b.created || b.updated) || 0) - (Number(a.created || a.updated) || 0))
     .slice(0, 4);
+  const onHoldItems = items
+    .filter(item => item.status === "On Hold")
+    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0))
+    .slice(0, 4);
+  const droppedItems = items
+    .filter(item => item.status === "Dropped")
+    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0))
+    .slice(0, 4);
   const notStartedIds = new Set(notStartedItems.map(item => item.id));
+  const onHoldIds = new Set(onHoldItems.map(item => item.id));
+  const droppedIds = new Set(droppedItems.map(item => item.id));
   const staleCutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
   const staleItems = items
     .filter(item => {
       const lastUpdated = Number(item.updated || item.created || 0);
       return !continueIds.has(item.id) && !completedIds.has(item.id) && !notStartedIds.has(item.id)
+        && !onHoldIds.has(item.id) && !droppedIds.has(item.id)
+        && !["Dropped", "On Hold"].includes(item.status)
         && lastUpdated > 0 && lastUpdated < staleCutoff;
     })
     .sort((a, b) => (Number(a.updated || a.created) || 0) - (Number(b.updated || b.created) || 0))
@@ -2768,12 +2933,16 @@ function renderDashboardInsights() {
   root.innerHTML = [
     section("Continue watching", continueItems.map(item => dashboardInsightCard(item, item.status, `${calculateProgress(item)}%`)).join(""), "continue"),
     section("Not started yet", notStartedItems.map(item => dashboardInsightCard(item, item.status || "No progress yet", "Ready to start")).join(""), "not-started"),
+    section("On hold", onHoldItems.map(item => dashboardInsightCard(item, item.status)).join(""), "on-hold"),
+    section("Dropped", droppedItems.map(item => dashboardInsightCard(item, item.status)).join(""), "dropped"),
     section("Haven't updated in a long time", staleItems.map(item => dashboardInsightCard(item, item.status, staleLabel(item))).join(""), "stale"),
     section("Completed", completedItems.map(item => dashboardInsightCard(item, item.completionDate || "Completed")).join(""), "completed")
   ].join("");
   root.dataset.insightItemIds = JSON.stringify([...new Set([
     ...continueItems.map(item => item.id),
     ...notStartedItems.map(item => item.id),
+    ...onHoldItems.map(item => item.id),
+    ...droppedItems.map(item => item.id),
     ...staleItems.map(item => item.id),
     ...completedItems.map(item => item.id)
   ])]);
@@ -2810,14 +2979,9 @@ function setupDashboardPullToRefresh() {
     if (distance < 64) return;
     if (status) status.textContent = "Refreshing metadata and images…";
     try {
-      if (window.SquashDBCache) {
-        // Clearing temporary caches is best-effort. A WebView may not expose
-        // one of the cache stores, but that must not make refresh look broken.
-        await Promise.allSettled([
-          window.SquashDBCache.clearMetadata(),
-          window.SquashDBCache.clearImages()
-        ]);
-      }
+      // Keep metadata and image caches during normal refresh. Cache clearing is
+      // an explicit Settings action so pull-to-refresh remains fast and does
+      // not force every thumbnail to download and decode again.
       renderDashboard();
       if (status) status.textContent = "Dashboard refreshed";
     } catch (err) {
@@ -2866,7 +3030,14 @@ function renderDashboard() {
   );
 
   // 1. Filter items based on active preferences, quick filter chip, and search query
-  let filtered = state.items.filter(item => {
+  const dashboardCacheKey = JSON.stringify([dashboardDataVersion, state.activeCategoryChip,
+    state.searchQuery, state.statusFilter, state.dashboardFilters, state.currentSort,
+    state.preferences.dashboardView, [...insightItemIds].sort()]);
+  let filtered;
+  if (renderDashboard._cache?.key === dashboardCacheKey) {
+    filtered = renderDashboard._cache.items;
+  } else {
+    filtered = state.items.filter(item => {
     // Check if category is enabled in settings
     if (!state.preferences[item.category]) return false;
     
@@ -2896,11 +3067,11 @@ function renderDashboard() {
     if (quick.recentlyAdded && (Date.now() - (Number(item.created) || 0)) > 30 * 24 * 60 * 60 * 1000) return false;
     if (quick.rated && !(Number(item.rating) > 0)) return false;
 
-    return true;
-  });
+      return true;
+    });
 
   // 2. Sort items
-  filtered.sort((a, b) => {
+    filtered.sort((a, b) => {
     if (state.currentSort === "alphabetical-asc") {
       return a.title.localeCompare(b.title);
     } else if (state.currentSort === "alphabetical-desc") {
@@ -2919,7 +3090,9 @@ function renderDashboard() {
       return dashboardReleaseTime(b) - dashboardReleaseTime(a);
     }
     return 0;
-  });
+    });
+    renderDashboard._cache = { key: dashboardCacheKey, items: filtered };
+  }
 
   // 3. Render note elements incrementally: only a first batch is built up front,
   // more are appended as the user scrolls near the bottom (see setupDashboardLazyLoad).
@@ -2979,6 +3152,11 @@ function renderDashboardEmptyState() {
 }
 
 const DASHBOARD_BATCH_SIZE = 30;
+// Keep at most this many batches materialised in the DOM at once. Off-screen
+// batches above/below the window are removed and replaced with spacer elements
+// that preserve scroll height, so the live node count stays bounded no matter
+// how large the library is (true windowing, not just incremental append).
+const DASHBOARD_MAX_LIVE_BATCHES = 5;
 let dashboardLazyLoadObserver = null;
 let dashboardGridSelectionMode = false;
 let dashboardSelectedIds = new Set();
@@ -3080,51 +3258,146 @@ function buildNoteCard(item) {
   return card;
 }
 
+// Holds the state for the currently windowed dashboard render so scroll
+// observers can add/remove batches. Reset on each renderDashboard().
+let dashboardWindow = null;
+
 function teardownDashboardLazyLoad() {
   if (dashboardLazyLoadObserver) {
     dashboardLazyLoadObserver.disconnect();
     dashboardLazyLoadObserver = null;
   }
+  dashboardWindow = null;
 }
 
-// Renders `filtered` in batches: an initial batch up front, then more batches
-// as a sentinel element at the end of the list scrolls into view. Avoids building
-// hundreds of DOM nodes synchronously for large watchlists on every render.
+// Virtualised list: only a bounded window of batches is kept in the DOM at any
+// time. As the user scrolls down, the next batch is appended and, once the
+// window exceeds DASHBOARD_MAX_LIVE_BATCHES, the top batch is removed and its
+// height is preserved by a top spacer. Scrolling back up restores earlier
+// batches. This keeps the live node count constant for arbitrarily large
+// libraries instead of growing without bound.
 function setupDashboardLazyLoad(container, filtered) {
   teardownDashboardLazyLoad();
   container.innerHTML = "";
 
-  let renderedCount = 0;
-  const sentinel = document.createElement("div");
-  sentinel.className = "dashboard-lazy-sentinel";
+  const isGrid = state.preferences.dashboardView === "grid";
+  const totalBatches = Math.ceil(filtered.length / DASHBOARD_BATCH_SIZE);
 
-  function renderNextBatch() {
-    const nextItems = filtered.slice(renderedCount, renderedCount + DASHBOARD_BATCH_SIZE);
-    if (nextItems.length === 0) return;
+  // Spacers stand in for removed batches so the scrollbar height is stable.
+  const topSpacer = document.createElement("div");
+  topSpacer.className = "dashboard-window-spacer dashboard-window-spacer-top";
+  const bottomSpacer = document.createElement("div");
+  bottomSpacer.className = "dashboard-window-spacer dashboard-window-spacer-bottom";
+  const topSentinel = document.createElement("div");
+  topSentinel.className = "dashboard-lazy-sentinel dashboard-lazy-sentinel-top";
+  const bottomSentinel = document.createElement("div");
+  bottomSentinel.className = "dashboard-lazy-sentinel dashboard-lazy-sentinel-bottom";
 
-    const fragment = document.createDocumentFragment();
-    const isGrid = state.preferences.dashboardView === "grid";
-    nextItems.forEach(item => fragment.appendChild(isGrid ? buildGridCard(item) : buildNoteCard(item)));
-    container.insertBefore(fragment, sentinel);
-    renderedCount += nextItems.length;
+  container.appendChild(topSpacer);
+  container.appendChild(topSentinel);
+  container.appendChild(bottomSentinel);
+  container.appendChild(bottomSpacer);
 
+  // firstBatch..lastBatch (inclusive) are the batch indexes currently in the DOM.
+  const win = { firstBatch: 0, lastBatch: -1, batchHeights: {}, container,
+    topSpacer, bottomSpacer, topSentinel, bottomSentinel, isGrid };
+  dashboardWindow = win;
+
+  const buildBatchFragment = (batchIndex) => {
+    const start = batchIndex * DASHBOARD_BATCH_SIZE;
+    const items = filtered.slice(start, start + DASHBOARD_BATCH_SIZE);
+    const wrapper = document.createElement("div");
+    wrapper.className = "dashboard-batch";
+    wrapper.dataset.batch = String(batchIndex);
+    // Grid needs the wrapper to participate in the grid; use display:contents
+    // so batch wrappers don't break the CSS grid/flex layout of the cards.
+    wrapper.style.display = "contents";
+    items.forEach(item => wrapper.appendChild(isGrid ? buildGridCard(item) : buildNoteCard(item)));
+    return wrapper;
+  };
+
+  const afterMutate = () => {
     attachCardEvents();
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons(container);
+  };
 
-    if (renderedCount >= filtered.length) {
-      teardownDashboardLazyLoad();
-      sentinel.remove();
+  // A display:contents wrapper has no box of its own, so measure a batch by the
+  // vertical span of its child cards (top of first card → bottom of last card).
+  const measureBatchHeight = (batchEl) => {
+    const cards = batchEl.children;
+    if (!cards.length) return 0;
+    const first = cards[0].getBoundingClientRect();
+    const last = cards[cards.length - 1].getBoundingClientRect();
+    return Math.max(0, Math.round(last.bottom - first.top));
+  };
+
+  const appendBottomBatch = () => {
+    if (win.lastBatch + 1 >= totalBatches) return false;
+    const batchIndex = win.lastBatch + 1;
+    const wrapper = buildBatchFragment(batchIndex);
+    container.insertBefore(wrapper, win.bottomSentinel);
+    win.lastBatch = batchIndex;
+    afterMutate();
+
+    // Trim from the top if the window grew too large; preserve height via spacer.
+    while (win.lastBatch - win.firstBatch + 1 > DASHBOARD_MAX_LIVE_BATCHES) {
+      const topEl = container.querySelector(`.dashboard-batch[data-batch="${win.firstBatch}"]`);
+      if (!topEl) break;
+      win.batchHeights[win.firstBatch] = measureBatchHeight(topEl);
+      topEl.remove();
+      win.firstBatch += 1;
+      const topPad = Object.keys(win.batchHeights)
+        .filter(k => Number(k) < win.firstBatch)
+        .reduce((sum, k) => sum + (win.batchHeights[k] || 0), 0);
+      win.topSpacer.style.height = `${topPad}px`;
     }
-  }
+    return true;
+  };
 
-  container.appendChild(sentinel);
-  renderNextBatch();
+  const prependTopBatch = () => {
+    if (win.firstBatch <= 0) return false;
+    const batchIndex = win.firstBatch - 1;
+    const wrapper = buildBatchFragment(batchIndex);
+    container.insertBefore(wrapper, win.topSentinel.nextSibling);
+    win.firstBatch = batchIndex;
+    // Shrink the top spacer by the height we no longer need to fake.
+    const topPad = Object.keys(win.batchHeights)
+      .filter(k => Number(k) < win.firstBatch)
+      .reduce((sum, k) => sum + (win.batchHeights[k] || 0), 0);
+    win.topSpacer.style.height = `${topPad}px`;
+    afterMutate();
 
-  if (renderedCount < filtered.length) {
+    // Trim from the bottom if over budget.
+    while (win.lastBatch - win.firstBatch + 1 > DASHBOARD_MAX_LIVE_BATCHES) {
+      const botEl = container.querySelector(`.dashboard-batch[data-batch="${win.lastBatch}"]`);
+      if (!botEl) break;
+      win.batchHeights[win.lastBatch] = measureBatchHeight(botEl);
+      botEl.remove();
+      win.lastBatch -= 1;
+    }
+    const bottomPad = Object.keys(win.batchHeights)
+      .filter(k => Number(k) > win.lastBatch)
+      .reduce((sum, k) => sum + (win.batchHeights[k] || 0), 0);
+    win.bottomSpacer.style.height = `${bottomPad}px`;
+    return true;
+  };
+
+  win.appendBottomBatch = appendBottomBatch;
+  win.prependTopBatch = prependTopBatch;
+
+  // Seed the first batch.
+  appendBottomBatch();
+
+  if (totalBatches > 1) {
     dashboardLazyLoadObserver = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) renderNextBatch();
-    }, { root: null, rootMargin: "400px" });
-    dashboardLazyLoadObserver.observe(sentinel);
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        if (entry.target === win.bottomSentinel) appendBottomBatch();
+        else if (entry.target === win.topSentinel) prependTopBatch();
+      });
+    }, { root: null, rootMargin: "600px" });
+    dashboardLazyLoadObserver.observe(win.bottomSentinel);
+    dashboardLazyLoadObserver.observe(win.topSentinel);
   }
 }
 
@@ -3589,7 +3862,9 @@ function renderStatsWatchCharts(activeItemIds) {
   timeChart.innerHTML = weekBuckets.map(day => `
     <div class="column-chart-col">
       <span class="column-chart-value">${day.minutes ? formatMinutesAsDuration(day.minutes) : ""}</span>
-      <div class="column-chart-bar" style="height:${Math.max(day.minutes ? 8 : 2, Math.round((day.minutes / maxMinutes) * 100))}%" title="${day.episodes} episode${day.episodes === 1 ? "" : "s"}"></div>
+      <div class="column-chart-bar-track">
+        <div class="column-chart-bar" style="height:${Math.max(day.minutes ? 8 : 2, Math.round((day.minutes / maxMinutes) * 100))}%" title="${day.episodes} episode${day.episodes === 1 ? "" : "s"}"></div>
+      </div>
       <span class="column-chart-label">${day.date.toLocaleDateString(undefined, { weekday: "short" })}</span>
     </div>
   `).join("");
@@ -3632,7 +3907,9 @@ function renderStatsWatchCharts(activeItemIds) {
   epChart.innerHTML = monthBuckets.map(bucket => `
     <div class="column-chart-col">
       <span class="column-chart-value">${bucket.episodes ? `${bucket.episodes} ep` : ""}</span>
-      <div class="column-chart-bar monthly-chart-bar" style="height:${Math.max(bucket.minutes ? 8 : 2, Math.round((bucket.minutes / maxMonthMinutes) * 100))}%" title="${formatMinutesAsDuration(bucket.minutes)}"></div>
+      <div class="column-chart-bar-track">
+        <div class="column-chart-bar monthly-chart-bar" style="height:${Math.max(bucket.minutes ? 8 : 2, Math.round((bucket.minutes / maxMonthMinutes) * 100))}%" title="${formatMinutesAsDuration(bucket.minutes)}"></div>
+      </div>
       <span class="column-chart-label">Week ${bucket.week}</span>
     </div>
   `).join("");
@@ -3915,7 +4192,7 @@ function openRowActionMenu(id) {
   list.appendChild(deleteBtn);
 
   modal.classList.add("active");
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons(root);
 }
 
 // Custom in-app delete confirmation (avoids relying on window.confirm in WebViews)
@@ -4103,7 +4380,7 @@ const SHOW_DETAIL_PAGE_CATEGORIES = [...EPISODE_TRACKED_CATEGORIES, "movie", "ga
 function openItemForCategory(id) {
   const item = state.items.find(i => i.id === id);
   if (item && SHOW_DETAIL_PAGE_CATEGORIES.includes(item.category)) {
-    const detailUrl = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    const detailUrl = `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
     if (typeof navigateToAppPage === "function") navigateToAppPage(detailUrl);
     else window.location.href = detailUrl;
     return;
@@ -4112,7 +4389,7 @@ function openItemForCategory(id) {
   // the tap useful for detail-page categories instead of opening an empty
   // editor modal when the in-memory lookup briefly has no item.
   if (!item && id) {
-    const detailUrl = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    const detailUrl = `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
     if (typeof navigateToAppPage === "function") navigateToAppPage(detailUrl);
     else window.location.href = detailUrl;
     return;
@@ -4246,7 +4523,10 @@ function openModal(editId = null) {
 
     // Populate dynamic fields
     const statusSelect = document.getElementById("field-status");
-    if (statusSelect) statusSelect.value = item.status;
+    if (statusSelect) {
+      statusSelect.value = item.status;
+      statusSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    }
 
     const ratingVal = document.getElementById("field-rating-val");
     if (ratingVal) ratingVal.value = item.rating || 0;
@@ -4331,7 +4611,9 @@ function openModal(editId = null) {
       document.getElementById("entry-title").value = draft.title || "";
       document.getElementById("entry-notes").value = draft.notes || "";
       if (draft.status && document.getElementById("field-status")?.querySelector(`option[value="${draft.status}"]`)) {
-        document.getElementById("field-status").value = draft.status;
+        const draftStatusSelect = document.getElementById("field-status");
+        draftStatusSelect.value = draft.status;
+        draftStatusSelect.dispatchEvent(new Event("change", { bubbles: true }));
       }
     } else if (draft) {
       clearFormDraft();
@@ -4357,29 +4639,42 @@ function renderDynamicFormFields(category) {
 
   const config = CATEGORIES[category];
   
-  // Status Dropdown Options
+  // Status options: a visible pill row driving a hidden <select> so every
+  // existing read/write of #field-status keeps working unchanged.
   let statusOptions = "";
-  config.statuses.forEach(st => {
+  let statusPills = "";
+  config.statuses.forEach((st, index) => {
     statusOptions += `<option value="${st}">${st}</option>`;
+    statusPills += `<button type="button" class="status-pill${index === 0 ? " active" : ""}" data-status-value="${st}">${st}</button>`;
   });
 
   // Compile Dynamic HTML
   let fieldsHTML = `
     <div class="form-group">
       <label for="field-status">Status</label>
-      <select id="field-status" class="form-control" required>
+      <select id="field-status" class="form-control" required hidden>
         ${statusOptions}
       </select>
+      <div class="status-pill-row" id="field-status-pills" role="radiogroup" aria-label="Status">
+        ${statusPills}
+      </div>
     </div>
   `;
 
   if ((category === "series" || category === "kdrama" || category === "cdrama" || category === "anime" || category === "movie") && state.preferences.metadataMode === "online") {
     fieldsHTML += `
       <div class="form-group" id="metadata-hint" style="margin-top: 8px;">
-        <button type="button" class="btn btn-secondary" id="metadata-fetch-btn" style="width: 100%;">
-          <i data-lucide="search"></i> Fetch metadata
-        </button>
-        <p class="settings-row-note" style="margin: 8px 2px 0;">Online mode will try to fill counts and show a thumbnail from public metadata sources.</p>
+        <div class="metadata-fetch-toggle">
+          <div class="metadata-fetch-toggle-body">
+            <label for="metadata-fetch-toggle-input">Fetch metadata</label>
+            <p>Online mode will try to fill counts and show a thumbnail from public metadata sources.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="metadata-fetch-toggle-input" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <button type="button" id="metadata-fetch-btn" hidden aria-hidden="true"></button>
       </div>
     `;
   }
@@ -4560,13 +4855,42 @@ function renderDynamicFormFields(category) {
     state.lastEntryStatusByCategory[category] = e.target.value;
     localStorage.setItem("squashdb_last_entry_statuses", JSON.stringify(state.lastEntryStatusByCategory));
     toggleCompletionDateVisibility(e.target.value);
+    syncStatusPills();
     scheduleFormDraftSave();
   });
 
+  // Visible status pills mirror the hidden <select>. Clicking a pill sets the
+  // select's value and dispatches its change event so all existing logic runs.
+  const statusPillRow = document.getElementById("field-status-pills");
+  function syncStatusPills() {
+    if (!statusPillRow) return;
+    statusPillRow.querySelectorAll(".status-pill").forEach(pill => {
+      pill.classList.toggle("active", pill.dataset.statusValue === statusSelect.value);
+    });
+  }
+  if (statusPillRow) {
+    statusPillRow.addEventListener("click", (e) => {
+      const pill = e.target.closest(".status-pill");
+      if (!pill) return;
+      statusSelect.value = pill.dataset.statusValue;
+      statusSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    syncStatusPills();
+  }
+
+  // "Fetch metadata" toggle: when on, title typing/blur looks up metadata; the
+  // hidden #metadata-fetch-btn keeps its (guarded) legacy listener a no-op.
   const metadataFetchBtn = document.getElementById("metadata-fetch-btn");
   if (metadataFetchBtn) {
     metadataFetchBtn.addEventListener("click", async () => {
       await fetchAndApplyMetadataFromTitle();
+    });
+  }
+  const metadataFetchToggle = document.getElementById("metadata-fetch-toggle-input");
+  if (metadataFetchToggle) {
+    metadataFetchToggle.addEventListener("change", () => {
+      if (metadataFetchToggle.checked) fetchAndApplyMetadataFromTitle();
+      else hideMetadataResults();
     });
   }
 
@@ -4576,6 +4900,8 @@ function renderDynamicFormFields(category) {
     let titleLookupTimer = null;
     const scheduleLookup = () => {
       if (state.preferences.metadataMode !== "online") return;
+      const toggle = document.getElementById("metadata-fetch-toggle-input");
+      if (toggle && !toggle.checked) return;
       clearTimeout(titleLookupTimer);
       titleLookupTimer = setTimeout(() => {
         fetchAndApplyMetadataFromTitle();
@@ -4648,7 +4974,8 @@ function applySeriesMetadata(meta) {
     const statusSelect = document.getElementById("field-status");
     if (statusSelect && statusSelect.value === "Watchlist") {
       statusSelect.value = "In Progress";
-      toggleCompletionDateVisibility("In Progress");
+      // Fire change so the completion-date toggle and status pills both update.
+      statusSelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
 }

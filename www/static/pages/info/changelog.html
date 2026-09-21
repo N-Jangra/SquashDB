@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base href="../../../">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SquashDB - Changelog</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="static/index.css">
+  <script defer src="core/logcat.js"></script>
+  <script defer src="lucide.min.js"></script>
+</head>
+<body class="info-screen">
+  <div id="app-container">
+    <header class="settings-ios-header">
+      <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+      <h1>Changelog</h1>
+      <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+    </header>
+    <main>
+      <section class="tab-content active">
+        <p class="info-intro">What's new in each version of SquashDB.</p>
+
+        <div class="settings-section">
+          <div id="changelog-content" class="changelog-content">
+            <p class="settings-row-note">Loading changelog…</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script defer src="core/applock.js"></script><script defer src="features/metadata.js"></script><script defer src="core/app-navigation.js"></script><script defer src="core/app-backups.js"></script><script defer src="core/app-search.js"></script><script defer src="app.js"></script><script defer src="core/fonts.js"></script>
+  <script>
+    // Minimal Markdown → HTML for CHANGELOG.md's own simple structure only:
+    // "# " / "## " / "### " headers, "- " bullet lists, blank-line-separated
+    // paragraphs. Version headings become an accordion. Not a general
+    // Markdown parser — deliberately narrow so it has no injection surface
+    // beyond escaping raw text.
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function renderChangelogMarkdown(markdown) {
+      const lines = markdown.split("\n");
+      let html = "";
+      let inList = false;
+      let versionOpen = false;
+      let versionCount = 0;
+
+      const closeList = () => {
+        if (inList) {
+          html += "</ul>";
+          inList = false;
+        }
+      };
+
+      const closeVersion = () => {
+        closeList();
+        if (versionOpen) {
+          html += "</div></details>";
+          versionOpen = false;
+        }
+      };
+
+      lines.forEach(rawLine => {
+        const line = rawLine.trimEnd();
+        if (/^###\s+/.test(line)) {
+          closeList();
+          html += `<h3>${escapeHtml(line.replace(/^###\s+/, ""))}</h3>`;
+        } else if (/^##\s+/.test(line)) {
+          const heading = line.replace(/^##\s+/, "");
+          if (/^\[?\d+\.\d+/.test(heading)) {
+            closeVersion();
+            const label = heading.replace(/^\[|\]$/g, "");
+            html += `<details class="changelog-version"${versionCount === 0 ? " open" : ""}><summary><span>${escapeHtml(label)}</span><span class="changelog-version-chevron" aria-hidden="true">⌄</span></summary><div class="changelog-version-body">`;
+            versionOpen = true;
+            versionCount += 1;
+          } else {
+            closeList();
+            html += `<h2>${escapeHtml(heading)}</h2>`;
+          }
+        } else if (/^#\s+/.test(line)) {
+          closeList();
+          html += `<h2>${escapeHtml(line.replace(/^#\s+/, ""))}</h2>`;
+        } else if (/^[-*]\s+/.test(line)) {
+          if (!inList) {
+            html += "<ul>";
+            inList = true;
+          }
+          html += `<li>${escapeHtml(line.replace(/^[-*]\s+/, ""))}</li>`;
+        } else if (line.trim() === "") {
+          closeList();
+        } else {
+          closeList();
+          html += `<p>${escapeHtml(line)}</p>`;
+        }
+      });
+      closeVersion();
+      return html;
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const contentEl = document.getElementById("changelog-content");
+      if (!contentEl) return;
+      try {
+        const res = await fetch("CHANGELOG.md");
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        const text = await res.text();
+        contentEl.innerHTML = renderChangelogMarkdown(text);
+        contentEl.querySelectorAll(".changelog-version").forEach(selected => {
+          selected.addEventListener("toggle", () => {
+            if (!selected.open) return;
+            contentEl.querySelectorAll(".changelog-version").forEach(other => {
+              if (other !== selected) other.open = false;
+            });
+          });
+        });
+      } catch (err) {
+        console.warn("Could not load changelog", err);
+        contentEl.innerHTML = `<p class="settings-row-note">Couldn't load the changelog file.</p>`;
+      }
+    });
+  </script>
+</body>
+</html>

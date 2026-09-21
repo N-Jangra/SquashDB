@@ -15,14 +15,18 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 public class BiometricPlugin extends Plugin {
     @PluginMethod
     public void isAvailable(PluginCall call) {
-        int result = BiometricManager.from(getContext()).canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_STRONG
-                | BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        );
-        JSObject response = new JSObject();
-        response.put("available", result == BiometricManager.BIOMETRIC_SUCCESS);
-        response.put("code", result);
-        call.resolve(response);
+        try {
+            int result = BiometricManager.from(getContext()).canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG
+                    | BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            );
+            JSObject response = new JSObject();
+            response.put("available", result == BiometricManager.BIOMETRIC_SUCCESS);
+            response.put("code", result);
+            call.resolve(response);
+        } catch (Exception error) {
+            call.reject("Biometric availability could not be checked", error);
+        }
     }
 
     @PluginMethod

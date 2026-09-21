@@ -2,6 +2,63 @@
 
 All notable changes to SquashDB are documented in this file.
 
+## [0.0.6]
+
+### Performance and persistence
+- Improved startup performance with immediate loading guards, cached progress values, dashboard result caching, batched dashboard rendering, and consistent search debouncing.
+- Scoped icon rendering and reduced unnecessary work during page updates.
+- Replaced list-view insight progress rings with compact horizontal progress bars, including green completed-state bars.
+- Fixed TV-series progress percentages to count watched and total episodes across all seasons instead of using only completed-season ratios.
+- Bounded dashboard DOM rendering with a sliding window of batches so large libraries do not keep every card mounted at once.
+- Android encrypted persistence now stores individual encrypted item records plus separate encrypted metadata instead of rewriting one complete encrypted state blob.
+- Added automatic migration from legacy encrypted state and removal of the old snapshot after successful migration.
+
+### Android and biometric unlock
+- Added Android biometric and device-credential availability handling for API 22+.
+- Added `USE_BIOMETRIC` and legacy `USE_FINGERPRINT` permissions.
+- Improved biometric setup and error messages when the device has no enrolled credential or the native plugin is unavailable.
+- Added a visible Enable Biometric Unlock action that checks availability before saving the biometric lock method.
+- Verified the Android debug build with the updated native plugins.
+
+### Settings and navigation polish
+- Redesigned Settings with a compact grouped layout, theme-aware colors, accent-aware controls, and clearer section organization.
+- Changed on/off settings to inline switches instead of opening selection popups.
+- Removed the Navigation Style setting; app navigation is now direct everywhere.
+- Added direct navigation from Timeline and Statistics without the navigation-sheet overlay, while preserving back navigation.
+- Added dedicated headers and simplified the Timeline and Statistics page actions.
+- Added touch-friendly drag handles for reordering metadata sources and bottom navigation items in Android WebView.
+- Shortened Dashboard Row Actions labels and changed boolean settings to compact inline controls where appropriate.
+- Added a guided multi-step App Lock setup flow with secret confirmation, optional recovery questions, and a direct biometric path.
+- Refreshed Backup management with separate Backup, Status, and Cloud & Recovery tabs while keeping all backup controls available.
+- Improved notification time and quiet-hours dialogs with clear full-width Save buttons.
+- Refined Settings subpage headers, descriptions, and mobile spacing for Category Order and Tracking Choices.
+- Added consistent deferred asset loading across pages and improved back-navigation enter/exit transitions.
+
+### Dashboard and show details
+- Added dedicated Dashboard sections for On hold and Dropped items without duplicating them in other insight sections.
+- The Show Detail Next Episode action now switches season, expands the episode synopsis, and scrolls the episode into view.
+
+### Explore and changelog
+- Redesigned Explore insights and metadata-source sections as grouped list rows with clearer icons and navigation chevrons.
+- Changed the in-app changelog to collapsible version sections, with the newest version expanded by default.
+- Applied consistent mobile edge-to-edge spacing to Explore, Statistics, Dashboard, information pages, and Settings subpages.
+- Improved Android toast layout so long messages wrap inside a compact rounded notification without clipping.
+
+### SteamDB and Steam details
+- Added SteamDB source search and detail-page support, including Steam descriptions, thumbnails, screenshots, prices, Steam links, and price-history links.
+- Added an in-app screenshot gallery with horizontal scrolling and previous/next navigation instead of opening screenshots in an external browser.
+- Improved Steam purchase-card layout for mobile screens.
+
+### Web structure and navigation
+- Reorganized HTML pages, styles, and JavaScript into `www/static/`, `www/core/`, and `www/features/` directories.
+- Added route normalization and compatibility handling for old page URLs, query parameters, Android back navigation, and direct navigation.
+- Fixed startup routing, missing-page redirects, WebView asset paths, and the initial loading/theme/navigation transition.
+- Updated the development server and Android build configuration for desktop, LAN, and Capacitor use.
+
+### Documentation
+- Added Android build and project requirements notes.
+- Added a performance review with completed improvements and remaining work.
+
 ## [0.0.5]
 
 ### Android and security
@@ -118,7 +175,7 @@ All notable changes to SquashDB are documented in this file.
 
 ### File-based backups (Android)
 - New native plugin (`BackupFolderPlugin`) for Storage Access Framework (SAF) folder picking, plain/nested/binary file I/O, and a from-scratch POSIX (ustar) tar writer/reader — no third-party library.
-- **Folder-tree mirror**: enabling a backup folder mirrors every tracked item into `squash-db/<category>/<item-slug>/index.json` + `thumbnail.webp` (thumbnail fetched and re-encoded to WebP), additive-only — items removed in-app are never deleted from the mirror.
+- **Folder-tree mirror**: enabling a backup folder mirrors every tracked item into `squash-db/<category>/<item-slug>/index.json` + `.thumbnail` (thumbnail resized to max 500px and re-encoded to WebP), additive-only — items removed in-app are never deleted from the mirror.
 - **Full tar backups**: Export now writes a single `squashdb_backup_<date>.tar` containing the entire `squash-db/` tree plus the state JSON, as a sibling of `squash-db/` in the chosen folder. Falls back to a plain `.json` download on non-native/desktop.
 - **Import** accepts both `.json` and `.tar` (previously JSON-only); always merges by item ID, never overwrites existing items.
 - **Daily auto-backup**: on app launch, if 24+ hours have passed since the last auto-backup and there are tracked items, writes a new tar snapshot automatically and prunes old ones, keeping only the newest 3 backup dates.
