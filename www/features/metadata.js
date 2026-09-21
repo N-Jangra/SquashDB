@@ -184,6 +184,76 @@ function renderMetadataSourcesSettings() {
   }
 }
 
+// HTML5 drag events are not consistently emitted by Android WebView. Keep
+// those events for desktop browsers, but also support pointer dragging from
+// the grip handle so source ordering works with touch and mouse input.
+function bindMetadataSourceSorting(list, getKey, onSave) {
+  const items = () => Array.from(list.querySelectorAll(".sortable-item"));
+  let dragged = null;
+  let pointerId = null;
+  let moved = false;
+
+  const saveOrder = () => onSave(items().map(item => getKey(item)));
+  const finishPointerDrag = () => {
+    if (!dragged) return;
+    dragged.classList.remove("dragging");
+    if (moved) saveOrder();
+    if (pointerId !== null && dragged.hasPointerCapture?.(pointerId)) {
+      dragged.releasePointerCapture(pointerId);
+    }
+    dragged = null;
+    pointerId = null;
+    moved = false;
+  };
+
+  items().forEach(item => {
+    item.draggable = true;
+
+    // Desktop HTML5 dragging.
+    item.addEventListener("dragstart", () => {
+      dragged = item;
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      dragged = null;
+      saveOrder();
+    });
+    item.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (!dragged || dragged === item) return;
+      const rect = item.getBoundingClientRect();
+      const after = event.clientY > rect.top + rect.height / 2;
+      list.insertBefore(dragged, after ? item.nextSibling : item);
+    });
+
+    // Touch/pointer dragging from the grip avoids stealing taps from toggles.
+    const handle = item.querySelector(".drag-handle");
+    if (!handle) return;
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      dragged = item;
+      pointerId = event.pointerId;
+      moved = false;
+      item.classList.add("dragging");
+      handle.setPointerCapture?.(pointerId);
+      event.preventDefault();
+    });
+    handle.addEventListener("pointermove", (event) => {
+      if (!dragged || event.pointerId !== pointerId) return;
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".sortable-item");
+      if (!target || target.parentElement !== list || target === dragged) return;
+      moved = true;
+      const rect = target.getBoundingClientRect();
+      const after = event.clientY > rect.top + rect.height / 2;
+      list.insertBefore(dragged, after ? target.nextSibling : target);
+      event.preventDefault();
+    });
+    handle.addEventListener("pointerup", finishPointerDrag);
+    handle.addEventListener("pointercancel", finishPointerDrag);
+  });
+}
+
 function renderBuiltinMetadataSourcesList() {
   const list = document.getElementById("builtin-metadata-sources-list");
   if (!list) return;
@@ -219,27 +289,14 @@ function renderBuiltinMetadataSourcesList() {
     list.appendChild(item);
   });
 
-  let dragged = null;
-  list.querySelectorAll(".sortable-item").forEach(item => {
-    item.addEventListener("dragstart", () => {
-      dragged = item;
-      item.classList.add("dragging");
-    });
-    item.addEventListener("dragend", () => {
-      item.classList.remove("dragging");
-      dragged = null;
-      const newOrder = Array.from(list.querySelectorAll(".sortable-item")).map(el => el.dataset.source);
+  bindMetadataSourceSorting(
+    list,
+    item => item.dataset.source,
+    newOrder => {
       state.preferences.metadataSources.builtinOrder = newOrder;
       saveData();
-    });
-    item.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      if (!dragged || dragged === item) return;
-      const rect = item.getBoundingClientRect();
-      const after = e.clientY > rect.top + rect.height / 2;
-      list.insertBefore(dragged, after ? item.nextSibling : item);
-    });
-  });
+    }
+  );
 
   list.querySelectorAll("input[data-builtin-source]").forEach(checkbox => {
     checkbox.addEventListener("change", (e) => {

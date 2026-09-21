@@ -68,8 +68,13 @@ function renderAppLockSetupArea() {
     setupSection.style.display = "block";
     questionsSection.style.display = "none";
     setupTitle.textContent = "Biometric Unlock";
-    setupArea.innerHTML = `<p class="setting-desc">Android will verify your enrolled fingerprint, face, or device credential when the app opens.</p>`;
+    setupArea.innerHTML = `
+      <p class="setting-desc">Android will verify your enrolled fingerprint, face, or device credential when the app opens.</p>
+      <button type="button" class="btn btn-primary" id="app-lock-enable-biometric" style="width:100%;margin-top:12px;">Enable Biometric Unlock</button>
+      <p class="app-lock-error" id="app-lock-biometric-error" style="display:none;"></p>
+    `;
     appLockPendingSecret = "__biometric__";
+    document.getElementById("app-lock-enable-biometric").addEventListener("click", enableBiometricAppLock);
     return;
   }
 
@@ -114,6 +119,39 @@ function renderAppLockSetupArea() {
   renderAppLockQuestionsArea();
 }
 
+async function enableBiometricAppLock() {
+  const biometric = window.Capacitor?.Plugins?.Biometric;
+  const errorEl = document.getElementById("app-lock-biometric-error");
+  const showError = (message) => {
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.style.display = "block";
+    } else {
+      alert(message);
+    }
+  };
+
+  if (!biometric?.isAvailable) {
+    showError("Biometric support is unavailable in this Android build. Rebuild and reinstall the app.");
+    return;
+  }
+
+  try {
+    const available = await biometric.isAvailable();
+    if (!available?.available) {
+      showError("No biometric or device credential is available. Enroll a fingerprint, face unlock, or screen lock first.");
+      return;
+    }
+  } catch (err) {
+    showError("Android could not check biometric availability. Make sure a fingerprint, face unlock, or screen lock is enrolled.");
+    return;
+  }
+
+  setBiometricAppLock();
+  alert("Biometric unlock enabled.");
+  window.location.href = "settings.html";
+}
+
 function renderAppLockQuestionsArea() {
   const questionsSection = document.getElementById("app-lock-questions-section");
   const questionsArea = document.getElementById("app-lock-questions-area");
@@ -153,15 +191,7 @@ function setupAppLockSaveButton() {
     }
 
     if (appLockDraftMethod === "biometric") {
-      const biometric = window.Capacitor?.Plugins?.Biometric;
-      const available = await biometric?.isAvailable?.();
-      if (!available?.available) {
-        alert("No biometric or device credential is available on this Android device.");
-        return;
-      }
-      setBiometricAppLock();
-      alert("Biometric unlock enabled.");
-      window.location.href = "settings.html";
+      await enableBiometricAppLock();
       return;
     }
 

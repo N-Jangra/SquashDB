@@ -121,12 +121,7 @@ function setupAppNavigation() {
       const href = navItem.getAttribute("href");
       if (!href) return;
       e.preventDefault();
-      const navigationSheetEnabled = typeof state !== "undefined" && Boolean(state.preferences?.navigationSheet);
-      if (navigationSheetEnabled) {
-        openNavigationSheet();
-      } else {
-        navigateToAppPage(href);
-      }
+      navigateToAppPage(href);
     });
   });
   // Page links outside the bottom bar (Settings subpages, About pages,
@@ -149,40 +144,6 @@ function setupAppNavigation() {
 function navigateToAppPage(href) {
   recordCurrentPage();
   window.location.href = normalizeAppPageHref(href);
-}
-
-function openNavigationSheet() {
-  let sheet = document.getElementById("app-navigation-sheet");
-  if (!sheet) {
-    sheet = document.createElement("div");
-    sheet.id = "app-navigation-sheet";
-    sheet.className = "app-navigation-sheet-overlay";
-    sheet.innerHTML = `<div class="app-navigation-sheet" role="dialog" aria-label="App navigation"><div class="app-navigation-sheet-handle"></div><div class="app-navigation-sheet-header"><strong>Navigate</strong><button type="button" data-nav-sheet-close aria-label="Close">×</button></div><div class="app-navigation-sheet-grid"></div></div>`;
-    document.body.appendChild(sheet);
-    sheet.addEventListener("click", event => {
-      if (event.target === sheet || event.target.closest("[data-nav-sheet-close]")) closeNavigationSheet();
-    });
-  }
-  const labels = { dashboard: "Dashboard", timeline: "Timeline", discover: "Discover", sources: "Sources", explore: "Explore", stats: "Statistics", settings: "Settings" };
-  const grid = sheet.querySelector(".app-navigation-sheet-grid");
-  grid.innerHTML = Array.from(document.querySelectorAll(".nav-item"))
-    .filter(item => !item.hidden && item.style.display !== "none" && getComputedStyle(item).display !== "none")
-    .map(item => {
-    const href = item.getAttribute("href");
-    const key = item.dataset.tab?.replace("tab-", "") || "";
-    return `<button type="button" class="app-navigation-sheet-item${item.classList.contains("active") ? " active" : ""}" data-nav-sheet-href="${href}"><i data-lucide="${item.querySelector("svg")?.getAttribute("data-lucide") || item.querySelector("i")?.dataset.lucide || "circle"}"></i><span>${labels[key] || key}</span></button>`;
-    }).join("");
-  grid.querySelectorAll("[data-nav-sheet-href]").forEach(item => item.addEventListener("click", () => {
-    const href = item.dataset.navSheetHref;
-    closeNavigationSheet();
-    if (href && href !== getCurrentPagePath()) navigateToAppPage(href);
-  }));
-  sheet.classList.add("active");
-  if (window.lucide) lucide.createIcons();
-}
-
-function closeNavigationSheet() {
-  document.getElementById("app-navigation-sheet")?.classList.remove("active");
 }
 
 function setupPageBackButtons() {
@@ -255,7 +216,6 @@ function setupSwipeBackGesture() {
 function setupHardwareBackButton() {
   const handler = (e) => {
     if (e) e.preventDefault();
-    closeNavigationSheet();
     navigateBackWithinApp("static/pages/main/dashboard.html");
   };
 
@@ -265,7 +225,6 @@ function setupHardwareBackButton() {
   // Browser history already performs the correct back navigation after a
   // normal swipe/back action. Do not also pop the app stack here, otherwise
   // one gesture can skip the previous page and land on Dashboard.
-  window.addEventListener("popstate", closeNavigationSheet);
 
   const capApp = window.Capacitor?.Plugins?.App;
   if (capApp?.addListener) {
