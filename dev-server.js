@@ -77,8 +77,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   let pathname = url.pathname;
-  if (pathname === "/") pathname = "/dashboard.html";
-  if (pathname === "/index.html") pathname = "/dashboard.html";
+  if (pathname === "/") pathname = "/static/index.html";
+  if (pathname === "/index.html") pathname = "/static/index.html";
 
   const filePath = safeJoin(ROOT, pathname);
   if (!filePath) {
