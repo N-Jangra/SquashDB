@@ -1445,7 +1445,7 @@ function setupEventListeners() {
     const titleEl = document.getElementById("picker-modal-title");
     if (!modal || !list || !titleEl) return;
     titleEl.textContent = title;
-    list.innerHTML = `<p class="settings-row-note action-popup-message">Select a local device time.</p><input type="time" class="form-control notification-time-input" value="${state.preferences[key]}"><button type="button" class="picker-option active" data-save-notification-time><span class="choice-radio"></span><span>Save time</span></button>`;
+    list.innerHTML = `<p class="settings-row-note action-popup-message">Select a local device time.</p><input type="time" class="form-control notification-time-input" value="${state.preferences[key]}"><button type="button" class="btn btn-primary notification-time-save" data-save-notification-time>Save time</button>`;
     list.querySelector("[data-save-notification-time]").addEventListener("click", () => {
       const value = list.querySelector("input").value || state.preferences[key];
       state.preferences[key] = value;
@@ -1481,7 +1481,7 @@ function openNotificationQuietHoursPopup(updateStatus) {
   const title = document.getElementById("picker-modal-title");
   if (!modal || !list || !title) return;
   title.textContent = "Quiet Hours";
-  list.innerHTML = `<p class="settings-row-note action-popup-message">Reminders will be skipped during this time window.</p><label class="notification-time-label">Quiet hours <input type="checkbox" id="quiet-hours-enabled" ${state.preferences.notificationQuietHours ? "checked" : ""}></label><div class="notification-time-pair"><label>From<input type="time" id="quiet-hours-start" class="form-control" value="${state.preferences.notificationQuietStart}"></label><label>Until<input type="time" id="quiet-hours-end" class="form-control" value="${state.preferences.notificationQuietEnd}"></label></div><button type="button" class="picker-option active" id="quiet-hours-save"><span class="choice-radio"></span><span>Save</span></button>`;
+  list.innerHTML = `<p class="settings-row-note action-popup-message">Reminders will be skipped during this time window.</p><label class="notification-time-label">Quiet hours <input type="checkbox" id="quiet-hours-enabled" ${state.preferences.notificationQuietHours ? "checked" : ""}></label><div class="notification-time-pair"><label>From<input type="time" id="quiet-hours-start" class="form-control" value="${state.preferences.notificationQuietStart}"></label><label>Until<input type="time" id="quiet-hours-end" class="form-control" value="${state.preferences.notificationQuietEnd}"></label></div><button type="button" class="btn btn-primary notification-time-save" id="quiet-hours-save">Save</button>`;
   list.querySelector("#quiet-hours-save").addEventListener("click", () => {
     state.preferences.notificationQuietHours = list.querySelector("#quiet-hours-enabled").checked;
     state.preferences.notificationQuietStart = list.querySelector("#quiet-hours-start").value || "22:00";
@@ -2562,17 +2562,27 @@ function calculateProgress(item) {
   if (status === "Completed") result = 100;
 
   if (!result && (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime")) {
-    const totalEp = parseInt(totalEpisodes) || getSeasonTotalEpisodes(item) || 0;
-    const doneEp = parseInt(episodesDone) || 0;
-    
-    if (totalEp > 0) {
-      result = Math.min(100, Math.round((doneEp / totalEp) * 100));
-    }
-    
-    const totalS = parseInt(totalSeasons) || 0;
-    const doneS = parseInt(seasonsDone) || 0;
-    if (totalS > 0) {
-      result = Math.min(100, Math.round((doneS / totalS) * 100));
+    // Prefer the true per-season episode counts (watched vs total across all
+    // seasons); they reflect where the user actually is. Fall back to the flat
+    // episodesDone/totalEpisodes counters, and only use the coarse
+    // seasons-done/total-seasons ratio when there is no episode data at all.
+    const seasonTotalEp = getSeasonTotalEpisodes(item);
+    const seasonWatchedEp = getSeasonWatchedEpisodes(item);
+
+    if (seasonTotalEp > 0) {
+      result = Math.min(100, Math.round((seasonWatchedEp / seasonTotalEp) * 100));
+    } else {
+      const totalEp = parseInt(totalEpisodes) || 0;
+      const doneEp = parseInt(episodesDone) || 0;
+      if (totalEp > 0) {
+        result = Math.min(100, Math.round((doneEp / totalEp) * 100));
+      } else {
+        const totalS = parseInt(totalSeasons) || 0;
+        const doneS = parseInt(seasonsDone) || 0;
+        if (totalS > 0) {
+          result = Math.min(100, Math.round((doneS / totalS) * 100));
+        }
+      }
     }
   } else if (category === "manga" || category === "novel") {
     const totalCh = parseInt(totalChapters) || 0;
