@@ -9,6 +9,7 @@ All notable changes to SquashDB are documented in this file.
 - Scoped icon rendering and reduced unnecessary work during page updates.
 - Replaced list-view insight progress rings with compact horizontal progress bars, including green completed-state bars.
 - Fixed TV-series progress percentages to count watched and total episodes across all seasons instead of using only completed-season ratios.
+- Bounded dashboard DOM rendering with a sliding window of batches so large libraries do not keep every card mounted at once.
 - Android encrypted persistence now stores individual encrypted item records plus separate encrypted metadata instead of rewriting one complete encrypted state blob.
 - Added automatic migration from legacy encrypted state and removal of the old snapshot after successful migration.
 
@@ -31,6 +32,11 @@ All notable changes to SquashDB are documented in this file.
 - Refreshed Backup management with separate Backup, Status, and Cloud & Recovery tabs while keeping all backup controls available.
 - Improved notification time and quiet-hours dialogs with clear full-width Save buttons.
 - Refined Settings subpage headers, descriptions, and mobile spacing for Category Order and Tracking Choices.
+- Added consistent deferred asset loading across pages and improved back-navigation enter/exit transitions.
+
+### Dashboard and show details
+- Added dedicated Dashboard sections for On hold and Dropped items without duplicating them in other insight sections.
+- The Show Detail Next Episode action now switches season, expands the episode synopsis, and scrolls the episode into view.
 
 ### Explore and changelog
 - Redesigned Explore insights and metadata-source sections as grouped list rows with clearer icons and navigation chevrons.
