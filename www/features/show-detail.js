@@ -1661,6 +1661,7 @@ function ensureLocalItem(extraFields) {
     const itemIndex = state.items.findIndex(i => i.id === showDetailState.itemId);
     if (itemIndex !== -1) {
       state.items[itemIndex] = { ...state.items[itemIndex], ...extraFields };
+      if (extraFields.status === "Completed" && typeof markItemAsCompleted === "function") markItemAsCompleted(state.items[itemIndex]);
       saveData();
       updateShowDetailMenu();
     }
@@ -1693,6 +1694,7 @@ function ensureLocalItem(extraFields) {
     episodesCache: showDetailState.pendingEpisodesCache || [],
     ...extraFields
   };
+  if (newItem.status === "Completed" && typeof markItemAsCompleted === "function") markItemAsCompleted(newItem);
   state.items.push(newItem);
   saveData();
 
