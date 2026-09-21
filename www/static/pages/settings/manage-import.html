@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base href="../../../">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SquashDB - Import List</title>
+<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="static/index.css">
+<script defer src="core/logcat.js"></script><script defer src="lucide.min.js"></script>
+</head>
+<body class="manage-screen import-manage-screen">
+  <div id="app-container">
+    <header class="settings-ios-header"><button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button><h1>Import List</h1><span class="settings-ios-header-spacer" aria-hidden="true"></span></header>
+    <main><section class="tab-content active" id="settings-import-page">
+      <p class="manage-intro">Import titles from CSV, TSV, or TXT files. Items are added immediately, then metadata is synced in the background.</p>
+      <div class="settings-section">
+        <div class="btn-group-vertical">
+          <button type="button" class="btn btn-secondary" id="settings-import-btn"><i data-lucide="file-up"></i> Choose Import File</button>
+          <input type="file" id="settings-import-file" accept=".csv,.txt,.tsv,text/csv,text/plain" hidden>
+        </div>
+        <p class="settings-row-note">CSV: <code>title,status</code> · TXT: <code>Title - Completed</code></p>
+      </div>
+      <div class="settings-section import-page-options">
+        <div class="form-group"><label for="import-concurrency">Metadata sync workers <span class="beta-label">Beta</span></label><input id="import-concurrency" class="form-control" type="number" min="1" max="10" step="1"><span class="setting-desc">How many titles can sync at the same time. Default: 5.</span></div>
+        <div class="form-group"><label for="import-category">Category</label><select id="import-category" class="form-control"></select></div>
+        <div class="form-group"><label for="import-default-status">Default status</label><select id="import-default-status" class="form-control"></select></div>
+        <div class="form-group"><label for="import-duplicates">Duplicates</label><select id="import-duplicates" class="form-control"><option value="skip">Skip existing titles</option><option value="update">Update existing status</option><option value="create">Create another copy</option></select></div>
+        <div class="form-group"><label for="import-metadata-source">Metadata source</label><select id="import-metadata-source" class="form-control"></select></div>
+        <label class="form-check"><input type="checkbox" id="import-fetch-metadata" checked> Start background metadata syncing</label>
+        <label class="form-check"><input type="checkbox" id="import-download-thumbnails" checked> Download thumbnails when available</label>
+      </div>
+      <div id="import-list-summary" class="settings-row-note import-list-summary">Choose a file to preview it.</div>
+      <div id="import-list-preview" class="import-list-preview" hidden></div>
+      <div class="form-actions import-page-actions"><button type="button" class="btn btn-primary" id="import-list-confirm" disabled><i data-lucide="file-up"></i> Import List</button></div>
+    </section></main>
+  </div>
+  <script defer src="core/applock.js"></script><script defer src="features/metadata.js"></script><script defer src="core/cache-manager.js"></script><script defer src="core/app-navigation.js"></script><script defer src="core/app-backups.js"></script><script defer src="core/app-search.js"></script><script defer src="app.js"></script><script defer src="core/fonts.js"></script><script defer src="features/import-list.js"></script>
+</body>
+</html>
