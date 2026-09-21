@@ -14,11 +14,30 @@ function getCurrentPageTab() {
 }
 
 function getCurrentPagePath() {
-  return window.location.pathname.split("/").pop() || "index.html";
+  const pathname = window.location.pathname.replace(/^\/+/, "");
+  const filename = pathname.split("/").pop() || "index.html";
+  const staticPagesIndex = pathname.indexOf("static/pages/");
+  if (staticPagesIndex !== -1) return pathname.slice(staticPagesIndex);
+  return normalizeAppPageHref(filename);
 }
 
 function getCurrentPagePathWithQuery() {
   return getCurrentPagePath() + window.location.search;
+}
+
+function normalizeAppPageHref(href) {
+  const value = String(href || "");
+  if (!value || value.startsWith("http") || value.startsWith("#")) return value;
+  if (value.includes("static/pages/")) return value;
+  if (value.includes("/")) {
+    const filename = value.split("/").pop();
+    return normalizeAppPageHref(filename);
+  }
+  const mainPages = new Set(["dashboard.html", "discover.html", "explore.html", "sources.html", "source-search.html", "show-detail.html", "timeline.html", "statistics.html"]);
+  if (mainPages.has(value)) return `static/pages/main/${value}`;
+  if (value === "settings.html" || value.startsWith("manage-")) return `static/pages/settings/${value}`;
+  if (["app-info.html", "changelog.html", "logcat.html", "logcat-history.html", "usage-guide.html"].includes(value)) return `static/pages/info/${value}`;
+  return value;
 }
 
 function getAppPageStack() {
@@ -129,7 +148,7 @@ function setupAppNavigation() {
 
 function navigateToAppPage(href) {
   recordCurrentPage();
-  window.location.href = href;
+  window.location.href = normalizeAppPageHref(href);
 }
 
 function openNavigationSheet() {
@@ -171,20 +190,13 @@ function setupPageBackButtons() {
     if (btn.dataset.boundBack === "true") return;
     btn.dataset.boundBack = "true";
     btn.addEventListener("click", () => {
-      navigateBackWithinApp(btn.getAttribute("data-back-fallback") || "settings.html");
+      navigateBackWithinApp(btn.getAttribute("data-back-fallback") || "static/pages/settings/settings.html");
     });
   });
 }
 
-function navigateBackWithinApp(fallback = "settings.html") {
-  // Full-page navigation already creates the correct WebView history entry.
-  // Prefer it so a back action returns to the exact previous page instead of
-  // selecting an older route from the session stack.
-  if (window.history.length > 1) {
-    animatePredictiveBack(() => window.history.back());
-    return true;
-  }
-
+function navigateBackWithinApp(fallback = "static/pages/settings/settings.html") {
+  fallback = normalizeAppPageHref(fallback);
   const stack = getAppPageStack();
   const current = getCurrentPagePathWithQuery();
   const currentPath = getCurrentPagePath();
@@ -193,7 +205,10 @@ function navigateBackWithinApp(fallback = "settings.html") {
   setAppPageStack(stack);
   animatePredictiveBack(() => {
     if (previous) {
-      window.location.href = previous;
+      const [path, query = ""] = String(previous).split("?");
+      window.location.href = `${normalizeAppPageHref(path)}${query ? `?${query}` : ""}`;
+    } else if (window.history.length > 1) {
+      window.history.back();
     } else window.location.href = fallback;
   });
   return true;
@@ -233,7 +248,7 @@ function setupSwipeBackGesture() {
     tracking = false;
     const dx = event.changedTouches[0].clientX - startX;
     document.documentElement.style.removeProperty("--back-swipe-progress");
-    if (dx > 80) navigateBackWithinApp("dashboard.html");
+    if (dx > 80) navigateBackWithinApp("static/pages/main/dashboard.html");
   }, { passive: true });
 }
 
@@ -241,7 +256,7 @@ function setupHardwareBackButton() {
   const handler = (e) => {
     if (e) e.preventDefault();
     closeNavigationSheet();
-    navigateBackWithinApp("dashboard.html");
+    navigateBackWithinApp("static/pages/main/dashboard.html");
   };
 
   if (!document.body || document.body.dataset.boundHardwareBack) return;
@@ -257,11 +272,11 @@ function setupHardwareBackButton() {
     capApp.addListener("backButton", () => {
     const current = getCurrentPagePath();
     const stack = getAppPageStack();
-      const atRoot = current === "dashboard.html" && stack.length <= 1;
+      const atRoot = current === "static/pages/main/dashboard.html" && stack.length <= 1;
       if (atRoot) {
         if (capApp.exitApp) capApp.exitApp();
       } else {
-        navigateBackWithinApp("dashboard.html");
+        navigateBackWithinApp("static/pages/main/dashboard.html");
       }
     });
   }

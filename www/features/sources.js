@@ -1,5 +1,5 @@
 // SquashDB - Sources: a browsable list of every built-in metadata source
-// (sources.html), plus a per-source search page (source-search.html?source=X)
+// (static/pages/main/sources.html), plus a per-source search page (source-search.html?source=X)
 // that queries just that one source across the categories it covers.
 // Depends on globals from metadata.js (BUILTIN_METADATA_SOURCES,
 // normalizeMetadataSources, builtinSourceEnabled), app.js (state, CATEGORIES,
@@ -14,9 +14,9 @@ function sourceIsUsable(key) {
   return enabled && hasKey;
 }
 
-// ---- Sources grid (sources.html and explore.html) ----
-// sources.html lists every built-in source (dimmed if disabled/missing a key)
-// so it doubles as a way to discover what's available. explore.html is meant
+// ---- Sources grid (static/pages/main/sources.html and static/pages/main/explore.html) ----
+// static/pages/main/sources.html lists every built-in source (dimmed if disabled/missing a key)
+// so it doubles as a way to discover what's available. static/pages/main/explore.html is meant
 // to be a clean jumping-off point, so it only lists sources that are actually
 // usable right now — the toolbox icon there links to Settings for the rest.
 function renderSourcesList(enabledOnly = false) {
@@ -35,7 +35,7 @@ function renderSourcesList(enabledOnly = false) {
     const hasKey = !info.needsApiKey || Boolean(state.preferences.metadataSources.builtinApiKeys[key]);
     const status = !enabled ? "Disabled" : (!hasKey ? "API key needed" : "");
     return `
-      <a class="source-tile${enabled && hasKey ? "" : " source-row-unavailable"}" href="source-search.html?source=${key}">
+      <a class="source-tile${enabled && hasKey ? "" : " source-row-unavailable"}" href="static/pages/main/source-search.html?source=${key}">
         <span class="source-tile-icon"><i data-lucide="${info.icon || "database"}"></i></span>
         <span class="source-tile-name">${info.name}</span>
         <span class="source-tile-desc">${status || info.categories.map(c => CATEGORIES[c]?.label || c).join(", ")}</span>
@@ -124,7 +124,7 @@ function initSourceSearchPage() {
   const key = params.get("source");
   const info = BUILTIN_METADATA_SOURCES[key];
   if (!info) {
-    window.location.href = "sources.html";
+    window.location.href = "static/pages/main/sources.html";
     return;
   }
 
@@ -288,7 +288,7 @@ function renderSourceSearchResults() {
         category: result.category,
         title: result.title
       });
-      window.location.href = `show-detail.html?${urlParams.toString()}`;
+      window.location.href = `static/pages/main/show-detail.html?${urlParams.toString()}`;
     });
   });
 

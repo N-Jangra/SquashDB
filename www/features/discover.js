@@ -296,7 +296,7 @@ function renderDiscoverCategoryChips() {
       <i data-lucide="${CATEGORIES[cat].icon}"></i> ${CATEGORIES[cat].label}
     </div>
   `).join("") + `
-    <a class="chip" href="sources.html" title="Browse individual metadata sources">
+    <a class="chip" href="static/pages/main/sources.html" title="Browse individual metadata sources">
       <i data-lucide="database"></i> Sources
     </a>
   `;
@@ -955,7 +955,7 @@ function renderDiscoverResults() {
         category: result.category,
         title: result.title
       });
-      window.location.href = `show-detail.html?${params.toString()}`;
+      window.location.href = `static/pages/main/show-detail.html?${params.toString()}`;
     });
   });
 
