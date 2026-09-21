@@ -294,6 +294,9 @@ let state = {
     backgroundBackups: false,
     folderSyncDelay: "30000",
     animationSpeed: "normal",
+    metadataQueue: [],
+    metadataQueuePaused: false,
+    metadataImportConcurrency: 5,
     metadataSources: {
       builtinOrder: ["tvmaze", "wikidata", "openlibrary"],
       builtinEnabled: { tvmaze: true, wikidata: true, openlibrary: true },
@@ -471,6 +474,7 @@ function runAppInit() {
   renderAppIconPicker();
   lucide.createIcons();
   updateProgressWidget();
+  window.dispatchEvent(new Event("squashdb-app-ready"));
   handleIncomingShareIntent();
   handleNotificationAction();
   scheduleUnfinishedItemReminder();
@@ -612,6 +616,10 @@ async function loadData() {
   }
   normalizeMetadataSources();
   normalizeAppLock();
+  if (!Array.isArray(state.preferences.metadataQueue)) state.preferences.metadataQueue = [];
+  if (typeof state.preferences.metadataQueuePaused !== "boolean") state.preferences.metadataQueuePaused = false;
+  if (!Number.isFinite(Number(state.preferences.metadataImportConcurrency))) state.preferences.metadataImportConcurrency = 5;
+  state.preferences.metadataImportConcurrency = Math.max(1, Math.min(10, Math.round(Number(state.preferences.metadataImportConcurrency))));
   if (!state.preferences.navIcons || typeof state.preferences.navIcons !== "object") {
     state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", discover: "search", sources: "database", explore: "compass", stats: "pie-chart", settings: "settings" };
   }
@@ -754,6 +762,18 @@ async function loadData() {
       console.warn("Could not migrate local data into encrypted storage", err);
     }
   }
+
+  // Keep older completed records internally consistent as well as visually
+  // complete. This also repairs imported records after their metadata arrives.
+  let completedProgressChanged = false;
+  state.items.forEach(item => {
+    if (item?.status !== "Completed") return;
+    const before = [item.completionDate, item.episodesDone, item.volumesRead, item.chaptersRead, item.watchedEpisodeIds?.length].join("|");
+    markItemAsCompleted(item);
+    const after = [item.completionDate, item.episodesDone, item.volumesRead, item.chaptersRead, item.watchedEpisodeIds?.length].join("|");
+    if (before !== after) completedProgressChanged = true;
+  });
+  if (completedProgressChanged) saveData();
 
   // Keep a readable JSON mirror for browser/local-storage users and backup
   // tools. Android still uses the encrypted store as the primary source, but
@@ -1006,6 +1026,30 @@ function formatRatingValue(rating) {
   return `${value}/5`;
 }
 
+function markItemAsCompleted(item) {
+  if (!item) return item;
+  item.status = "Completed";
+  if (!item.completionDate) item.completionDate = new Date().toISOString().split("T")[0];
+
+  if (["series", "kdrama", "cdrama", "anime"].includes(item.category)) {
+    const episodes = Array.isArray(item.episodesCache) ? item.episodesCache : [];
+    const seasons = normalizeSeasonEpisodes(item.seasonEpisodes);
+    const seasonTotal = Object.values(seasons).reduce((sum, season) => sum + (Number(season.total) || 0), 0);
+    const total = Math.max(Number(item.totalEpisodes) || 0, seasonTotal, episodes.length);
+    if (total > 0) {
+      item.totalEpisodes = total;
+      item.episodesDone = total;
+      if (episodes.length) item.watchedEpisodeIds = episodes.map(episode => episode.id);
+      Object.keys(seasons).forEach(key => { seasons[key].watched = seasons[key].total; seasons[key].completed = true; });
+      if (Object.keys(seasons).length) item.seasonEpisodes = seasons;
+    }
+  } else if (["manga", "novel"].includes(item.category)) {
+    if (Number(item.totalVolumes) > 0) item.volumesRead = Number(item.totalVolumes);
+    if (Number(item.totalChapters) > 0) item.chaptersRead = Number(item.totalChapters);
+  }
+  return item;
+}
+
 function ratingToStoredValue(value) {
   const format = state.preferences.ratingFormat || "5-stars";
   const num = Number(value) || 0;
@@ -1251,16 +1295,31 @@ function setupEventListeners() {
   }
   // Reset Database
   const dbReset = document.getElementById("db-reset");
-  if (dbReset) {
-    dbReset.addEventListener("click", () => {
-      if (confirm("Are you absolutely sure you want to delete all entries? This action cannot be undone.")) {
+  if (dbReset && dbReset.dataset.bound !== "true") {
+    dbReset.dataset.bound = "true";
+    dbReset.addEventListener("click", async () => {
+      const confirmed = await requestInAppConfirmation(
+        "Wipe all data?",
+        "This permanently removes your tracked entries, watch history, and pending metadata imports.",
+        "Wipe data"
+      );
+      if (confirmed) {
         state.items = [];
+        state.watchLog = [];
+        if (state.preferences && Array.isArray(state.preferences.metadataQueue)) {
+          state.preferences.metadataQueue = [];
+          state.preferences.metadataQueuePaused = false;
+        }
         saveData();
         renderDashboard();
         renderTimeline();
         renderStats();
-        alert("All SquashDB database data has been successfully wiped.");
-        switchTab("tab-dashboard");
+        if (typeof showToast === "function") showToast("All SquashDB data has been wiped.", "success");
+        if (document.getElementById("notes-container")) {
+          switchTab("tab-dashboard");
+        } else {
+          window.location.href = "static/pages/main/dashboard.html";
+        }
       }
     });
   }
@@ -1325,7 +1384,12 @@ function setupEventListeners() {
     try {
       const scheduler = nativePlugin("BackupScheduler");
       if (value === "on" && (!scheduler?.schedule || !backupFolderPluginAvailable())) {
-        throw new Error("Select a backup folder in the Android app first.");
+        const message = scheduler?.schedule
+          ? "Select a backup folder in the Android app first."
+          : "Background encrypted backups are available in the Android app after selecting a backup folder.";
+        updateBackgroundBackupStatus();
+        if (typeof showToast === "function") showToast(message, "error");
+        return;
       }
       const previous = state.preferences.backgroundBackups;
       state.preferences.backgroundBackups = value === "on";
@@ -1343,6 +1407,8 @@ function setupEventListeners() {
       }
     } catch (err) {
       console.warn("Background backup toggle failed", err);
+      updateBackgroundBackupStatus();
+      if (typeof showToast === "function") showToast(err.message || "Background backup could not be enabled.", "error");
     }
   });
 
@@ -2249,6 +2315,60 @@ function openActionPopup(title, message, actionLabel, action) {
   if (window.lucide) lucide.createIcons();
 }
 
+function requestInAppConfirmation(title, message, actionLabel = "Continue") {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay active squashdb-confirm-modal";
+    overlay.innerHTML = `
+      <div class="modal-content" role="dialog" aria-modal="true">
+        <div class="modal-header"><h3 class="modal-title"></h3><button type="button" class="modal-close" aria-label="Close">&times;</button></div>
+        <p class="settings-row-note"></p>
+        <div class="form-actions"><button type="button" class="btn btn-secondary" data-confirm-cancel>Cancel</button><button type="button" class="btn btn-primary" data-confirm-action></button></div>
+      </div>`;
+    overlay.querySelector(".modal-title").textContent = title;
+    overlay.querySelector(".settings-row-note").textContent = message;
+    overlay.querySelector("[data-confirm-action]").textContent = actionLabel;
+    const finish = result => { overlay.remove(); resolve(result); };
+    overlay.querySelector("[data-confirm-cancel]").addEventListener("click", () => finish(false));
+    overlay.querySelector(".modal-close").addEventListener("click", () => finish(false));
+    overlay.addEventListener("click", event => { if (event.target === overlay) finish(false); });
+    overlay.querySelector("[data-confirm-action]").addEventListener("click", () => finish(true));
+    document.body.appendChild(overlay);
+  });
+}
+
+async function clearSquashDbData({ factoryReset = false } = {}) {
+  const title = factoryReset ? "Factory reset SquashDB?" : "Clear all tracked data?";
+  const message = factoryReset
+    ? "This removes tracked items, watch history, preferences, pending imports, and temporary caches. This cannot be undone."
+    : "This removes all tracked items, watch history, and pending imports. Preferences and backups will be kept.";
+  const confirmed = await requestInAppConfirmation(title, message, factoryReset ? "Factory reset" : "Clear data");
+  if (!confirmed) return false;
+
+  const encryptedStore = nativePlugin("EncryptedStore");
+  const writes = [];
+  if (encryptedStore?.deleteItem) state.items.forEach(item => { if (item?.id) writes.push(encryptedStore.deleteItem({ id: String(item.id) })); });
+  if (encryptedStore?.setMeta) writes.push(encryptedStore.setMeta({ data: "{\"watchLog\":[],\"preferences\":{}}" }));
+  state.items = [];
+  state.watchLog = [];
+  if (state.preferences) {
+    state.preferences.metadataQueue = [];
+    state.preferences.metadataQueuePaused = false;
+  }
+  saveData();
+  await Promise.allSettled(writes);
+
+  if (window.SquashDBCache) await window.SquashDBCache.clearTemporary();
+  if (factoryReset) {
+    Object.keys(localStorage).filter(key => key.startsWith("squashdb_")).forEach(key => localStorage.removeItem(key));
+  }
+  if (typeof showToast === "function") showToast(factoryReset ? "SquashDB was reset." : "All tracked data was cleared.", "success");
+  setTimeout(() => window.location.reload(), 350);
+  return true;
+}
+
+window.clearSquashDbData = clearSquashDbData;
+
 function openChoicePopup(title, message, options, currentValue, onSelect) {
   const modal = document.getElementById("picker-modal");
   const list = document.getElementById("picker-options-list");
@@ -2553,7 +2673,7 @@ function calculateProgress(item) {
   if (!item || typeof item !== "object") return 0;
   const signature = [item.category, item.status, item.seasonsDone, item.totalSeasons,
     item.episodesDone, item.totalEpisodes, item.seasonEpisodes, item.chaptersRead,
-    item.totalChapters].join("|");
+    item.totalChapters, item.volumesRead, item.totalVolumes].join("|");
   const cached = progressCache.get(item);
   if (cached?.signature === signature) return cached.value;
   const { category, status, seasonsDone, totalSeasons, episodesDone, totalEpisodes, chaptersRead, totalChapters } = item;
@@ -2587,7 +2707,13 @@ function calculateProgress(item) {
   } else if (category === "manga" || category === "novel") {
     const totalCh = parseInt(totalChapters) || 0;
     const doneCh = parseInt(chaptersRead) || 0;
-    if (totalCh > 0) result = Math.min(100, Math.round((doneCh / totalCh) * 100));
+    const totalVol = parseInt(item.totalVolumes) || 0;
+    const doneVol = parseInt(item.volumesRead) || 0;
+    if (totalCh > 0) {
+      result = Math.min(100, Math.round((doneCh / totalCh) * 100));
+    } else if (totalVol > 0) {
+      result = Math.min(100, Math.round((doneVol / totalVol) * 100));
+    }
   }
 
   // Games / Movies with no numerical steps
@@ -2862,12 +2988,14 @@ function progressRingHTML(progress, className = "") {
 }
 
 function dashboardInsightCard(item, label, extra = "") {
-  const progress = calculateProgress(item);
+  const isStatusOnly = item.category === "movie" || item.category === "game";
+  const progress = isStatusOnly ? 0 : calculateProgress(item);
+  const movieRating = Number(item.rating) > 0 ? `Rating: ${formatRatingValue(item.rating)}` : "Unrated";
   return `
-    <button type="button" class="dashboard-insight-card" data-id="${item.id}">
+    <button type="button" class="dashboard-insight-card${isStatusOnly ? " dashboard-status-only-card" : ""}" data-id="${item.id}">
       ${thumbnailOrPlaceholder(item.thumbnail, "dashboard-insight-thumb")}
-      <span class="dashboard-insight-body"><strong>${item.title}</strong><small>${label}${extra ? ` · ${extra}` : ""}</small></span>
-      ${progressRingHTML(progress)}
+      <span class="dashboard-insight-body"><strong>${item.title}</strong><small>${isStatusOnly ? movieRating : `${label}${extra ? ` · ${extra}` : ""}`}</small></span>
+      ${isStatusOnly ? `<span class="dashboard-status-pill">${item.status || "Unrated"}</span>` : progressRingHTML(progress)}
     </button>
   `;
 }
@@ -2886,29 +3014,24 @@ function renderDashboardInsights() {
 
   const continueItems = items
     .filter(item => item.status !== "Completed" && (calculateProgress(item) > 0 || ["In Progress", "Playing", "Reading"].includes(item.status)))
-    .sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0))
-    .slice(0, 4);
+    .sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0));
   const continueIds = new Set(continueItems.map(item => item.id));
   const completedItems = items
     .filter(item => item.status === "Completed")
-    .sort((a, b) => String(b.completionDate || b.updated || "").localeCompare(String(a.completionDate || a.updated || "")))
-    .slice(0, 4);
+    .sort((a, b) => String(b.completionDate || b.updated || "").localeCompare(String(a.completionDate || a.updated || "")));
   const completedIds = new Set(completedItems.map(item => item.id));
   const notStartedItems = items
     .filter(item => item.status !== "Completed"
       && calculateProgress(item) <= 0
       && !["Dropped", "On Hold"].includes(item.status)
       && !["In Progress", "Playing", "Reading"].includes(item.status))
-    .sort((a, b) => (Number(b.created || b.updated) || 0) - (Number(a.created || a.updated) || 0))
-    .slice(0, 4);
+    .sort((a, b) => (Number(b.created || b.updated) || 0) - (Number(a.created || a.updated) || 0));
   const onHoldItems = items
     .filter(item => item.status === "On Hold")
-    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0))
-    .slice(0, 4);
+    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0));
   const droppedItems = items
     .filter(item => item.status === "Dropped")
-    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0))
-    .slice(0, 4);
+    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0));
   const notStartedIds = new Set(notStartedItems.map(item => item.id));
   const onHoldIds = new Set(onHoldItems.map(item => item.id));
   const droppedIds = new Set(droppedItems.map(item => item.id));
@@ -2921,8 +3044,12 @@ function renderDashboardInsights() {
         && !["Dropped", "On Hold"].includes(item.status)
         && lastUpdated > 0 && lastUpdated < staleCutoff;
     })
-    .sort((a, b) => (Number(a.updated || a.created) || 0) - (Number(b.updated || b.created) || 0))
-    .slice(0, 4);
+    .sort((a, b) => (Number(a.updated || a.created) || 0) - (Number(b.updated || b.created) || 0));
+
+  const categorizedIds = new Set([
+    ...continueItems, ...completedItems, ...notStartedItems, ...onHoldItems, ...droppedItems, ...staleItems
+  ].map(item => item.id));
+  const otherItems = items.filter(item => !categorizedIds.has(item.id));
 
   const staleLabel = item => {
     const days = Math.max(1, Math.floor((Date.now() - Number(item.updated || item.created || Date.now())) / (24 * 60 * 60 * 1000)));
@@ -2936,7 +3063,8 @@ function renderDashboardInsights() {
     section("On hold", onHoldItems.map(item => dashboardInsightCard(item, item.status)).join(""), "on-hold"),
     section("Dropped", droppedItems.map(item => dashboardInsightCard(item, item.status)).join(""), "dropped"),
     section("Haven't updated in a long time", staleItems.map(item => dashboardInsightCard(item, item.status, staleLabel(item))).join(""), "stale"),
-    section("Completed", completedItems.map(item => dashboardInsightCard(item, item.completionDate || "Completed")).join(""), "completed")
+    section("Completed", completedItems.map(item => dashboardInsightCard(item, item.completionDate || "Completed")).join(""), "completed"),
+    section("Other", otherItems.map(item => dashboardInsightCard(item, item.status || "No status")).join(""), "other")
   ].join("");
   root.dataset.insightItemIds = JSON.stringify([...new Set([
     ...continueItems.map(item => item.id),
@@ -2944,7 +3072,8 @@ function renderDashboardInsights() {
     ...onHoldItems.map(item => item.id),
     ...droppedItems.map(item => item.id),
     ...staleItems.map(item => item.id),
-    ...completedItems.map(item => item.id)
+    ...completedItems.map(item => item.id),
+    ...otherItems.map(item => item.id)
   ])]);
   root.style.display = root.innerHTML ? "block" : "none";
   root.querySelectorAll(".dashboard-insight-card").forEach(card => card.addEventListener("click", () => openItemForCategory(card.dataset.id)));
@@ -3193,67 +3322,18 @@ function buildGridCard(item) {
 }
 
 function buildNoteCard(item) {
-  const rowActions = state.preferences.dashboardRowActions || "menu";
   const card = document.createElement("div");
   const isCompleted = item.status === "Completed";
-  card.className = `note-card ${isCompleted ? "completed" : ""}`;
+  card.className = `note-card dashboard-insight-card ${isCompleted ? "completed" : ""}`;
   card.dataset.id = item.id;
-  card.style.setProperty("--theme-color", CATEGORIES[item.category].color);
 
   const progress = calculateProgress(item);
-  const subtitleParts = [item.status];
-  const showProgressPercent = !isCompleted && progress > 0 && (item.category === "series" || item.category === "kdrama" || item.category === "cdrama" || item.category === "anime" || item.category === "manga" || item.category === "novel");
-  if (showProgressPercent) subtitleParts.push(`${progress}%`);
-  if (item.rating) subtitleParts.push(formatRatingValue(item.rating));
-  const timeToComplete = calculateTimeToComplete(item);
-  if (timeToComplete && !isCompleted && timeToComplete.remaining > 0) {
-    subtitleParts.push(`${formatMinutesAsDuration(timeToComplete.remaining)} left`);
-  }
-
-  // Second meta line from captured online metadata; hidden when the item
-  // predates metadata capture and has none of these fields.
-  const metaParts = [];
-  if (Array.isArray(item.genres) && item.genres.length) metaParts.push(item.genres.slice(0, 2).join(", "));
-  if (item.network) metaParts.push(item.network);
-  if (item.productionStatus) metaParts.push(item.productionStatus);
-  const sourceName = itemSourceName(item);
-  if (sourceName) metaParts.push(sourceName);
-  const metaLineHTML = metaParts.length ? `<span class="note-meta-line">${metaParts.join(" · ")}</span>` : "";
-
-  const progressType = ["series", "kdrama", "cdrama", "anime"].includes(item.category)
-    ? "ep"
-    : ["manga", "novel"].includes(item.category)
-      ? (parseInt(item.totalChapters) > 0 ? "ch" : "vol")
-      : "";
-  const progressUnit = progressType === "ep" ? "episode" : progressType === "vol" ? "volume" : "chapter";
-  const quickProgressHTML = progressType ? `<button class="note-action-btn inc-btn" data-id="${item.id}" data-type="${progressType}" title="Mark next ${progressUnit} watched"><i data-lucide="plus"></i></button>` : "";
-  const actionsHTML = `<div class="note-quick-actions">
-      ${quickProgressHTML}
-      <button class="note-action-btn edit-btn" data-id="${item.id}" title="Edit"><i data-lucide="edit-2"></i></button>
-      <button class="note-action-btn delete-btn" data-id="${item.id}" title="Delete"><i data-lucide="trash-2"></i></button>
-    </div>`;
-
-  const swipeActionsHTML = rowActions === "swipe" ? `
-    <div class="note-row-swipe-actions">
-      <button class="note-action-btn edit-btn" data-id="${item.id}" title="Edit"><i data-lucide="edit-2"></i></button>
-      <button class="note-action-btn delete-btn" data-id="${item.id}" title="Delete"><i data-lucide="trash-2"></i></button>
-    </div>
-  ` : "";
+  const subtitle = isCompleted ? (item.completionDate || "Completed") : item.status;
 
   card.innerHTML = `
-    ${swipeActionsHTML}
-    <div class="note-row-content">
-      <input type="checkbox" class="note-checkbox" ${isCompleted ? "checked" : ""} data-id="${item.id}" title="Toggle Completion">
-      ${thumbnailOrPlaceholder(item.thumbnail, "note-thumb")}
-      <div class="note-row-body">
-        <span class="note-title">${item.title}</span>
-        <span class="note-subtitle">${subtitleParts.join(" · ")}</span>
-        ${metaLineHTML}
-      </div>
-      ${progressRingHTML(progress)}
-      <span class="note-tag" style="--theme-color: ${CATEGORIES[item.category].color}">${CATEGORIES[item.category].label}</span>
-      ${actionsHTML}
-    </div>
+    ${thumbnailOrPlaceholder(item.thumbnail, "dashboard-insight-thumb")}
+    <span class="dashboard-insight-body"><strong>${item.title}</strong><small>${subtitle}</small></span>
+    ${progressRingHTML(progress)}
   `;
   return card;
 }
@@ -4039,7 +4119,7 @@ function attachCardEvents() {
   bindOnce(".note-card", card => {
     if (rowActions === "tap-hold") {
       bindTapHold(card);
-    } else if (rowActions === "swipe") {
+    } else if (rowActions === "swipe" && card.querySelector(".note-row-content")) {
       bindSwipe(card);
     }
     // The row itself always opens the detail page. Edit/delete remain available
@@ -4234,23 +4314,7 @@ function toggleCompletion(id, isChecked) {
   const item = state.items[itemIndex];
   
   if (isChecked) {
-    item.status = "Completed";
-    
-    // Set completion date to local time today
-    const now = new Date();
-    const offset = now.getTimezoneOffset();
-    const localDateStr = new Date(now.getTime() - (offset * 60 * 1000)).toISOString().split("T")[0];
-    item.completionDate = localDateStr;
-    
-    // Max progress if numerical fields exist
-    if (item.category === "series" || item.category === "kdrama" || item.category === "cdrama" || item.category === "anime") {
-      const seasonTotal = getSeasonTotalEpisodes(item);
-      const seasonWatched = getSeasonWatchedEpisodes(item);
-      if (seasonTotal > 0) item.totalEpisodes = seasonTotal;
-    if (seasonWatched > 0) item.episodesDone = seasonWatched;
-  } else if (item.category === "manga" || item.category === "novel") {
-      if (parseInt(item.totalVolumes) > 0) item.volumesRead = item.totalVolumes;
-    }
+    markItemAsCompleted(item);
   } else {
     // Revert status to In Progress / Playing
     if (item.category === "game") {
@@ -5161,6 +5225,7 @@ function handleFormSubmit(e) {
         thumbnail: thumbnailsEnabled() ? (fetchedMetadataDraft?.thumbnail || state.items[itemIndex].thumbnail || "") : "",
         ...extraData
       };
+      if (status === "Completed") markItemAsCompleted(state.items[itemIndex]);
     }
   } else {
     // Create new item
@@ -5177,6 +5242,7 @@ function handleFormSubmit(e) {
       thumbnail: thumbnailsEnabled() ? (fetchedMetadataDraft?.thumbnail || "") : "",
       ...extraData
     };
+    if (status === "Completed") markItemAsCompleted(newItem);
     state.items.push(newItem);
   }
 
