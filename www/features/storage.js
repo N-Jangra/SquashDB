@@ -52,6 +52,12 @@
     const breakdown = document.getElementById("storage-breakdown");
     const categories = document.getElementById("storage-categories");
     if (total) total.textContent = formatBytes(data.total);
+    const warningLimit = Number(state.preferences.storageWarningLimitMb) || 0;
+    const warning = document.getElementById("storage-warning");
+    if (warning) {
+      warning.hidden = !warningLimit || data.total <= warningLimit * 1024 * 1024;
+      warning.textContent = `Storage is above your ${warningLimit} MB warning limit.`;
+    }
     if (updated) updated.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
     if (breakdown) breakdown.innerHTML = [
       row("Library data", data.library, data.total, "primary"),

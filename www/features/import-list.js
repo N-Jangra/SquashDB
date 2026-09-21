@@ -4,7 +4,7 @@
 (function () {
   "use strict";
 
-  const MAX_ATTEMPTS = 3;
+  const maxAttempts = () => Math.max(1, Number(state.preferences?.metadataRetryLimit) || 3);
   let dialog;
   let rows = [];
   let queueWorkers = 0;
@@ -189,7 +189,11 @@
     const current = categorySelect.value;
     categorySelect.innerHTML = "";
     categoryKeys().forEach(key => { const option = document.createElement("option"); option.value = key; option.textContent = categoryLabel(key); categorySelect.appendChild(option); });
-    categorySelect.value = categoryKeys().includes(current) ? current : defaultCategory();
+    categorySelect.value = categoryKeys().includes(current)
+      ? current
+      : (categoryKeys().includes(state.preferences.importDefaultCategory) ? state.preferences.importDefaultCategory : defaultCategory());
+    const duplicateSelect = dialog.querySelector("#import-duplicates");
+    if (duplicateSelect) duplicateSelect.value = state.preferences.importDuplicatePolicy || "skip";
     updateStatusOptions();
     updateMetadataSourceOptions();
   }
@@ -340,7 +344,7 @@
     const queue = state.preferences.metadataQueue;
     const jobs = [];
     while (queueWorkers + jobs.length < queueConcurrency()) {
-      const entry = queue.find(value => ["pending", "failed"].includes(value.state) && Number(value.attempts || 0) < MAX_ATTEMPTS);
+      const entry = queue.find(value => ["pending", "failed"].includes(value.state) && Number(value.attempts || 0) < maxAttempts());
       if (!entry) break;
       const item = state.items.find(value => value.id === entry.itemId);
       entry.state = "processing";
@@ -353,7 +357,7 @@
     saveData();
     renderQueueStatus();
     await Promise.all(jobs.map(job => processQueueJob(job.entry, job.item)));
-    if (queue.some(entry => ["pending", "failed"].includes(entry.state) && Number(entry.attempts || 0) < MAX_ATTEMPTS)) {
+    if (queue.some(entry => ["pending", "failed"].includes(entry.state) && Number(entry.attempts || 0) < maxAttempts())) {
       importTimer = setTimeout(processQueue, 250);
     }
   }
@@ -372,7 +376,7 @@
       entry.state = "synced"; entry.lastError = ""; entry.syncedAt = Date.now(); item.metadataStatus = "synced";
       if (item.status === "Completed" && typeof markItemAsCompleted === "function") markItemAsCompleted(item);
     } catch (error) {
-      entry.attempts = Number(entry.attempts || 0) + 1; entry.state = entry.attempts >= MAX_ATTEMPTS ? "failed" : "pending"; entry.lastError = error.message || "Metadata request failed"; if (entry.state === "failed") item.metadataStatus = "not-found";
+      entry.attempts = Number(entry.attempts || 0) + 1; entry.state = entry.attempts >= maxAttempts() ? "failed" : "pending"; entry.lastError = error.message || "Metadata request failed"; if (entry.state === "failed") item.metadataStatus = "not-found";
     } finally {
       entry.updatedAt = Date.now(); queueWorkers -= 1; saveData();
       if (typeof renderDashboard === "function") renderDashboard();
@@ -381,7 +385,11 @@
     }
   }
 
-  function scheduleQueue() { clearTimeout(importTimer); importTimer = setTimeout(processQueue, 500); }
+  function scheduleQueue() {
+    clearTimeout(importTimer);
+    const delays = { immediate: 500, "five-minutes": 5 * 60 * 1000, "fifteen-minutes": 15 * 60 * 1000 };
+    importTimer = setTimeout(processQueue, delays[state.preferences.metadataSyncFrequency] || delays.immediate);
+  }
 
   function renderQueueStatus() {
     const target = document.getElementById("import-list-progress");

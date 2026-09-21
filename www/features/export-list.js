@@ -31,9 +31,11 @@
       extension = "txt"; mime = "text/plain;charset=utf-8";
     } else {
       const separator = format === "tsv" ? "\t" : ",";
+      const fields = state.preferences.exportIncludeMetadata
+        ? ["title", "status", "category", "rating", "notes"] : ["title", "status", "category"];
       text = [
-        ["title", "status", "category"].join(separator),
-        ...items.map(item => [item.title, item.status, item.category].map(value => escapeDelimited(value, separator)).join(separator))
+        fields.join(separator),
+        ...items.map(item => fields.map(field => escapeDelimited(item[field] || "", separator)).join(separator))
       ].join("\n") + "\n";
       extension = format; mime = format === "tsv" ? "text/tab-separated-values;charset=utf-8" : "text/csv;charset=utf-8";
     }
@@ -54,7 +56,7 @@
       const option = document.createElement("option"); option.value = key; option.textContent = CATEGORIES[key].label || key; select.appendChild(option);
     });
     if (select.options.length) select.value = select.options[0].value;
-    document.querySelectorAll("[data-export-format]").forEach(button => button.addEventListener("click", () => exportList(button.dataset.exportFormat)));
+    document.querySelectorAll("[data-export-format]").forEach(button => button.addEventListener("click", () => exportList(button.dataset.exportFormat || state.preferences.exportDefaultFormat || "csv")));
     if (window.lucide) lucide.createIcons();
   }
 

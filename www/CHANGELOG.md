@@ -29,6 +29,10 @@ All notable changes to SquashDB are documented in this file.
 - Reordered Settings sections and options alphabetically, moved Information to the bottom, and grouped Metadata & Storage together.
 - Added clearer spacing between Settings groups and the new Storage entry.
 - Improved show-detail navigation and completion behavior.
+- Added configurable dashboard defaults, recently-added limits, card corner styles, progress increments, automatic completion behavior, rating reminders, and notes templates.
+- Added metadata refresh/retry controls, offline fallback behavior, scheduled thumbnail cleanup, and configurable import/export defaults.
+- Added backup safety, notification, security, data maintenance, and advanced preference controls, including storage limits, cache cleanup, retry policies, auto-lock options, duplicate detection, and network tuning.
+- Added Settings → Storage usage warnings and expanded storage breakdown and cleanup controls.
 
 ## [0.0.6]
 

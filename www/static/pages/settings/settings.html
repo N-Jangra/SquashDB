@@ -51,6 +51,16 @@
       <div class="settings-row-body"><label>Accessible Contrast</label><span>Increase contrast for easier reading.</span></div>
       <div class="settings-row-value"><span>Standard</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="accessibilityPreset">
+      <div class="settings-row-icon"><i data-lucide="accessibility"></i></div>
+      <div class="settings-row-body"><label>Accessibility Preset</label><span>Apply contrast, motion, and text-size settings together.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="accessibleTextSize">
+      <div class="settings-row-icon"><i data-lucide="text-cursor-input"></i></div>
+      <div class="settings-row-body"><label>Text Size</label><span>Increase readable text size throughout the app.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
     <button type="button" class="settings-row settings-row-picker" id="animation-speed-picker" data-pref="animationSpeed">
       <div class="settings-row-icon"><i data-lucide="zap"></i></div>
       <div class="settings-row-body">
@@ -118,11 +128,50 @@
       </div>
       <div class="settings-row-value"><span id="folder-sync-delay-picker-value">30 seconds</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="backupSchedule">
+      <div class="settings-row-icon"><i data-lucide="calendar-clock"></i></div>
+      <div class="settings-row-body"><label>Backup Schedule</label><span>Choose how often encrypted backups run.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="backupRetention">
+      <div class="settings-row-icon"><i data-lucide="archive-restore"></i></div>
+      <div class="settings-row-body"><label>Backup Retention</label><span>Choose how many backup snapshots to keep.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="backupBeforeDestructive" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="shield-alert"></i></div>
+      <div class="settings-row-body"><label>Backup Before Destructive Actions</label><span>Create a backup before wiping or replacing data.</span></div>
+      <div class="settings-row-value"><span>On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="backupPasswordReminder" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="key-round"></i></div><div class="settings-row-body"><label>Backup Password Reminder</label></div><div class="settings-row-value"><span>On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="backupMaxSizeMb"><div class="settings-row-icon"><i data-lucide="hard-drive"></i></div><div class="settings-row-body"><label>Maximum Backup Size</label></div><div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="backupValidateLocation" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="folder-check"></i></div><div class="settings-row-body"><label>Validate Backup Location</label></div><div class="settings-row-value"><span>On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="backupRestorePreview" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="file-search"></i></div><div class="settings-row-body"><label>Restore Preview</label></div><div class="settings-row-value"><span>On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
     <a class="settings-row settings-row-link" href="static/pages/settings/manage-import.html">
       <div class="settings-row-icon"><i data-lucide="file-up"></i></div>
       <div class="settings-row-body"><label>Import List</label><span>Import anime, movies, series, manga, and games.</span></div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
+    <button type="button" class="settings-row settings-row-picker" data-pref="importDefaultCategory">
+      <div class="settings-row-icon"><i data-lucide="folder-input"></i></div>
+      <div class="settings-row-body"><label>Import Default Category</label><span>Choose the category preselected for new imports.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="importDuplicatePolicy">
+      <div class="settings-row-icon"><i data-lucide="copy-check"></i></div>
+      <div class="settings-row-body"><label>Import Duplicate Handling</label><span>Choose what happens when a title already exists.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="exportDefaultFormat">
+      <div class="settings-row-icon"><i data-lucide="file-output"></i></div>
+      <div class="settings-row-body"><label>Export Default Format</label><span>Choose the preferred export file type.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="exportIncludeMetadata" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="file-spreadsheet"></i></div>
+      <div class="settings-row-body"><label>Export Metadata</label><span>Include ratings, notes, and extra item fields when supported.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
     <a class="settings-row settings-row-link" href="static/pages/settings/manage-storage.html">
       <div class="settings-row-icon"><i data-lucide="hard-drive"></i></div>
       <div class="settings-row-body"><label>Storage</label><span>See what is using space and manage saved data.</span></div>
@@ -142,8 +191,58 @@
     </button>
     <button type="button" class="settings-row settings-row-picker" id="dashboard-view-picker" data-pref="dashboardView">
       <div class="settings-row-icon"><i data-lucide="layout-grid"></i></div>
-      <div class="settings-row-body"><label>Dashboard View</label><span>Show items as a list or a poster grid.</span></div>
+      <div class="settings-row-body"><label>Dashboard View</label><span>Choose list, compact list, grids, or table view.</span></div>
       <div class="settings-row-value"><span id="dashboard-view-picker-value">List</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dashboardDefaultCategory">
+      <div class="settings-row-icon"><i data-lucide="list-filter"></i></div>
+      <div class="settings-row-body"><label>Default Category</label><span>Choose which category opens on the Dashboard.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="recentlyAddedLimit">
+      <div class="settings-row-icon"><i data-lucide="clock-3"></i></div>
+      <div class="settings-row-body"><label>Recently Added Limit</label><span>Choose how many recent items appear on the Dashboard.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dashboardCardCorners">
+      <div class="settings-row-icon"><i data-lucide="square-dashed"></i></div>
+      <div class="settings-row-body"><label>Card Corner Style</label><span>Choose rounded, soft, or square Dashboard cards.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dashboardDensity">
+      <div class="settings-row-icon"><i data-lucide="rows-3"></i></div>
+      <div class="settings-row-body"><label>Dashboard Density</label><span>Control the spacing between dashboard items.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dashboardGroupBy">
+      <div class="settings-row-icon"><i data-lucide="group"></i></div>
+      <div class="settings-row-body"><label>Dashboard Grouping</label><span>Group items by status, category, or release date.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dashboardSort">
+      <div class="settings-row-icon"><i data-lucide="arrow-down-wide-narrow"></i></div>
+      <div class="settings-row-body"><label>Dashboard Sorting</label><span>Choose the default item order.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dashboardShowThumbnails" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="image"></i></div>
+      <div class="settings-row-body"><label>Show Thumbnails</label><span>Show or hide item artwork on the Dashboard.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dashboardShowRatings" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="star"></i></div>
+      <div class="settings-row-body"><label>Show Ratings</label><span>Show or hide ratings in Dashboard cards.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dashboardShowProgress" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="percent"></i></div>
+      <div class="settings-row-body"><label>Show Progress</label><span>Show or hide progress values and rings.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" id="reset-dashboard-preferences">
+      <div class="settings-row-icon"><i data-lucide="rotate-ccw"></i></div>
+      <div class="settings-row-body"><label>Reset Dashboard Preferences</label><span>Restore the default Dashboard layout and display settings.</span></div>
+      <div class="settings-row-value"><span>Reset</span><i data-lucide="rotate-ccw" class="settings-row-chevron"></i></div>
     </button>
     <button type="button" class="settings-row settings-row-picker" data-pref="oneHandedMode">
       <div class="settings-row-icon"><i data-lucide="hand"></i></div>
@@ -187,12 +286,52 @@
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
+    <button type="button" class="settings-row settings-row-picker" data-pref="metadataRefreshInterval">
+      <div class="settings-row-icon"><i data-lucide="refresh-cw"></i></div>
+      <div class="settings-row-body"><label>Metadata Refresh Interval</label><span>Control how often saved metadata may be refreshed.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="metadataRetryLimit">
+      <div class="settings-row-icon"><i data-lucide="rotate-ccw"></i></div>
+      <div class="settings-row-body"><label>Metadata Retry Limit</label><span>Maximum attempts for a failed metadata request.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="offlineFallback">
+      <div class="settings-row-icon"><i data-lucide="wifi-off"></i></div>
+      <div class="settings-row-body"><label>Offline Fallback</label><span>Choose what remains visible when metadata cannot be reached.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="thumbnailCleanup">
+      <div class="settings-row-icon"><i data-lucide="trash-2"></i></div>
+      <div class="settings-row-body"><label>Automatic Thumbnail Cleanup</label><span>Trim old cached thumbnails on a schedule.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="metadataSyncFrequency">
+      <div class="settings-row-icon"><i data-lucide="refresh-cw"></i></div>
+      <div class="settings-row-body"><label>Metadata Sync Frequency</label><span>Choose how often queued metadata is processed.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="metadataImportConcurrency">
+      <div class="settings-row-icon"><i data-lucide="between-horizontal-start"></i></div>
+      <div class="settings-row-body"><label>Metadata Sync Workers</label><span>Beta: process multiple metadata requests in parallel.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
     <button type="button" class="settings-row settings-row-picker" id="metadata-thumbnails-picker" data-pref="metadataThumbnails" data-direct-toggle="true">
       <div class="settings-row-icon"><i data-lucide="image"></i></div>
       <div class="settings-row-body">
         <label>Metadata Thumbnails</label>
       </div>
       <div class="settings-row-value"><span id="metadata-thumbnails-picker-value">On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="thumbnailSize">
+      <div class="settings-row-icon"><i data-lucide="scan"></i></div>
+      <div class="settings-row-body"><label>Thumbnail Size</label><span>Choose how large thumbnails appear in the Dashboard.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="thumbnailQuality">
+      <div class="settings-row-icon"><i data-lucide="image-up"></i></div>
+      <div class="settings-row-body"><label>Thumbnail Quality</label><span>Balance image quality, data use, and storage.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
   </div>
 </div>
@@ -238,10 +377,27 @@
       </div>
       <div class="settings-row-value"><span id="image-cache-limit-status">250 images</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="storageWarningLimitMb">
+      <div class="settings-row-icon"><i data-lucide="triangle-alert"></i></div>
+      <div class="settings-row-body"><label>Storage Warning Limit</label><span>Show a warning when local storage grows beyond this size.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="backupStorageLimitMb">
+      <div class="settings-row-icon"><i data-lucide="hard-drive-download"></i></div>
+      <div class="settings-row-body"><label>Backup Storage Limit</label><span>Set a local limit for saved backup snapshots.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
   </div>
 </div>
 <div class="settings-page-header">
   <h4 class="settings-section-title">Notifications</h4>
+  <div class="settings-section"><div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" data-pref="notificationSound" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="volume-2"></i></div><div class="settings-row-body"><label>Notification Sound</label></div><div class="settings-row-value"><span>On</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="notificationVibration" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="smartphone"></i></div><div class="settings-row-body"><label>Vibration</label></div><div class="settings-row-value"><span>On</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="reminderDays"><div class="settings-row-icon"><i data-lucide="calendar-clock"></i></div><div class="settings-row-body"><label>Reminder Days</label></div><div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="notificationPerCategory" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="tags"></i></div><div class="settings-row-body"><label>Per-Category Reminders</label></div><div class="settings-row-value"><span>Off</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="notificationGrouping"><div class="settings-row-icon"><i data-lucide="layers-2"></i></div><div class="settings-row-body"><label>Notification Grouping</label></div><div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+  </div></div>
 </div>
 <div class="settings-section">
   <div class="settings-list">
@@ -275,7 +431,40 @@
   </div>
 </div>
 <div class="settings-page-header">
+  <h4 class="settings-section-title">Privacy &amp; Network</h4>
+</div>
+<div class="settings-section">
+  <div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" data-pref="analyticsEnabled" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="activity"></i></div>
+      <div class="settings-row-body"><label>Usage Analytics</label><span>Share anonymous usage information.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="sendErrorLogs" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="bug"></i></div>
+      <div class="settings-row-body"><label>Error Log Sharing</label><span>Allow diagnostic logs to be shared when requested.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="networkOnlyOnWifi" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="wifi"></i></div>
+      <div class="settings-row-body"><label>Wi-Fi Only Metadata</label><span>Do not fetch online metadata on mobile data.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="externalLinks">
+      <div class="settings-row-icon"><i data-lucide="external-link"></i></div>
+      <div class="settings-row-body"><label>External Links</label><span>Control how links to websites are opened.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+  </div>
+</div>
+<div class="settings-page-header">
   <h4 class="settings-section-title">Security</h4>
+  <div class="settings-section"><div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" data-pref="autoLockTimeout"><div class="settings-row-icon"><i data-lucide="timer"></i></div><div class="settings-row-body"><label>Auto-Lock Timeout</label></div><div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="lockOnBackground" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="lock-keyhole"></i></div><div class="settings-row-body"><label>Lock on App Background</label></div><div class="settings-row-value"><span>Off</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="biometricFallback"><div class="settings-row-icon"><i data-lucide="fingerprint"></i></div><div class="settings-row-body"><label>Biometric Fallback</label></div><div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="hideSensitiveNotes" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="eye-off"></i></div><div class="settings-row-body"><label>Hide Sensitive Notes</label></div><div class="settings-row-value"><span>Off</span></div></button>
+  </div></div>
 </div>
 <div class="settings-section">
   <div class="settings-list">
@@ -293,6 +482,31 @@
 </div>
 <div class="settings-section">
   <div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" data-pref="automaticCompletion">
+      <div class="settings-row-icon"><i data-lucide="check-check"></i></div>
+      <div class="settings-row-body"><label>Automatic Completion</label><span>Choose how completed episodes and chapters change status.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="defaultEntryStatus">
+      <div class="settings-row-icon"><i data-lucide="bookmark-plus"></i></div>
+      <div class="settings-row-body"><label>Default Status</label><span>Use this status for new items when a category has no remembered choice.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="progressIncrement">
+      <div class="settings-row-icon"><i data-lucide="plus-circle"></i></div>
+      <div class="settings-row-body"><label>Episode/Chapter Increment</label><span>Choose how much progress a quick action adds.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="ratingReminders" data-direct-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="star"></i></div>
+      <div class="settings-row-body"><label>Rating Reminders</label><span>Remind me to rate items after completing them.</span></div>
+      <div class="settings-row-value"><span>Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="notesTemplate">
+      <div class="settings-row-icon"><i data-lucide="notebook-pen"></i></div>
+      <div class="settings-row-body"><label>Notes Template</label><span>Start new item notes with a reusable structure.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
     <a class="settings-row settings-row-link" href="static/pages/settings/manage-category-order.html">
       <div class="settings-row-icon"><i data-lucide="arrow-down-up"></i></div>
       <div class="settings-row-body">
@@ -310,6 +524,38 @@
   </div>
 </div>
 <div class="settings-page-header">
+  <h4 class="settings-section-title">Language &amp; Dates</h4>
+</div>
+<div class="settings-section">
+  <div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" data-pref="language">
+      <div class="settings-row-icon"><i data-lucide="languages"></i></div>
+      <div class="settings-row-body"><label>Language</label><span>Choose the app language.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="dateFormat">
+      <div class="settings-row-icon"><i data-lucide="calendar-days"></i></div>
+      <div class="settings-row-body"><label>Date Format</label><span>Choose how dates appear throughout the app.</span></div>
+      <div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    </button>
+  </div>
+</div>
+<div class="settings-page-header">
+  <h4 class="settings-section-title">Data</h4>
+  <div class="settings-section"><div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" data-pref="duplicateDetector" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="copy-check"></i></div><div class="settings-row-body"><label>Duplicate Detector</label></div><div class="settings-row-value"><span>On</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="orphanedMetadataCleanup" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="unlink"></i></div><div class="settings-row-body"><label>Orphaned Metadata Cleanup</label></div><div class="settings-row-value"><span>Off</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="importHistory" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="history"></i></div><div class="settings-row-body"><label>Import History</label></div><div class="settings-row-value"><span>On</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="exportSelectedOnly" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="list-checks"></i></div><div class="settings-row-body"><label>Export Selected Items Only</label></div><div class="settings-row-value"><span>Off</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="databaseHealthCheck" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="heart-pulse"></i></div><div class="settings-row-body"><label>Database Health Check</label></div><div class="settings-row-value"><span>Off</span></div></button>
+  </div></div>
+  <h4 class="settings-section-title">Advanced</h4>
+  <div class="settings-section"><div class="settings-list">
+    <button type="button" class="settings-row settings-row-picker" data-pref="debugMode" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="bug"></i></div><div class="settings-row-body"><label>Debug Mode</label></div><div class="settings-row-value"><span>Off</span></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="networkTimeout"><div class="settings-row-icon"><i data-lucide="hourglass"></i></div><div class="settings-row-body"><label>Network Timeout</label></div><div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="apiRateLimitDelay"><div class="settings-row-icon"><i data-lucide="gauge"></i></div><div class="settings-row-body"><label>API Rate-Limit Delay</label></div><div class="settings-row-value"><span></span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div></button>
+    <button type="button" class="settings-row settings-row-picker" data-pref="experimentalFeatures" data-direct-toggle="true"><div class="settings-row-icon"><i data-lucide="flask-conical"></i></div><div class="settings-row-body"><label>Experimental Features</label></div><div class="settings-row-value"><span>Off</span></div></button>
+  </div></div>
   <h4 class="settings-section-title">Information</h4>
 </div>
 <div class="settings-section">

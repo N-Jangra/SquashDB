@@ -265,6 +265,14 @@ let state = {
     customCategories: {},
     categoryOrder: ["series", "movie", "anime", "novel", "game", "kdrama", "cdrama", "manga"],
     defaultStartPage: "remember-last",
+    dashboardDefaultCategory: "remember-last",
+    recentlyAddedLimit: 10,
+    dashboardCardCorners: "rounded",
+    automaticCompletion: "automatic",
+    defaultEntryStatus: "watchlist",
+    progressIncrement: 1,
+    ratingReminders: false,
+    notesTemplate: "none",
     ratingFormat: "5-stars",
     uiTheme: "dark",
     uiFont: "inter",
@@ -272,17 +280,46 @@ let state = {
     categoryColors: {},
     highContrast: false,
     reducedMotion: false,
+    accessibilityPreset: "standard",
+    accessibleTextSize: "normal",
+    language: "system",
+    dateFormat: "system",
+    analyticsEnabled: false,
+    sendErrorLogs: false,
+    networkOnlyOnWifi: false,
+    externalLinks: "ask",
     dashboardRowActions: "menu",
     dashboardView: "list",
+    dashboardDensity: "comfortable",
+    dashboardShowThumbnails: true,
+    dashboardShowRatings: true,
+    dashboardShowProgress: true,
+    dashboardGroupBy: "none",
     oneHandedMode: "off",
     tabletTwoColumn: true,
     compactMode: false,
     metadataMode: "online",
     metadataThumbnails: true,
+    thumbnailSize: "medium",
+    thumbnailQuality: "balanced",
+    duplicateDetector: true,
+    orphanedMetadataCleanup: false,
+    importHistory: true,
+    exportSelectedOnly: false,
+    databaseHealthCheck: false,
+    debugMode: false,
+    networkTimeout: 30,
+    apiRateLimitDelay: 250,
+    experimentalFeatures: false,
     episodeReminders: true,
     notificationsEnabled: false,
     notificationEpisodeReminders: true,
     notificationBackupReminders: false,
+    notificationSound: true,
+    notificationVibration: true,
+    reminderDays: 1,
+    notificationPerCategory: false,
+    notificationGrouping: "grouped",
     notificationCloudFailures: true,
     notificationUnfinishedItems: false,
     notificationSnoozeMinutes: 60,
@@ -291,12 +328,34 @@ let state = {
     notificationQuietEnd: "07:00",
     notificationReminderTime: "09:00",
     imageCacheMaxEntries: 250,
+    storageWarningLimitMb: 500,
+    backupStorageLimitMb: 1000,
     backgroundBackups: false,
+    autoLockTimeout: "never",
+    lockOnBackground: false,
+    biometricFallback: "pin",
+    hideSensitiveNotes: false,
+    backupSchedule: "daily",
+    backupRetention: "10",
+    backupBeforeDestructive: true,
+    backupPasswordReminder: true,
+    backupMaxSizeMb: 1000,
+    backupValidateLocation: true,
+    backupRestorePreview: true,
     folderSyncDelay: "30000",
     animationSpeed: "normal",
     metadataQueue: [],
     metadataQueuePaused: false,
     metadataImportConcurrency: 5,
+    metadataSyncFrequency: "immediate",
+    metadataRefreshInterval: "weekly",
+    metadataRetryLimit: 3,
+    offlineFallback: "cached",
+    thumbnailCleanup: "weekly",
+    importDefaultCategory: "anime",
+    importDuplicatePolicy: "skip",
+    exportDefaultFormat: "csv",
+    exportIncludeMetadata: true,
     metadataSources: {
       builtinOrder: ["tvmaze", "wikidata", "openlibrary"],
       builtinEnabled: { tvmaze: true, wikidata: true, openlibrary: true },
@@ -473,6 +532,15 @@ function runAppInit() {
   renderNavIconPickers();
   renderAppIconPicker();
   lucide.createIcons();
+  if (window.SquashDBCache?.trimImages && state.preferences.thumbnailCleanup !== "never") {
+    const interval = state.preferences.thumbnailCleanup === "daily" ? 86400000 : 604800000;
+    const lastCleanup = Number(localStorage.getItem("squashdb_thumbnail_cleanup_at") || 0);
+    if (Date.now() - lastCleanup >= interval) {
+      window.SquashDBCache.trimImages(state.preferences.imageCacheMaxEntries).then(() => {
+        localStorage.setItem("squashdb_thumbnail_cleanup_at", String(Date.now()));
+      }).catch(error => console.warn("Thumbnail cleanup failed", error));
+    }
+  }
   updateProgressWidget();
   window.dispatchEvent(new Event("squashdb-app-ready"));
   handleIncomingShareIntent();
@@ -574,6 +642,15 @@ async function loadData() {
   if (!state.preferences.defaultStartPage) {
     state.preferences.defaultStartPage = "remember-last";
   }
+  if (state.preferences.dashboardDefaultCategory !== "remember-last"
+    && !CATEGORIES[state.preferences.dashboardDefaultCategory]) state.preferences.dashboardDefaultCategory = "remember-last";
+  if (![5, 10, 20, 50].includes(Number(state.preferences.recentlyAddedLimit))) state.preferences.recentlyAddedLimit = 10;
+  if (!["rounded", "soft", "square"].includes(state.preferences.dashboardCardCorners)) state.preferences.dashboardCardCorners = "rounded";
+  if (!["automatic", "ask", "manual"].includes(state.preferences.automaticCompletion)) state.preferences.automaticCompletion = "automatic";
+  if (!["watchlist", "in-progress", "on-hold", "dropped", "completed"].includes(state.preferences.defaultEntryStatus)) state.preferences.defaultEntryStatus = "watchlist";
+  if (![1, 5, 10].includes(Number(state.preferences.progressIncrement))) state.preferences.progressIncrement = 1;
+  if (typeof state.preferences.ratingReminders !== "boolean") state.preferences.ratingReminders = false;
+  if (!["none", "review", "journal"].includes(state.preferences.notesTemplate)) state.preferences.notesTemplate = "none";
   if (!state.preferences.ratingFormat) state.preferences.ratingFormat = "5-stars";
   if (!state.preferences.uiTheme) state.preferences.uiTheme = "dark";
   if (!state.preferences.uiFont) state.preferences.uiFont = "inter";
@@ -581,8 +658,25 @@ async function loadData() {
   if (!state.preferences.categoryColors || typeof state.preferences.categoryColors !== "object") state.preferences.categoryColors = {};
   if (typeof state.preferences.highContrast !== "boolean") state.preferences.highContrast = false;
   if (typeof state.preferences.reducedMotion !== "boolean") state.preferences.reducedMotion = false;
+  if (!["standard", "high-contrast", "reduced-motion", "maximum"].includes(state.preferences.accessibilityPreset)) state.preferences.accessibilityPreset = "standard";
+  if (!["normal", "large", "largest"].includes(state.preferences.accessibleTextSize)) state.preferences.accessibleTextSize = "normal";
+  if (!["system", "en"].includes(state.preferences.language)) state.preferences.language = "system";
+  if (!["system", "short", "long", "iso"].includes(state.preferences.dateFormat)) state.preferences.dateFormat = "system";
+  if (typeof state.preferences.analyticsEnabled !== "boolean") state.preferences.analyticsEnabled = false;
+  if (typeof state.preferences.sendErrorLogs !== "boolean") state.preferences.sendErrorLogs = false;
+  if (typeof state.preferences.networkOnlyOnWifi !== "boolean") state.preferences.networkOnlyOnWifi = false;
+  if (!["ask", "always", "never"].includes(state.preferences.externalLinks)) state.preferences.externalLinks = "ask";
   if (!state.preferences.dashboardRowActions) state.preferences.dashboardRowActions = "menu";
-  if (!["list", "grid"].includes(state.preferences.dashboardView)) state.preferences.dashboardView = "list";
+  if (!["list", "compact-list", "grid", "compact-grid", "detailed-grid", "table", "minimal-list", "large-grid", "kanban", "timeline"].includes(state.preferences.dashboardView)) state.preferences.dashboardView = "list";
+  if (!["comfortable", "compact"].includes(state.preferences.dashboardDensity)) state.preferences.dashboardDensity = "comfortable";
+  if (typeof state.preferences.dashboardShowThumbnails !== "boolean") state.preferences.dashboardShowThumbnails = true;
+  if (typeof state.preferences.dashboardShowRatings !== "boolean") state.preferences.dashboardShowRatings = true;
+  if (typeof state.preferences.dashboardShowProgress !== "boolean") state.preferences.dashboardShowProgress = true;
+  if (!["none", "status", "category", "release"].includes(state.preferences.dashboardGroupBy)) state.preferences.dashboardGroupBy = "none";
+  if (!CATEGORIES[state.preferences.importDefaultCategory]) state.preferences.importDefaultCategory = "anime";
+  if (!["skip", "update", "create"].includes(state.preferences.importDuplicatePolicy)) state.preferences.importDuplicatePolicy = "skip";
+  if (!["csv", "tsv", "txt"].includes(state.preferences.exportDefaultFormat)) state.preferences.exportDefaultFormat = "csv";
+  if (typeof state.preferences.exportIncludeMetadata !== "boolean") state.preferences.exportIncludeMetadata = true;
   if (!["off", "left", "right"].includes(state.preferences.oneHandedMode)) state.preferences.oneHandedMode = "off";
   if (typeof state.preferences.tabletTwoColumn !== "boolean") state.preferences.tabletTwoColumn = true;
   if (typeof state.preferences.compactMode !== "boolean") state.preferences.compactMode = false;
@@ -595,10 +689,26 @@ async function loadData() {
     saveData();
   }
   if (typeof state.preferences.metadataThumbnails !== "boolean") state.preferences.metadataThumbnails = true;
+  if (!["small", "medium", "large"].includes(state.preferences.thumbnailSize)) state.preferences.thumbnailSize = "medium";
+  if (!["data-saver", "balanced", "best"].includes(state.preferences.thumbnailQuality)) state.preferences.thumbnailQuality = "balanced";
+  if (typeof state.preferences.duplicateDetector !== "boolean") state.preferences.duplicateDetector = true;
+  if (typeof state.preferences.orphanedMetadataCleanup !== "boolean") state.preferences.orphanedMetadataCleanup = false;
+  if (typeof state.preferences.importHistory !== "boolean") state.preferences.importHistory = true;
+  if (typeof state.preferences.exportSelectedOnly !== "boolean") state.preferences.exportSelectedOnly = false;
+  if (typeof state.preferences.databaseHealthCheck !== "boolean") state.preferences.databaseHealthCheck = false;
+  if (typeof state.preferences.debugMode !== "boolean") state.preferences.debugMode = false;
+  if (![10, 30, 60, 120].includes(Number(state.preferences.networkTimeout))) state.preferences.networkTimeout = 30;
+  if (![0, 250, 500, 1000].includes(Number(state.preferences.apiRateLimitDelay))) state.preferences.apiRateLimitDelay = 250;
+  if (typeof state.preferences.experimentalFeatures !== "boolean") state.preferences.experimentalFeatures = false;
   if (typeof state.preferences.episodeReminders !== "boolean") state.preferences.episodeReminders = true;
   if (typeof state.preferences.notificationsEnabled !== "boolean") state.preferences.notificationsEnabled = false;
   if (typeof state.preferences.notificationEpisodeReminders !== "boolean") state.preferences.notificationEpisodeReminders = state.preferences.episodeReminders;
   if (typeof state.preferences.notificationBackupReminders !== "boolean") state.preferences.notificationBackupReminders = false;
+  if (typeof state.preferences.notificationSound !== "boolean") state.preferences.notificationSound = true;
+  if (typeof state.preferences.notificationVibration !== "boolean") state.preferences.notificationVibration = true;
+  if (![1, 3, 7, 14].includes(Number(state.preferences.reminderDays))) state.preferences.reminderDays = 1;
+  if (typeof state.preferences.notificationPerCategory !== "boolean") state.preferences.notificationPerCategory = false;
+  if (!["grouped", "separate"].includes(state.preferences.notificationGrouping)) state.preferences.notificationGrouping = "grouped";
   if (typeof state.preferences.notificationCloudFailures !== "boolean") state.preferences.notificationCloudFailures = true;
   if (typeof state.preferences.notificationUnfinishedItems !== "boolean") state.preferences.notificationUnfinishedItems = false;
   if (![60, 180, 1440, 10080, 0].includes(Number(state.preferences.notificationSnoozeMinutes))) state.preferences.notificationSnoozeMinutes = 60;
@@ -607,7 +717,20 @@ async function loadData() {
   if (!/^\d{2}:\d{2}$/.test(state.preferences.notificationQuietEnd)) state.preferences.notificationQuietEnd = "07:00";
   if (!/^\d{2}:\d{2}$/.test(state.preferences.notificationReminderTime)) state.preferences.notificationReminderTime = "09:00";
   if (![0, 250, 500, 1000].includes(Number(state.preferences.imageCacheMaxEntries))) state.preferences.imageCacheMaxEntries = 250;
+  if (![100, 500, 1000, 5000, 0].includes(Number(state.preferences.storageWarningLimitMb))) state.preferences.storageWarningLimitMb = 500;
+  if (![250, 1000, 5000, 0].includes(Number(state.preferences.backupStorageLimitMb))) state.preferences.backupStorageLimitMb = 1000;
+  if (!["off", "daily", "weekly"].includes(state.preferences.backupSchedule)) state.preferences.backupSchedule = "daily";
+  if (!["3", "10", "30", "0"].includes(String(state.preferences.backupRetention))) state.preferences.backupRetention = "10";
+  if (typeof state.preferences.backupBeforeDestructive !== "boolean") state.preferences.backupBeforeDestructive = true;
+  if (typeof state.preferences.backupPasswordReminder !== "boolean") state.preferences.backupPasswordReminder = true;
+  if (![250, 1000, 5000, 0].includes(Number(state.preferences.backupMaxSizeMb))) state.preferences.backupMaxSizeMb = 1000;
+  if (typeof state.preferences.backupValidateLocation !== "boolean") state.preferences.backupValidateLocation = true;
+  if (typeof state.preferences.backupRestorePreview !== "boolean") state.preferences.backupRestorePreview = true;
   if (typeof state.preferences.backgroundBackups !== "boolean") state.preferences.backgroundBackups = false;
+  if (!["never", "5-minutes", "15-minutes", "1-hour"].includes(state.preferences.autoLockTimeout)) state.preferences.autoLockTimeout = "never";
+  if (typeof state.preferences.lockOnBackground !== "boolean") state.preferences.lockOnBackground = false;
+  if (!["pin", "password", "none"].includes(state.preferences.biometricFallback)) state.preferences.biometricFallback = "pin";
+  if (typeof state.preferences.hideSensitiveNotes !== "boolean") state.preferences.hideSensitiveNotes = false;
   if (!["0", "5000", "10000", "30000", "60000"].includes(String(state.preferences.folderSyncDelay))) {
     state.preferences.folderSyncDelay = "30000";
   }
@@ -620,6 +743,11 @@ async function loadData() {
   if (typeof state.preferences.metadataQueuePaused !== "boolean") state.preferences.metadataQueuePaused = false;
   if (!Number.isFinite(Number(state.preferences.metadataImportConcurrency))) state.preferences.metadataImportConcurrency = 5;
   state.preferences.metadataImportConcurrency = Math.max(1, Math.min(10, Math.round(Number(state.preferences.metadataImportConcurrency))));
+  if (!["immediate", "five-minutes", "fifteen-minutes"].includes(state.preferences.metadataSyncFrequency)) state.preferences.metadataSyncFrequency = "immediate";
+  if (!["never", "daily", "weekly"].includes(state.preferences.metadataRefreshInterval)) state.preferences.metadataRefreshInterval = "weekly";
+  if (![1, 3, 5].includes(Number(state.preferences.metadataRetryLimit))) state.preferences.metadataRetryLimit = 3;
+  if (!["cached", "manual", "strict"].includes(state.preferences.offlineFallback)) state.preferences.offlineFallback = "cached";
+  if (!["never", "daily", "weekly"].includes(state.preferences.thumbnailCleanup)) state.preferences.thumbnailCleanup = "weekly";
   if (!state.preferences.navIcons || typeof state.preferences.navIcons !== "object") {
     state.preferences.navIcons = { dashboard: "layout-grid", timeline: "calendar", discover: "search", sources: "database", explore: "compass", stats: "pie-chart", settings: "settings" };
   }
@@ -733,7 +861,9 @@ async function loadData() {
   }
 
   if (!state.activeCategoryChip) {
-    state.activeCategoryChip = "series";
+    const preferred = state.preferences.dashboardDefaultCategory;
+    state.activeCategoryChip = preferred !== "remember-last" && state.preferences[preferred]
+      ? preferred : getOrderedCategories().find(key => state.preferences[key]) || "series";
   }
 
   rebuildSearchIndex();
@@ -993,6 +1123,12 @@ function applyPreferenceAttributes() {
       || CATEGORIES[key].color;
   });
   document.body.classList.toggle("compact-mode", Boolean(state.preferences.compactMode));
+  document.body.setAttribute("data-thumbnail-size", state.preferences.thumbnailSize || "medium");
+  document.body.setAttribute("data-thumbnail-quality", state.preferences.thumbnailQuality || "balanced");
+  document.body.setAttribute("data-text-size", state.preferences.accessibleTextSize || "normal");
+  document.body.setAttribute("data-dashboard-corners", state.preferences.dashboardCardCorners || "rounded");
+  document.documentElement.lang = state.preferences.language === "en" ? "en" : (navigator.language || "en").split("-")[0];
+  document.body.setAttribute("data-date-format", state.preferences.dateFormat || "system");
   const appShell = document.getElementById("app-container");
   if (appShell && window.matchMedia("(max-width: 560px)").matches) {
     const hand = state.preferences.oneHandedMode || "off";
@@ -1060,6 +1196,25 @@ function ratingToStoredValue(value) {
 
 // Setup Event Listeners
 function setupEventListeners() {
+  const resetDashboard = document.getElementById("reset-dashboard-preferences");
+  if (resetDashboard && resetDashboard.dataset.bound !== "true") {
+    resetDashboard.dataset.bound = "true";
+    resetDashboard.addEventListener("click", async () => {
+      const confirmed = await requestInAppConfirmation("Reset Dashboard preferences?", "This restores the Dashboard layout, grouping, sorting, density, and display options.", "Reset Dashboard");
+      if (!confirmed) return;
+      Object.assign(state.preferences, {
+        dashboardView: "list", dashboardDensity: "comfortable", dashboardGroupBy: "none",
+        dashboardShowThumbnails: true, dashboardShowRatings: true, dashboardShowProgress: true
+      });
+      state.currentSort = "alphabetical-asc";
+      state.statusFilter = "all";
+      state.dashboardFilters = { status: "", unwatched: false, recentlyAdded: false, rated: false };
+      saveData();
+      renderDashboard();
+      updatePickerRowValues();
+      showToast("Dashboard preferences reset", "success");
+    });
+  }
   // Global Search
   const globalSearch = document.getElementById("global-search");
   if (globalSearch) {
@@ -1090,6 +1245,8 @@ function setupEventListeners() {
   }
   const sortBtn = document.getElementById("dashboard-sort-btn");
   if (sortBtn) sortBtn.addEventListener("click", openDashboardSortFilter);
+  const formatBtn = document.getElementById("dashboard-format-btn");
+  if (formatBtn) formatBtn.addEventListener("click", openDashboardFormatOptions);
 
   // Floating cross-links between Timeline and Statistics (each page carries
   // a FAB to the other, since only one of the two sits in the bottom bar)
@@ -2047,6 +2204,37 @@ const SETTINGS_PICKERS = {
       { value: "true", label: "High contrast" }
     ]
   },
+  accessibilityPreset: {
+    default: "standard",
+    options: [
+      { value: "standard", label: "Standard" },
+      { value: "high-contrast", label: "High contrast" },
+      { value: "reduced-motion", label: "Reduced motion" },
+      { value: "maximum", label: "Maximum accessibility" }
+    ]
+  },
+  accessibleTextSize: {
+    default: "normal",
+    options: [{ value: "normal", label: "Normal" }, { value: "large", label: "Large" }, { value: "largest", label: "Largest" }]
+  },
+  language: {
+    default: "system",
+    options: [{ value: "system", label: "System default" }, { value: "en", label: "English" }]
+  },
+  dateFormat: {
+    default: "system",
+    options: [
+      { value: "system", label: "System default" }, { value: "short", label: "Short dates" },
+      { value: "long", label: "Long dates" }, { value: "iso", label: "YYYY-MM-DD" }
+    ]
+  },
+  externalLinks: {
+    default: "ask",
+    options: [{ value: "ask", label: "Ask every time" }, { value: "always", label: "Open automatically" }, { value: "never", label: "Block external links" }]
+  },
+  analyticsEnabled: { default: "false", options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  sendErrorLogs: { default: "false", options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  networkOnlyOnWifi: { default: "false", options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
   reducedMotion: {
     default: "false",
     options: [
@@ -2066,7 +2254,81 @@ const SETTINGS_PICKERS = {
     default: "list",
     options: [
       { value: "list", label: "List" },
-      { value: "grid", label: "Grid" }
+      { value: "compact-list", label: "Compact List" },
+      { value: "grid", label: "Poster Grid" },
+      { value: "compact-grid", label: "Compact Grid" },
+      { value: "detailed-grid", label: "Detailed Grid" },
+      { value: "table", label: "Table" },
+      { value: "minimal-list", label: "Minimal List" },
+      { value: "large-grid", label: "Large Poster Grid" },
+      { value: "kanban", label: "Kanban Board" },
+      { value: "timeline", label: "Timeline" }
+    ]
+  },
+  dashboardDensity: {
+    default: "comfortable",
+    options: [
+      { value: "comfortable", label: "Comfortable" },
+      { value: "compact", label: "Compact" }
+    ]
+  },
+  dashboardDefaultCategory: {
+    default: "remember-last",
+    options: [
+      { value: "remember-last", label: "Remember last" },
+      { value: "series", label: "TV Series" }, { value: "movie", label: "Movies" },
+      { value: "anime", label: "Anime" }, { value: "manga", label: "Manga" },
+      { value: "novel", label: "Novels" }, { value: "game", label: "Games" }
+    ]
+  },
+  recentlyAddedLimit: {
+    default: 10,
+    options: [5, 10, 20, 50].map(value => ({ value, label: `${value} items` }))
+  },
+  dashboardCardCorners: {
+    default: "rounded",
+    options: [{ value: "rounded", label: "Rounded" }, { value: "soft", label: "Soft" }, { value: "square", label: "Square" }]
+  },
+  automaticCompletion: {
+    default: "automatic",
+    options: [{ value: "automatic", label: "Automatic" }, { value: "ask", label: "Ask first" }, { value: "manual", label: "Manual" }]
+  },
+  defaultEntryStatus: {
+    default: "watchlist",
+    options: [
+      { value: "watchlist", label: "Watchlist" },
+      { value: "in-progress", label: "In Progress" },
+      { value: "on-hold", label: "On Hold" },
+      { value: "dropped", label: "Dropped" },
+      { value: "completed", label: "Completed" }
+    ]
+  },
+  progressIncrement: {
+    default: 1,
+    options: [{ value: 1, label: "1 episode/chapter" }, { value: 5, label: "5 episodes/chapters" }, { value: 10, label: "10 episodes/chapters" }]
+  },
+  notesTemplate: {
+    default: "none",
+    options: [{ value: "none", label: "None" }, { value: "review", label: "Review" }, { value: "journal", label: "Journal" }]
+  },
+  dashboardGroupBy: {
+    default: "none",
+    options: [
+      { value: "none", label: "No grouping" },
+      { value: "status", label: "Status" },
+      { value: "category", label: "Category" },
+      { value: "release", label: "Release date" }
+    ]
+  },
+  dashboardSort: {
+    default: "alphabetical-asc",
+    stateKey: "currentSort",
+    options: [
+      { value: "alphabetical-asc", label: "Alphabetical" },
+      { value: "updated-desc", label: "Last updated" },
+      { value: "progress-desc", label: "Progress" },
+      { value: "rating-desc", label: "Rating" },
+      { value: "release-desc", label: "Release date" }
     ]
   },
   oneHandedMode: {
@@ -2105,6 +2367,136 @@ const SETTINGS_PICKERS = {
       { value: "true", label: "On" },
       { value: "false", label: "Off" }
     ]
+  },
+  thumbnailSize: {
+    default: "medium",
+    options: [
+      { value: "small", label: "Small" },
+      { value: "medium", label: "Medium" },
+      { value: "large", label: "Large" }
+    ]
+  },
+  thumbnailQuality: {
+    default: "balanced",
+    options: [
+      { value: "data-saver", label: "Data saver" },
+      { value: "balanced", label: "Balanced" },
+      { value: "best", label: "Best quality" }
+    ]
+  },
+  importDefaultCategory: {
+    default: "anime",
+    options: [
+      { value: "anime", label: "Anime" }, { value: "movie", label: "Movies" },
+      { value: "series", label: "TV Series" }, { value: "manga", label: "Manga" },
+      { value: "novel", label: "Novels" }, { value: "game", label: "Games" }
+    ]
+  },
+  importDuplicatePolicy: {
+    default: "skip",
+    options: [
+      { value: "skip", label: "Skip existing" }, { value: "update", label: "Update existing" },
+      { value: "create", label: "Create duplicate" }
+    ]
+  },
+  exportDefaultFormat: {
+    default: "csv",
+    options: [{ value: "csv", label: "CSV" }, { value: "tsv", label: "TSV" }, { value: "txt", label: "TXT" }]
+  },
+  exportIncludeMetadata: {
+    default: "true",
+    options: [{ value: "true", label: "Include metadata" }, { value: "false", label: "Titles and status only" }]
+  },
+  metadataSyncFrequency: {
+    default: "immediate",
+    options: [
+      { value: "immediate", label: "Immediately" },
+      { value: "five-minutes", label: "Every 5 minutes" },
+      { value: "fifteen-minutes", label: "Every 15 minutes" }
+    ]
+  },
+  metadataRefreshInterval: {
+    default: "weekly",
+    options: [{ value: "never", label: "Never" }, { value: "daily", label: "Daily" }, { value: "weekly", label: "Weekly" }]
+  },
+  metadataRetryLimit: {
+    default: 3,
+    options: [1, 3, 5].map(value => ({ value, label: `${value} attempt${value === 1 ? "" : "s"}` }))
+  },
+  offlineFallback: {
+    default: "cached",
+    options: [{ value: "cached", label: "Use cached metadata" }, { value: "manual", label: "Keep manual data" }, { value: "strict", label: "Do not use fallback" }]
+  },
+  thumbnailCleanup: {
+    default: "weekly",
+    options: [{ value: "never", label: "Never" }, { value: "daily", label: "Daily" }, { value: "weekly", label: "Weekly" }]
+  },
+  metadataImportConcurrency: {
+    default: 5,
+    options: [1, 2, 3, 5, 8, 10].map(value => ({ value, label: `${value} workers` }))
+  },
+  storageWarningLimitMb: {
+    default: 500,
+    options: [100, 500, 1000, 5000, 0].map(value => ({ value, label: value ? `${value} MB` : "No warning" }))
+  },
+  backupStorageLimitMb: {
+    default: 1000,
+    options: [250, 1000, 5000, 0].map(value => ({ value, label: value ? `${value} MB` : "Unlimited" }))
+  },
+  backupSchedule: {
+    default: "daily",
+    options: [
+      { value: "off", label: "Off" },
+      { value: "daily", label: "Daily" },
+      { value: "weekly", label: "Weekly" }
+    ]
+  },
+  backupRetention: {
+    default: "10",
+    options: [
+      { value: "3", label: "Keep 3 backups" },
+      { value: "10", label: "Keep 10 backups" },
+      { value: "30", label: "Keep 30 backups" },
+      { value: "0", label: "Keep all backups" }
+    ]
+  },
+  backupBeforeDestructive: {
+    default: true,
+    options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }]
+  },
+  backupPasswordReminder: { default: true, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  backupMaxSizeMb: { default: 1000, options: [250, 1000, 5000, 0].map(value => ({ value, label: value ? `${value} MB` : "Unlimited" })) },
+  backupValidateLocation: { default: true, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  backupRestorePreview: { default: true, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  notificationSound: { default: true, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  notificationVibration: { default: true, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  reminderDays: { default: 1, options: [1, 3, 7, 14].map(value => ({ value, label: `${value} day${value === 1 ? "" : "s"}` })) },
+  notificationPerCategory: { default: false, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  notificationGrouping: { default: "grouped", options: [{ value: "grouped", label: "Grouped" }, { value: "separate", label: "Separate" }] },
+  autoLockTimeout: { default: "never", options: [{ value: "never", label: "Never" }, { value: "5-minutes", label: "5 minutes" }, { value: "15-minutes", label: "15 minutes" }, { value: "1-hour", label: "1 hour" }] },
+  lockOnBackground: { default: false, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  biometricFallback: { default: "pin", options: [{ value: "pin", label: "PIN" }, { value: "password", label: "Password" }, { value: "none", label: "No fallback" }] },
+  hideSensitiveNotes: { default: false, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  duplicateDetector: { default: true, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  orphanedMetadataCleanup: { default: false, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  importHistory: { default: true, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  exportSelectedOnly: { default: false, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  databaseHealthCheck: { default: false, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  debugMode: { default: false, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  networkTimeout: { default: 30, options: [10, 30, 60, 120].map(value => ({ value, label: `${value} seconds` })) },
+  apiRateLimitDelay: { default: 250, options: [0, 250, 500, 1000].map(value => ({ value, label: `${value} ms` })) },
+  experimentalFeatures: { default: false, options: [{ value: "true", label: "On" }, { value: "false", label: "Off" }] },
+  dashboardShowThumbnails: {
+    default: "true",
+    options: [{ value: "true", label: "Shown" }, { value: "false", label: "Hidden" }]
+  },
+  dashboardShowRatings: {
+    default: "true",
+    options: [{ value: "true", label: "Shown" }, { value: "false", label: "Hidden" }]
+  },
+  dashboardShowProgress: {
+    default: "true",
+    options: [{ value: "true", label: "Shown" }, { value: "false", label: "Hidden" }]
   },
   folderSyncDelay: {
     default: "30000",
@@ -2218,6 +2610,11 @@ function openSettingsPicker(pref, title) {
     btn.innerHTML = `<span class="choice-radio" aria-hidden="true"></span><span>${opt.label}</span>`;
     btn.addEventListener("click", () => {
       setPickerValue(pref, opt.value);
+      if (pref === "accessibilityPreset") {
+        state.preferences.highContrast = ["high-contrast", "maximum"].includes(opt.value);
+        state.preferences.reducedMotion = ["reduced-motion", "maximum"].includes(opt.value);
+        state.preferences.accessibleTextSize = opt.value === "maximum" ? "largest" : opt.value === "high-contrast" ? "large" : "normal";
+      }
       saveData();
       applyTheme();
       applyPreferenceAttributes();
@@ -2939,11 +3336,40 @@ function openDashboardStatusFilter() {
   const titleEl = document.getElementById("picker-modal-title");
   if (!modal || !list) return;
 
-  if (titleEl) titleEl.textContent = "Filter by Status";
+  if (titleEl) titleEl.textContent = "Filter dashboard";
   const statuses = CATEGORIES[state.activeCategoryChip]?.statuses || [];
   const current = dashboardStatusFilterActive() ? state.statusFilter : "all";
 
-  list.innerHTML = "";
+  list.innerHTML = '<div class="picker-section-label">Layout</div>';
+  [
+    ["list", "List"],
+    ["compact-list", "Compact List"],
+    ["grid", "Poster Grid"],
+    ["compact-grid", "Compact Grid"],
+    ["detailed-grid", "Detailed Grid"],
+    ["table", "Table"],
+    ["minimal-list", "Minimal List"],
+    ["large-grid", "Large Poster Grid"],
+    ["kanban", "Kanban Board"],
+    ["timeline", "Timeline"]
+  ].forEach(([value, label]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `picker-option${state.preferences.dashboardView === value ? " active" : ""}`;
+    btn.innerHTML = `<span class="choice-radio"></span><span>${label}</span>`;
+    btn.addEventListener("click", () => {
+      state.preferences.dashboardView = value;
+      saveData();
+      closeSettingsPicker();
+      renderDashboard();
+    });
+    list.appendChild(btn);
+  });
+
+  const statusLabel = document.createElement("div");
+  statusLabel.className = "picker-section-label";
+  statusLabel.textContent = "Status";
+  list.appendChild(statusLabel);
   ["all", ...statuses].forEach(value => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -2961,6 +3387,52 @@ function openDashboardStatusFilter() {
   modal.classList.add("active");
 }
 
+function openDashboardFormatOptions() {
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list) return;
+  if (titleEl) titleEl.textContent = "View options";
+
+  const choose = (section, options, current, onChange) => {
+    const label = document.createElement("div");
+    label.className = "picker-section-label";
+    label.textContent = section;
+    list.appendChild(label);
+    options.forEach(([value, text]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `picker-option${current === value ? " active" : ""}`;
+      button.innerHTML = `<span class="choice-radio"></span><span>${text}</span>`;
+      button.addEventListener("click", () => {
+        onChange(value);
+        saveData();
+        closeSettingsPicker();
+        renderDashboard();
+      });
+      list.appendChild(button);
+    });
+  };
+
+  list.innerHTML = "";
+  choose("Density", [["comfortable", "Comfortable"], ["compact", "Compact"]], state.preferences.dashboardDensity, value => {
+    state.preferences.dashboardDensity = value;
+  });
+  choose("Group items by", [["none", "No grouping"], ["status", "Status"], ["category", "Category"], ["release", "Release date"]], state.preferences.dashboardGroupBy, value => {
+    state.preferences.dashboardGroupBy = value;
+  });
+  choose("Ratings", [["shown", "Show ratings"], ["hidden", "Hide ratings"]], state.preferences.dashboardShowRatings ? "shown" : "hidden", value => {
+    state.preferences.dashboardShowRatings = value === "shown";
+  });
+  choose("Progress", [["shown", "Show progress"], ["hidden", "Hide progress"]], state.preferences.dashboardShowProgress ? "shown" : "hidden", value => {
+    state.preferences.dashboardShowProgress = value === "shown";
+  });
+  choose("Thumbnails", [["shown", "Show thumbnails"], ["hidden", "Hide thumbnails"]], state.preferences.dashboardShowThumbnails ? "shown" : "hidden", value => {
+    state.preferences.dashboardShowThumbnails = value === "shown";
+  });
+  modal.classList.add("active");
+}
+
 function renderDashboardSkeleton() {
   const container = document.getElementById("notes-container");
   const emptyState = document.getElementById("dashboard-empty");
@@ -2974,6 +3446,10 @@ function renderDashboardSkeleton() {
       <span class="dashboard-skeleton-lines"><i></i><i></i><i></i></span>
     </div>
   `).join("");
+}
+
+function dashboardUsesGridView() {
+  return ["grid", "compact-grid", "detailed-grid", "large-grid"].includes(state.preferences.dashboardView);
 }
 
 function dashboardCategoryItems() {
@@ -2997,15 +3473,23 @@ function progressRingHTML(progress, className = "") {
   return `<span class="dashboard-progress-ring ${className}" style="--progress:${value}%" aria-label="${value}% complete"><span>${value}%</span></span>`;
 }
 
+function dashboardThumbnail(item, className) {
+  return state.preferences.dashboardShowThumbnails
+    ? thumbnailOrPlaceholder(item.thumbnail, className)
+    : `<span class="${className} dashboard-thumb-hidden" aria-hidden="true"></span>`;
+}
+
 function dashboardInsightCard(item, label, extra = "") {
   const isStatusOnly = item.category === "movie" || item.category === "game";
+  const isTable = state.preferences.dashboardView === "table";
   const progress = isStatusOnly ? 0 : calculateProgress(item);
-  const movieRating = Number(item.rating) > 0 ? `Rating: ${formatRatingValue(item.rating)}` : "Unrated";
+  const movieRating = state.preferences.dashboardShowRatings
+    ? (Number(item.rating) > 0 ? `Rating: ${formatRatingValue(item.rating)}` : "Unrated") : "";
   return `
-    <button type="button" class="dashboard-insight-card${isStatusOnly ? " dashboard-status-only-card" : ""}" data-id="${item.id}">
-      ${thumbnailOrPlaceholder(item.thumbnail, "dashboard-insight-thumb")}
-      <span class="dashboard-insight-body"><strong>${item.title}</strong><small>${isStatusOnly ? movieRating : `${label}${extra ? ` · ${extra}` : ""}`}</small></span>
-      ${isStatusOnly ? `<span class="dashboard-status-pill">${item.status || "Unrated"}</span>` : progressRingHTML(progress)}
+    <button type="button" class="dashboard-insight-card${isStatusOnly ? " dashboard-status-only-card" : ""}${isTable ? " dashboard-table-row" : ""}" data-id="${item.id}">
+      ${dashboardThumbnail(item, "dashboard-insight-thumb")}
+      <span class="dashboard-insight-body"><strong>${item.title}</strong><small>${isStatusOnly ? (movieRating || item.status || "") : `${label}${extra ? ` · ${extra}` : ""}`}</small></span>
+      ${isTable ? `<span class="dashboard-table-status">${item.status || "—"}</span><span class="dashboard-table-value">${isStatusOnly ? (movieRating || "—") : (state.preferences.dashboardShowProgress ? `${progress}%` : "—")}</span>` : (isStatusOnly ? `<span class="dashboard-status-pill">${item.status || "Unrated"}</span>` : (state.preferences.dashboardShowProgress ? progressRingHTML(progress) : ""))}
     </button>
   `;
 }
@@ -3013,9 +3497,14 @@ function dashboardInsightCard(item, label, extra = "") {
 function renderDashboardInsights() {
   const root = document.getElementById("dashboard-insights");
   if (!root) return;
-  root.dataset.view = state.preferences.dashboardView === "grid" ? "grid" : "list";
+  root.dataset.view = dashboardUsesGridView() ? "grid" : "list";
+  root.dataset.layout = state.preferences.dashboardView;
+  root.dataset.density = state.preferences.dashboardDensity;
   const items = dashboardCategoryItems();
-  const visible = !state.searchQuery && !dashboardStatusFilterActive() && !dashboardFiltersActive();
+  const visible = !state.searchQuery
+    && !dashboardStatusFilterActive()
+    && !dashboardFiltersActive()
+    && !["kanban", "timeline"].includes(state.preferences.dashboardView);
   if (!visible || !items.length) {
     root.innerHTML = "";
     root.style.display = "none";
@@ -3060,13 +3549,18 @@ function renderDashboardInsights() {
     ...continueItems, ...completedItems, ...notStartedItems, ...onHoldItems, ...droppedItems, ...staleItems
   ].map(item => item.id));
   const otherItems = items.filter(item => !categorizedIds.has(item.id));
+  const recentlyAddedItems = [...items]
+    .sort((a, b) => (Number(b.created || b.updated) || 0) - (Number(a.created || a.updated) || 0))
+    .slice(0, Number(state.preferences.recentlyAddedLimit) || 10);
 
   const staleLabel = item => {
     const days = Math.max(1, Math.floor((Date.now() - Number(item.updated || item.created || Date.now())) / (24 * 60 * 60 * 1000)));
     return `${days} days since update`;
   };
 
-  const section = (title, content, className = "") => content ? `<section class="dashboard-insight-section ${className}"><h3>${title}</h3><div class="dashboard-insight-scroller">${content}</div></section>` : "";
+  const tableHeader = state.preferences.dashboardView === "table"
+    ? '<div class="dashboard-table-header"><span>Title</span><span>Status</span><span>Rating / Progress</span></div>' : "";
+  const section = (title, content, className = "") => content ? `<section class="dashboard-insight-section ${className}"><h3>${title}</h3>${tableHeader}<div class="dashboard-insight-scroller">${content}</div></section>` : "";
   root.innerHTML = [
     section("Continue watching", continueItems.map(item => dashboardInsightCard(item, item.status, `${calculateProgress(item)}%`)).join(""), "continue"),
     section("Not started yet", notStartedItems.map(item => dashboardInsightCard(item, item.status || "No progress yet", "Ready to start")).join(""), "not-started"),
@@ -3074,7 +3568,8 @@ function renderDashboardInsights() {
     section("Dropped", droppedItems.map(item => dashboardInsightCard(item, item.status)).join(""), "dropped"),
     section("Haven't updated in a long time", staleItems.map(item => dashboardInsightCard(item, item.status, staleLabel(item))).join(""), "stale"),
     section("Completed", completedItems.map(item => dashboardInsightCard(item, item.completionDate || "Completed")).join(""), "completed"),
-    section("Other", otherItems.map(item => dashboardInsightCard(item, item.status || "No status")).join(""), "other")
+    section("Other", otherItems.map(item => dashboardInsightCard(item, item.status || "No status")).join(""), "other"),
+    section("Recently added", recentlyAddedItems.map(item => dashboardInsightCard(item, item.status || "Added recently")).join(""), "recently-added")
   ].join("");
   root.dataset.insightItemIds = JSON.stringify([...new Set([
     ...continueItems.map(item => item.id),
@@ -3083,7 +3578,8 @@ function renderDashboardInsights() {
     ...droppedItems.map(item => item.id),
     ...staleItems.map(item => item.id),
     ...completedItems.map(item => item.id),
-    ...otherItems.map(item => item.id)
+    ...otherItems.map(item => item.id),
+    ...recentlyAddedItems.map(item => item.id)
   ])]);
   root.style.display = root.innerHTML ? "block" : "none";
   root.querySelectorAll(".dashboard-insight-card").forEach(card => card.addEventListener("click", () => openItemForCategory(card.dataset.id)));
@@ -3248,15 +3744,26 @@ function renderDashboard() {
     teardownDashboardLazyLoad();
   } else {
     emptyState.style.display = "none";
-    const isGrid = state.preferences.dashboardView === "grid";
+    const isGrid = dashboardUsesGridView();
     container.style.display = isGrid ? "grid" : "flex";
     container.classList.toggle("notes-grid-view", isGrid);
+    container.classList.toggle("notes-compact-view", state.preferences.dashboardView === "compact-list");
+    container.classList.toggle("notes-detailed-grid-view", state.preferences.dashboardView === "detailed-grid");
+    container.classList.toggle("notes-compact-grid-view", state.preferences.dashboardView === "compact-grid");
+    container.classList.toggle("notes-large-grid-view", state.preferences.dashboardView === "large-grid");
+    container.classList.toggle("notes-table-view", state.preferences.dashboardView === "table");
+    container.classList.remove("dashboard-special-view");
+    container.classList.toggle("dashboard-density-compact", state.preferences.dashboardDensity === "compact");
     container.dataset.rowActions = state.preferences.dashboardRowActions || "menu";
     if (!isGrid && dashboardSelectedIds.size > 0) {
       clearGridSelection();
     }
     updateGridSelectionBar();
-    setupDashboardLazyLoad(container, filtered);
+    if (["kanban", "timeline"].includes(state.preferences.dashboardView)) {
+      setupDashboardSpecialView(container, filtered);
+    } else {
+      setupDashboardLazyLoad(container, filtered);
+    }
   }
 }
 
@@ -3300,6 +3807,38 @@ let dashboardLazyLoadObserver = null;
 let dashboardGridSelectionMode = false;
 let dashboardSelectedIds = new Set();
 
+function setupDashboardSpecialView(container, filtered) {
+  teardownDashboardLazyLoad();
+  container.innerHTML = "";
+  const view = state.preferences.dashboardView;
+  container.className = `notes-container dashboard-special-view ${view === "kanban" ? "dashboard-kanban-view" : "dashboard-timeline-view"}`;
+  const groupBy = state.preferences.dashboardGroupBy;
+  const groups = new Map();
+  filtered.forEach(item => {
+    const timestamp = Number(item.updated || item.created) || 0;
+    const release = dashboardReleaseTime(item);
+    const key = groupBy === "status" || (groupBy === "none" && view === "kanban")
+      ? (item.status || "Uncategorized")
+      : groupBy === "category"
+        ? (CATEGORIES[item.category]?.label || item.category || "Uncategorized")
+        : groupBy === "release" || (groupBy === "none" && view === "timeline")
+          ? (release ? new Date(release).toLocaleDateString(undefined, { year: "numeric", month: "long" }) : "No release date")
+          : "All items";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  groups.forEach((items, title) => {
+    const group = document.createElement("section");
+    group.className = `dashboard-special-group ${view === "kanban" ? "dashboard-kanban-column" : "dashboard-timeline-group"}`;
+    group.innerHTML = `<h3>${title}<span>${items.length}</span></h3><div class="dashboard-special-items"></div>`;
+    const list = group.querySelector(".dashboard-special-items");
+    items.forEach(item => list.appendChild(buildNoteCard(item)));
+    container.appendChild(group);
+  });
+  attachCardEvents();
+  if (window.lucide) lucide.createIcons(container);
+}
+
 // Grid view: poster-only card with a progress strip along the bottom edge —
 // full purple bar for completed items, green partial bar for anything the
 // user has started or is actively on, no bar for untouched queue entries.
@@ -3321,8 +3860,8 @@ function buildGridCard(item) {
   }
 
   card.innerHTML = `
-    ${thumbnailOrPlaceholder(item.thumbnail, "grid-card-thumb")}
-    <div class="grid-card-progress">${progressRingHTML(progress)}</div>
+    ${dashboardThumbnail(item, "grid-card-thumb")}
+    ${state.preferences.dashboardShowProgress ? `<div class="grid-card-progress">${progressRingHTML(progress)}</div>` : ""}
     ${barHTML ? `<div class="grid-card-bar-track">${barHTML}</div>` : ""}
     <div class="grid-card-select-overlay">
       <div class="grid-card-select-check"><i data-lucide="check"></i></div>
@@ -3331,19 +3870,61 @@ function buildGridCard(item) {
   return card;
 }
 
+function buildDetailedGridCard(item) {
+  const card = document.createElement("div");
+  const isStatusOnly = item.category === "movie" || item.category === "game";
+  const isCompleted = item.status === "Completed";
+  const progress = isStatusOnly ? 0 : calculateProgress(item);
+  const subtitle = isCompleted ? (item.completionDate || "Completed") : (item.status || "No status");
+  const rating = Number(item.rating) > 0 ? formatRatingValue(item.rating) : "Unrated";
+  card.className = `grid-card detailed-grid-card${isCompleted ? " completed" : ""}`;
+  card.dataset.id = item.id;
+  card.innerHTML = `
+    ${dashboardThumbnail(item, "detailed-grid-thumb")}
+    <div class="detailed-grid-body">
+      <strong>${item.title}</strong>
+      <small>${subtitle}</small>
+      <span class="detailed-grid-meta">${isStatusOnly ? (state.preferences.dashboardShowRatings ? `Rating: ${rating}` : item.status || "") : (state.preferences.dashboardShowProgress ? `${progress}% complete` : "")}</span>
+    </div>
+    ${isStatusOnly ? `<span class="dashboard-status-pill">${item.status || "Unrated"}</span>` : (state.preferences.dashboardShowProgress ? progressRingHTML(progress) : "")}
+    <div class="grid-card-select-overlay">
+      <div class="grid-card-select-check"><i data-lucide="check"></i></div>
+    </div>
+  `;
+  return card;
+}
+
+function buildTableCard(item) {
+  const card = document.createElement("div");
+  const isStatusOnly = item.category === "movie" || item.category === "game";
+  const progress = isStatusOnly ? 0 : calculateProgress(item);
+  const rating = Number(item.rating) > 0 ? formatRatingValue(item.rating) : "—";
+  card.className = "note-card table-card";
+  card.dataset.id = item.id;
+  card.innerHTML = `
+    ${dashboardThumbnail(item, "table-card-thumb")}
+    <strong class="table-card-title">${item.title}</strong>
+    <span class="table-card-status">${item.status || "—"}</span>
+    <span class="table-card-rating">${state.preferences.dashboardShowRatings ? rating : "—"}</span>
+    <span class="table-card-progress">${isStatusOnly || !state.preferences.dashboardShowProgress ? "—" : `${progress}%`}</span>
+  `;
+  return card;
+}
+
 function buildNoteCard(item) {
   const card = document.createElement("div");
   const isCompleted = item.status === "Completed";
   card.className = `note-card dashboard-insight-card ${isCompleted ? "completed" : ""}`;
+  if (state.preferences.dashboardView === "minimal-list") card.classList.add("minimal-list-card");
   card.dataset.id = item.id;
 
   const progress = calculateProgress(item);
   const subtitle = isCompleted ? (item.completionDate || "Completed") : item.status;
 
   card.innerHTML = `
-    ${thumbnailOrPlaceholder(item.thumbnail, "dashboard-insight-thumb")}
+    ${dashboardThumbnail(item, "dashboard-insight-thumb")}
     <span class="dashboard-insight-body"><strong>${item.title}</strong><small>${subtitle}</small></span>
-    ${progressRingHTML(progress)}
+    ${state.preferences.dashboardShowProgress ? progressRingHTML(progress) : ""}
   `;
   return card;
 }
@@ -3370,8 +3951,15 @@ function setupDashboardLazyLoad(container, filtered) {
   teardownDashboardLazyLoad();
   container.innerHTML = "";
 
-  const isGrid = state.preferences.dashboardView === "grid";
+  const isGrid = dashboardUsesGridView();
   const totalBatches = Math.ceil(filtered.length / DASHBOARD_BATCH_SIZE);
+
+  if (state.preferences.dashboardView === "table") {
+    const header = document.createElement("div");
+    header.className = "dashboard-main-table-header";
+    header.innerHTML = "<span></span><span>Title</span><span>Status</span><span>Rating</span><span>Progress</span>";
+    container.appendChild(header);
+  }
 
   // Spacers stand in for removed batches so the scrollbar height is stable.
   const topSpacer = document.createElement("div");
@@ -3402,7 +3990,16 @@ function setupDashboardLazyLoad(container, filtered) {
     // Grid needs the wrapper to participate in the grid; use display:contents
     // so batch wrappers don't break the CSS grid/flex layout of the cards.
     wrapper.style.display = "contents";
-    items.forEach(item => wrapper.appendChild(isGrid ? buildGridCard(item) : buildNoteCard(item)));
+    items.forEach(item => {
+      if (["grid", "compact-grid", "large-grid"].includes(state.preferences.dashboardView)) wrapper.appendChild(buildGridCard(item));
+      else if (state.preferences.dashboardView === "detailed-grid") wrapper.appendChild(buildDetailedGridCard(item));
+      else if (state.preferences.dashboardView === "table") wrapper.appendChild(buildTableCard(item));
+      else {
+        const card = buildNoteCard(item);
+        if (state.preferences.dashboardView === "compact-list") card.classList.add("compact-list-card");
+        wrapper.appendChild(card);
+      }
+    });
     return wrapper;
   };
 
@@ -4101,7 +4698,7 @@ function attachCardEvents() {
 
   // Grid action overlay
   bindOnce(".grid-card", card => {
-    if (state.preferences.dashboardView !== "grid") return;
+    if (!dashboardUsesGridView()) return;
 
     let pressTimer = null;
     let longPressed = false;
@@ -4173,7 +4770,7 @@ function attachCardEvents() {
   });
 
   bindOnce(".grid-card", card => {
-    if (state.preferences.dashboardView !== "grid") return;
+    if (!dashboardUsesGridView()) return;
     if (card.dataset.boundGridPress === "true") return;
     card.dataset.boundGridPress = "true";
 
@@ -4381,19 +4978,18 @@ function incrementProgress(id, type) {
   if (itemIndex === -1) return;
 
   const item = state.items[itemIndex];
+  const increment = Math.max(1, Number(state.preferences.progressIncrement) || 1);
   
   if (type === "ep") {
     let currentEp = parseInt(item.episodesDone) || 0;
     let totalEp = parseInt(item.totalEpisodes) || getSeasonTotalEpisodes(item) || 0;
-    const nextEpisode = nextEpisodeForDashboardItem(item);
-    if (nextEpisode) {
-      const watched = new Set(item.watchedEpisodeIds || []);
-      watched.add(nextEpisode.id);
-      item.watchedEpisodeIds = Array.from(watched);
-      currentEp = item.watchedEpisodeIds.length;
-    } else {
-      currentEp += 1;
+    const watched = new Set(item.watchedEpisodeIds || []);
+    for (let i = 0; i < increment; i += 1) {
+      const nextEpisode = nextEpisodeForDashboardItem({ ...item, watchedEpisodeIds: Array.from(watched) });
+      if (nextEpisode) watched.add(nextEpisode.id);
+      else currentEp += 1;
     }
+    if (watched.size) currentEp = watched.size;
     if (totalEp > 0 && currentEp >= totalEp) {
       currentEp = totalEp;
       toggleCompletion(id, true);
@@ -4405,7 +5001,7 @@ function incrementProgress(id, type) {
     let currentCh = parseInt(item[isChapter ? "chaptersRead" : "volumesRead"]) || 0;
     let totalCh = parseInt(item[isChapter ? "totalChapters" : "totalVolumes"]) || 0;
     
-    currentCh += 1;
+    currentCh += increment;
     if (totalCh > 0 && currentCh >= totalCh) {
       currentCh = totalCh;
       toggleCompletion(id, true);
@@ -4536,10 +5132,16 @@ function clearFormDraft() {
   localStorage.removeItem(SQUASHDB_FORM_DRAFT_KEY);
 }
 
+function getNotesTemplate() {
+  if (state.preferences.notesTemplate === "review") return "What I liked:\n\nWhat to remember:\n";
+  if (state.preferences.notesTemplate === "journal") return "Date:\n\nThoughts:\n";
+  return "";
+}
+
 function applyRememberedStatus(category) {
   const select = document.getElementById("field-status");
   if (!select) return;
-  const remembered = state.lastEntryStatusByCategory?.[category];
+  const remembered = state.lastEntryStatusByCategory?.[category] || state.preferences.defaultEntryStatus;
   if (remembered && Array.from(select.options).some(option => option.value === remembered)) {
     select.value = remembered;
   }
@@ -4704,6 +5306,7 @@ function openModal(editId = null) {
     state.lastEntryCategory = preferredCat;
     renderDynamicFormFields(preferredCat);
     applyRememberedStatus(preferredCat);
+    document.getElementById("entry-notes").value = getNotesTemplate();
     clearMetadataPreview();
     const draft = readFormDraft();
     if (draft && window.confirm("Restore your unfinished add-item draft?")) {
