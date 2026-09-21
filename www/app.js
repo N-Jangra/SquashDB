@@ -215,6 +215,39 @@ function deleteCustomCategory(key) {
 }
 
 // Application State
+const persistenceDirtyDomains = new Set(["items", "watchLog", "preferences"]);
+const persistedJson = { items: null, watchLog: null, preferences: null };
+
+function trackStateMutations(root) {
+  const proxies = new WeakMap();
+  function wrap(value, domain) {
+    if (!value || typeof value !== "object") return value;
+    if (proxies.has(value)) return proxies.get(value);
+    const proxy = new Proxy(value, {
+      get(target, property, receiver) {
+        const result = Reflect.get(target, property, receiver);
+        return wrap(result, target === root ? String(property) : domain);
+      },
+      set(target, property, next, receiver) {
+        const previous = target[property];
+        const changed = previous !== next;
+        const result = Reflect.set(target, property, next, receiver);
+        if (changed) persistenceDirtyDomains.add(target === root ? String(property) : domain);
+        return result;
+      },
+      deleteProperty(target, property) {
+        const existed = property in target;
+        const result = Reflect.deleteProperty(target, property);
+        if (existed) persistenceDirtyDomains.add(target === root ? String(property) : domain);
+        return result;
+      }
+    });
+    proxies.set(value, proxy);
+    return proxy;
+  }
+  return wrap(root, "state");
+}
+
 let state = {
   items: [],
   watchLog: [],
@@ -302,6 +335,7 @@ let state = {
   timelineYear: "",
   activeRating: 0 // temp rating state for form
 };
+state = trackStateMutations(state);
 
 function thumbnailsEnabled() {
   return Boolean(state.preferences.metadataThumbnails);
@@ -451,8 +485,15 @@ document.addEventListener("visibilitychange", () => {
 // Load data from LocalStorage
 async function loadData() {
   let encryptedState = null;
+  // The readable local mirror is intentionally the fast startup path. On
+  // Android it lets the dashboard render immediately instead of waiting for
+  // Keystore decryption before any cards can be shown.
+  const localItems = localStorage.getItem("squashdb_items");
+  const localWatchLog = localStorage.getItem("squashdb_watch_log");
+  const localPrefs = localStorage.getItem("squashdb_prefs");
   const encryptedStore = nativePlugin("EncryptedStore");
-  if (encryptedStore?.getState) {
+  const hasLocalMirror = Boolean(localItems || localWatchLog || localPrefs);
+  if (encryptedStore?.getState && !hasLocalMirror) {
     try {
       const result = await encryptedStore.getState();
       if (result?.exists && result.data) encryptedState = JSON.parse(result.data);
@@ -461,7 +502,7 @@ async function loadData() {
     }
   }
 
-  const savedItems = encryptedState?.items ? JSON.stringify(encryptedState.items) : localStorage.getItem("squashdb_items");
+  const savedItems = encryptedState?.items ? JSON.stringify(encryptedState.items) : localItems;
   if (savedItems) {
     try {
       state.items = JSON.parse(savedItems);
@@ -471,7 +512,7 @@ async function loadData() {
     }
   }
 
-  const savedWatchLog = encryptedState?.watchLog ? JSON.stringify(encryptedState.watchLog) : localStorage.getItem("squashdb_watch_log");
+  const savedWatchLog = encryptedState?.watchLog ? JSON.stringify(encryptedState.watchLog) : localWatchLog;
   if (savedWatchLog) {
     try {
       state.watchLog = JSON.parse(savedWatchLog);
@@ -481,7 +522,7 @@ async function loadData() {
     }
   }
 
-  const savedPrefs = encryptedState?.preferences ? JSON.stringify(encryptedState.preferences) : localStorage.getItem("squashdb_prefs");
+  const savedPrefs = encryptedState?.preferences ? JSON.stringify(encryptedState.preferences) : localPrefs;
   if (savedPrefs) {
     try {
       state.preferences = { ...state.preferences, ...JSON.parse(savedPrefs) };
@@ -723,6 +764,7 @@ function initializePage() {
 // Save data to LocalStorage
 let saveTimer = null;
 let saveQueued = false;
+let dashboardDataVersion = 0;
 
 function flushPendingSave() {
   if (!saveQueued) return;
@@ -731,9 +773,18 @@ function flushPendingSave() {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  localStorage.setItem("squashdb_items", JSON.stringify(state.items));
-  localStorage.setItem("squashdb_watch_log", JSON.stringify(state.watchLog || []));
-  localStorage.setItem("squashdb_prefs", JSON.stringify(state.preferences));
+  if (persistenceDirtyDomains.has("items") || !persistedJson.items) {
+    persistedJson.items = JSON.stringify(state.items);
+    localStorage.setItem("squashdb_items", persistedJson.items);
+  }
+  if (persistenceDirtyDomains.has("watchLog") || !persistedJson.watchLog) {
+    persistedJson.watchLog = JSON.stringify(state.watchLog || []);
+    localStorage.setItem("squashdb_watch_log", persistedJson.watchLog);
+  }
+  if (persistenceDirtyDomains.has("preferences") || !persistedJson.preferences) {
+    persistedJson.preferences = JSON.stringify(state.preferences);
+    localStorage.setItem("squashdb_prefs", persistedJson.preferences);
+  }
   localStorage.setItem("squashdb_theme", state.theme);
   localStorage.setItem("squashdb_sort", state.currentSort);
   localStorage.setItem("squashdb_search_history", JSON.stringify(state.searchHistory || []));
@@ -749,14 +800,16 @@ function flushPendingSave() {
   const encryptedStore = nativePlugin("EncryptedStore");
   if (encryptedStore?.setState) {
     encryptedStore.setState({
-      data: JSON.stringify({ items: state.items, watchLog: state.watchLog || [], preferences: state.preferences })
+      data: `{"items":${persistedJson.items},"watchLog":${persistedJson.watchLog},"preferences":${persistedJson.preferences}}`
     }).catch(err => console.warn("Encrypted local database save failed", err));
   }
+  persistenceDirtyDomains.clear();
   applyPreferenceAttributes();
   updateProgressWidget();
 }
 
 function saveData() {
+  dashboardDataVersion += 1;
   saveQueued = true;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(flushPendingSave, 120);
@@ -834,6 +887,8 @@ function applyPreferenceAttributes() {
   document.body.setAttribute("data-tablet-layout", state.preferences.tabletTwoColumn ? "two-column" : "single-column");
   document.body.setAttribute("data-contrast", state.preferences.highContrast ? "high" : "normal");
   document.body.classList.toggle("reduced-motion", Boolean(state.preferences.reducedMotion));
+  const lowEndDevice = Number(navigator.deviceMemory || 0) > 0 && Number(navigator.deviceMemory) <= 2;
+  document.body.classList.toggle("low-end-device", lowEndDevice);
   Object.keys(CATEGORIES).forEach(key => {
     CATEGORIES[key].color = state.preferences.categoryColors?.[key]
       || BUILTIN_CATEGORIES[key]?.color
@@ -857,7 +912,10 @@ function applyPreferenceAttributes() {
 
 function applyAnimationSpeed() {
   const speed = state.preferences.animationSpeed || "normal";
-  const multiplier = ANIMATION_SPEED_MULTIPLIERS[speed] ?? 1;
+  const lowEndDevice = Number(navigator.deviceMemory || 0) > 0 && Number(navigator.deviceMemory) <= 2;
+  const multiplier = state.preferences.reducedMotion || lowEndDevice
+    ? 0.001
+    : (ANIMATION_SPEED_MULTIPLIERS[speed] ?? 1);
   document.documentElement.style.setProperty("--anim-speed", multiplier);
 }
 
@@ -883,10 +941,12 @@ function setupEventListeners() {
   // Global Search
   const globalSearch = document.getElementById("global-search");
   if (globalSearch) {
+    let searchRenderTimer = null;
     globalSearch.addEventListener("input", (e) => {
       state.searchQuery = e.target.value.toLowerCase().trim();
       renderSearchHistory();
-      renderDashboard();
+      clearTimeout(searchRenderTimer);
+      searchRenderTimer = setTimeout(() => renderDashboard(), 200);
     });
     globalSearch.addEventListener("focus", renderSearchHistory);
     globalSearch.addEventListener("keydown", (e) => {
@@ -2409,39 +2469,44 @@ function renderCategorySelectOptions() {
   }
 }
 
-// Compute progress percentage
-function calculateProgress(item) {
-  const { category, status, seasonsDone, totalSeasons, episodesDone, totalEpisodes, chaptersRead, totalChapters } = item;
-  
-  if (status === "Completed") return 100;
+const progressCache = new WeakMap();
 
-  if (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime") {
+// Compute progress percentage, reusing the result while progress inputs are unchanged.
+function calculateProgress(item) {
+  if (!item || typeof item !== "object") return 0;
+  const signature = [item.category, item.status, item.seasonsDone, item.totalSeasons,
+    item.episodesDone, item.totalEpisodes, item.seasonEpisodes, item.chaptersRead,
+    item.totalChapters].join("|");
+  const cached = progressCache.get(item);
+  if (cached?.signature === signature) return cached.value;
+  const { category, status, seasonsDone, totalSeasons, episodesDone, totalEpisodes, chaptersRead, totalChapters } = item;
+  let result = 0;
+  
+  if (status === "Completed") result = 100;
+
+  if (!result && (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime")) {
     const totalEp = parseInt(totalEpisodes) || getSeasonTotalEpisodes(item) || 0;
     const doneEp = parseInt(episodesDone) || 0;
     
     if (totalEp > 0) {
-      return Math.min(100, Math.round((doneEp / totalEp) * 100));
+      result = Math.min(100, Math.round((doneEp / totalEp) * 100));
     }
     
     const totalS = parseInt(totalSeasons) || 0;
     const doneS = parseInt(seasonsDone) || 0;
     if (totalS > 0) {
-      return Math.min(100, Math.round((doneS / totalS) * 100));
+      result = Math.min(100, Math.round((doneS / totalS) * 100));
     }
   } else if (category === "manga" || category === "novel") {
     const totalCh = parseInt(totalChapters) || 0;
     const doneCh = parseInt(chaptersRead) || 0;
-    if (totalCh > 0) {
-      return Math.min(100, Math.round((doneCh / totalCh) * 100));
-    }
+    if (totalCh > 0) result = Math.min(100, Math.round((doneCh / totalCh) * 100));
   }
 
   // Games / Movies with no numerical steps
-  if (status === "Playing" || status === "In Progress" || status === "Reading") {
-    return 50;
-  }
-
-  return 0;
+  if (!result && (status === "Playing" || status === "In Progress" || status === "Reading")) result = 50;
+  progressCache.set(item, { signature, value: result });
+  return result;
 }
 
 // Estimated time to finish an item, in minutes. Returns { total, remaining } or
@@ -2810,14 +2875,9 @@ function setupDashboardPullToRefresh() {
     if (distance < 64) return;
     if (status) status.textContent = "Refreshing metadata and images…";
     try {
-      if (window.SquashDBCache) {
-        // Clearing temporary caches is best-effort. A WebView may not expose
-        // one of the cache stores, but that must not make refresh look broken.
-        await Promise.allSettled([
-          window.SquashDBCache.clearMetadata(),
-          window.SquashDBCache.clearImages()
-        ]);
-      }
+      // Keep metadata and image caches during normal refresh. Cache clearing is
+      // an explicit Settings action so pull-to-refresh remains fast and does
+      // not force every thumbnail to download and decode again.
       renderDashboard();
       if (status) status.textContent = "Dashboard refreshed";
     } catch (err) {
@@ -2866,7 +2926,14 @@ function renderDashboard() {
   );
 
   // 1. Filter items based on active preferences, quick filter chip, and search query
-  let filtered = state.items.filter(item => {
+  const dashboardCacheKey = JSON.stringify([dashboardDataVersion, state.activeCategoryChip,
+    state.searchQuery, state.statusFilter, state.dashboardFilters, state.currentSort,
+    state.preferences.dashboardView, [...insightItemIds].sort()]);
+  let filtered;
+  if (renderDashboard._cache?.key === dashboardCacheKey) {
+    filtered = renderDashboard._cache.items;
+  } else {
+    filtered = state.items.filter(item => {
     // Check if category is enabled in settings
     if (!state.preferences[item.category]) return false;
     
@@ -2896,11 +2963,11 @@ function renderDashboard() {
     if (quick.recentlyAdded && (Date.now() - (Number(item.created) || 0)) > 30 * 24 * 60 * 60 * 1000) return false;
     if (quick.rated && !(Number(item.rating) > 0)) return false;
 
-    return true;
-  });
+      return true;
+    });
 
   // 2. Sort items
-  filtered.sort((a, b) => {
+    filtered.sort((a, b) => {
     if (state.currentSort === "alphabetical-asc") {
       return a.title.localeCompare(b.title);
     } else if (state.currentSort === "alphabetical-desc") {
@@ -2919,7 +2986,9 @@ function renderDashboard() {
       return dashboardReleaseTime(b) - dashboardReleaseTime(a);
     }
     return 0;
-  });
+    });
+    renderDashboard._cache = { key: dashboardCacheKey, items: filtered };
+  }
 
   // 3. Render note elements incrementally: only a first batch is built up front,
   // more are appended as the user scrolls near the bottom (see setupDashboardLazyLoad).
@@ -3109,7 +3178,7 @@ function setupDashboardLazyLoad(container, filtered) {
     renderedCount += nextItems.length;
 
     attachCardEvents();
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons(container);
 
     if (renderedCount >= filtered.length) {
       teardownDashboardLazyLoad();
@@ -3915,7 +3984,7 @@ function openRowActionMenu(id) {
   list.appendChild(deleteBtn);
 
   modal.classList.add("active");
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons(root);
 }
 
 // Custom in-app delete confirmation (avoids relying on window.confirm in WebViews)
