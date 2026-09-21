@@ -983,6 +983,9 @@ function renderPrimaryDetailActions() {
     showDetailState.episodeFilter = "all";
     renderEpisodeList();
     const nextRow = Array.from(document.querySelectorAll("[data-episode-id]")).find(row => String(row.dataset.episodeId) === String(next.id));
+    // Selecting Next should open the episode's synopsis as well as navigating
+    // to its season, so the user lands on the actual next episode details.
+    nextRow?.classList.add("expanded");
     nextRow?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
   previousButton.onclick = () => {

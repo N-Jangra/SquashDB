@@ -176,11 +176,51 @@ function navigateBackWithinApp(fallback = "static/pages/settings/settings.html")
 }
 
 function animatePredictiveBack(callback) {
-  document.body.classList.add("app-predictive-back");
-  setTimeout(() => {
-    document.body.classList.remove("app-predictive-back");
+  // Respect reduced-motion: navigate immediately, no exit animation.
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const container = document.getElementById("app-container");
+  if (reduce || !container) {
     callback();
-  }, 150);
+    return;
+  }
+
+  // Mark that the NEXT page load should play the enter animation. Read on the
+  // destination page in setupPageEnterAnimation().
+  try { sessionStorage.setItem("app-back-enter", "1"); } catch (e) {}
+
+  document.body.classList.add("app-predictive-back");
+
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    container.removeEventListener("animationend", finish);
+    callback();
+  };
+  // Navigate exactly when the exit animation ends (not a guessed timeout), with
+  // a safety fallback so navigation never stalls if animationend doesn't fire.
+  container.addEventListener("animationend", finish, { once: true });
+  setTimeout(finish, 260);
+}
+
+// On a fresh page load, if we just came from a back navigation, play a brief
+// enter transition so the new page slides in instead of snapping in after the
+// load gap. Called from setupPageBackButtons()/init.
+function setupPageEnterAnimation() {
+  let cameFromBack = false;
+  try {
+    cameFromBack = sessionStorage.getItem("app-back-enter") === "1";
+    if (cameFromBack) sessionStorage.removeItem("app-back-enter");
+  } catch (e) {}
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!cameFromBack || reduce) return;
+  const container = document.getElementById("app-container");
+  if (!container) return;
+  document.body.classList.add("app-page-enter");
+  container.addEventListener("animationend", () => {
+    document.body.classList.remove("app-page-enter");
+  }, { once: true });
+  setTimeout(() => document.body.classList.remove("app-page-enter"), 400);
 }
 
 function setupSwipeBackGesture() {
@@ -239,4 +279,12 @@ function setupHardwareBackButton() {
       }
     });
   }
+}
+
+// Play the enter transition as early as possible (before the unlock-gated
+// runAppInit), so a page navigated to via Back slides in on first paint.
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", setupPageEnterAnimation, { once: true });
+} else {
+  setupPageEnterAnimation();
 }

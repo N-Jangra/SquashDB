@@ -2897,15 +2897,28 @@ function renderDashboardInsights() {
   const notStartedItems = items
     .filter(item => item.status !== "Completed"
       && calculateProgress(item) <= 0
+      && !["Dropped", "On Hold"].includes(item.status)
       && !["In Progress", "Playing", "Reading"].includes(item.status))
     .sort((a, b) => (Number(b.created || b.updated) || 0) - (Number(a.created || a.updated) || 0))
     .slice(0, 4);
+  const onHoldItems = items
+    .filter(item => item.status === "On Hold")
+    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0))
+    .slice(0, 4);
+  const droppedItems = items
+    .filter(item => item.status === "Dropped")
+    .sort((a, b) => (Number(b.updated || b.created) || 0) - (Number(a.updated || a.created) || 0))
+    .slice(0, 4);
   const notStartedIds = new Set(notStartedItems.map(item => item.id));
+  const onHoldIds = new Set(onHoldItems.map(item => item.id));
+  const droppedIds = new Set(droppedItems.map(item => item.id));
   const staleCutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
   const staleItems = items
     .filter(item => {
       const lastUpdated = Number(item.updated || item.created || 0);
       return !continueIds.has(item.id) && !completedIds.has(item.id) && !notStartedIds.has(item.id)
+        && !onHoldIds.has(item.id) && !droppedIds.has(item.id)
+        && !["Dropped", "On Hold"].includes(item.status)
         && lastUpdated > 0 && lastUpdated < staleCutoff;
     })
     .sort((a, b) => (Number(a.updated || a.created) || 0) - (Number(b.updated || b.created) || 0))
@@ -2920,12 +2933,16 @@ function renderDashboardInsights() {
   root.innerHTML = [
     section("Continue watching", continueItems.map(item => dashboardInsightCard(item, item.status, `${calculateProgress(item)}%`)).join(""), "continue"),
     section("Not started yet", notStartedItems.map(item => dashboardInsightCard(item, item.status || "No progress yet", "Ready to start")).join(""), "not-started"),
+    section("On hold", onHoldItems.map(item => dashboardInsightCard(item, item.status)).join(""), "on-hold"),
+    section("Dropped", droppedItems.map(item => dashboardInsightCard(item, item.status)).join(""), "dropped"),
     section("Haven't updated in a long time", staleItems.map(item => dashboardInsightCard(item, item.status, staleLabel(item))).join(""), "stale"),
     section("Completed", completedItems.map(item => dashboardInsightCard(item, item.completionDate || "Completed")).join(""), "completed")
   ].join("");
   root.dataset.insightItemIds = JSON.stringify([...new Set([
     ...continueItems.map(item => item.id),
     ...notStartedItems.map(item => item.id),
+    ...onHoldItems.map(item => item.id),
+    ...droppedItems.map(item => item.id),
     ...staleItems.map(item => item.id),
     ...completedItems.map(item => item.id)
   ])]);
@@ -3135,6 +3152,11 @@ function renderDashboardEmptyState() {
 }
 
 const DASHBOARD_BATCH_SIZE = 30;
+// Keep at most this many batches materialised in the DOM at once. Off-screen
+// batches above/below the window are removed and replaced with spacer elements
+// that preserve scroll height, so the live node count stays bounded no matter
+// how large the library is (true windowing, not just incremental append).
+const DASHBOARD_MAX_LIVE_BATCHES = 5;
 let dashboardLazyLoadObserver = null;
 let dashboardGridSelectionMode = false;
 let dashboardSelectedIds = new Set();
@@ -3236,51 +3258,146 @@ function buildNoteCard(item) {
   return card;
 }
 
+// Holds the state for the currently windowed dashboard render so scroll
+// observers can add/remove batches. Reset on each renderDashboard().
+let dashboardWindow = null;
+
 function teardownDashboardLazyLoad() {
   if (dashboardLazyLoadObserver) {
     dashboardLazyLoadObserver.disconnect();
     dashboardLazyLoadObserver = null;
   }
+  dashboardWindow = null;
 }
 
-// Renders `filtered` in batches: an initial batch up front, then more batches
-// as a sentinel element at the end of the list scrolls into view. Avoids building
-// hundreds of DOM nodes synchronously for large watchlists on every render.
+// Virtualised list: only a bounded window of batches is kept in the DOM at any
+// time. As the user scrolls down, the next batch is appended and, once the
+// window exceeds DASHBOARD_MAX_LIVE_BATCHES, the top batch is removed and its
+// height is preserved by a top spacer. Scrolling back up restores earlier
+// batches. This keeps the live node count constant for arbitrarily large
+// libraries instead of growing without bound.
 function setupDashboardLazyLoad(container, filtered) {
   teardownDashboardLazyLoad();
   container.innerHTML = "";
 
-  let renderedCount = 0;
-  const sentinel = document.createElement("div");
-  sentinel.className = "dashboard-lazy-sentinel";
+  const isGrid = state.preferences.dashboardView === "grid";
+  const totalBatches = Math.ceil(filtered.length / DASHBOARD_BATCH_SIZE);
 
-  function renderNextBatch() {
-    const nextItems = filtered.slice(renderedCount, renderedCount + DASHBOARD_BATCH_SIZE);
-    if (nextItems.length === 0) return;
+  // Spacers stand in for removed batches so the scrollbar height is stable.
+  const topSpacer = document.createElement("div");
+  topSpacer.className = "dashboard-window-spacer dashboard-window-spacer-top";
+  const bottomSpacer = document.createElement("div");
+  bottomSpacer.className = "dashboard-window-spacer dashboard-window-spacer-bottom";
+  const topSentinel = document.createElement("div");
+  topSentinel.className = "dashboard-lazy-sentinel dashboard-lazy-sentinel-top";
+  const bottomSentinel = document.createElement("div");
+  bottomSentinel.className = "dashboard-lazy-sentinel dashboard-lazy-sentinel-bottom";
 
-    const fragment = document.createDocumentFragment();
-    const isGrid = state.preferences.dashboardView === "grid";
-    nextItems.forEach(item => fragment.appendChild(isGrid ? buildGridCard(item) : buildNoteCard(item)));
-    container.insertBefore(fragment, sentinel);
-    renderedCount += nextItems.length;
+  container.appendChild(topSpacer);
+  container.appendChild(topSentinel);
+  container.appendChild(bottomSentinel);
+  container.appendChild(bottomSpacer);
 
+  // firstBatch..lastBatch (inclusive) are the batch indexes currently in the DOM.
+  const win = { firstBatch: 0, lastBatch: -1, batchHeights: {}, container,
+    topSpacer, bottomSpacer, topSentinel, bottomSentinel, isGrid };
+  dashboardWindow = win;
+
+  const buildBatchFragment = (batchIndex) => {
+    const start = batchIndex * DASHBOARD_BATCH_SIZE;
+    const items = filtered.slice(start, start + DASHBOARD_BATCH_SIZE);
+    const wrapper = document.createElement("div");
+    wrapper.className = "dashboard-batch";
+    wrapper.dataset.batch = String(batchIndex);
+    // Grid needs the wrapper to participate in the grid; use display:contents
+    // so batch wrappers don't break the CSS grid/flex layout of the cards.
+    wrapper.style.display = "contents";
+    items.forEach(item => wrapper.appendChild(isGrid ? buildGridCard(item) : buildNoteCard(item)));
+    return wrapper;
+  };
+
+  const afterMutate = () => {
     attachCardEvents();
     if (window.lucide) lucide.createIcons(container);
+  };
 
-    if (renderedCount >= filtered.length) {
-      teardownDashboardLazyLoad();
-      sentinel.remove();
+  // A display:contents wrapper has no box of its own, so measure a batch by the
+  // vertical span of its child cards (top of first card → bottom of last card).
+  const measureBatchHeight = (batchEl) => {
+    const cards = batchEl.children;
+    if (!cards.length) return 0;
+    const first = cards[0].getBoundingClientRect();
+    const last = cards[cards.length - 1].getBoundingClientRect();
+    return Math.max(0, Math.round(last.bottom - first.top));
+  };
+
+  const appendBottomBatch = () => {
+    if (win.lastBatch + 1 >= totalBatches) return false;
+    const batchIndex = win.lastBatch + 1;
+    const wrapper = buildBatchFragment(batchIndex);
+    container.insertBefore(wrapper, win.bottomSentinel);
+    win.lastBatch = batchIndex;
+    afterMutate();
+
+    // Trim from the top if the window grew too large; preserve height via spacer.
+    while (win.lastBatch - win.firstBatch + 1 > DASHBOARD_MAX_LIVE_BATCHES) {
+      const topEl = container.querySelector(`.dashboard-batch[data-batch="${win.firstBatch}"]`);
+      if (!topEl) break;
+      win.batchHeights[win.firstBatch] = measureBatchHeight(topEl);
+      topEl.remove();
+      win.firstBatch += 1;
+      const topPad = Object.keys(win.batchHeights)
+        .filter(k => Number(k) < win.firstBatch)
+        .reduce((sum, k) => sum + (win.batchHeights[k] || 0), 0);
+      win.topSpacer.style.height = `${topPad}px`;
     }
-  }
+    return true;
+  };
 
-  container.appendChild(sentinel);
-  renderNextBatch();
+  const prependTopBatch = () => {
+    if (win.firstBatch <= 0) return false;
+    const batchIndex = win.firstBatch - 1;
+    const wrapper = buildBatchFragment(batchIndex);
+    container.insertBefore(wrapper, win.topSentinel.nextSibling);
+    win.firstBatch = batchIndex;
+    // Shrink the top spacer by the height we no longer need to fake.
+    const topPad = Object.keys(win.batchHeights)
+      .filter(k => Number(k) < win.firstBatch)
+      .reduce((sum, k) => sum + (win.batchHeights[k] || 0), 0);
+    win.topSpacer.style.height = `${topPad}px`;
+    afterMutate();
 
-  if (renderedCount < filtered.length) {
+    // Trim from the bottom if over budget.
+    while (win.lastBatch - win.firstBatch + 1 > DASHBOARD_MAX_LIVE_BATCHES) {
+      const botEl = container.querySelector(`.dashboard-batch[data-batch="${win.lastBatch}"]`);
+      if (!botEl) break;
+      win.batchHeights[win.lastBatch] = measureBatchHeight(botEl);
+      botEl.remove();
+      win.lastBatch -= 1;
+    }
+    const bottomPad = Object.keys(win.batchHeights)
+      .filter(k => Number(k) > win.lastBatch)
+      .reduce((sum, k) => sum + (win.batchHeights[k] || 0), 0);
+    win.bottomSpacer.style.height = `${bottomPad}px`;
+    return true;
+  };
+
+  win.appendBottomBatch = appendBottomBatch;
+  win.prependTopBatch = prependTopBatch;
+
+  // Seed the first batch.
+  appendBottomBatch();
+
+  if (totalBatches > 1) {
     dashboardLazyLoadObserver = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) renderNextBatch();
-    }, { root: null, rootMargin: "400px" });
-    dashboardLazyLoadObserver.observe(sentinel);
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        if (entry.target === win.bottomSentinel) appendBottomBatch();
+        else if (entry.target === win.topSentinel) prependTopBatch();
+      });
+    }, { root: null, rootMargin: "600px" });
+    dashboardLazyLoadObserver.observe(win.bottomSentinel);
+    dashboardLazyLoadObserver.observe(win.topSentinel);
   }
 }
 
@@ -3745,7 +3862,9 @@ function renderStatsWatchCharts(activeItemIds) {
   timeChart.innerHTML = weekBuckets.map(day => `
     <div class="column-chart-col">
       <span class="column-chart-value">${day.minutes ? formatMinutesAsDuration(day.minutes) : ""}</span>
-      <div class="column-chart-bar" style="height:${Math.max(day.minutes ? 8 : 2, Math.round((day.minutes / maxMinutes) * 100))}%" title="${day.episodes} episode${day.episodes === 1 ? "" : "s"}"></div>
+      <div class="column-chart-bar-track">
+        <div class="column-chart-bar" style="height:${Math.max(day.minutes ? 8 : 2, Math.round((day.minutes / maxMinutes) * 100))}%" title="${day.episodes} episode${day.episodes === 1 ? "" : "s"}"></div>
+      </div>
       <span class="column-chart-label">${day.date.toLocaleDateString(undefined, { weekday: "short" })}</span>
     </div>
   `).join("");
@@ -3788,7 +3907,9 @@ function renderStatsWatchCharts(activeItemIds) {
   epChart.innerHTML = monthBuckets.map(bucket => `
     <div class="column-chart-col">
       <span class="column-chart-value">${bucket.episodes ? `${bucket.episodes} ep` : ""}</span>
-      <div class="column-chart-bar monthly-chart-bar" style="height:${Math.max(bucket.minutes ? 8 : 2, Math.round((bucket.minutes / maxMonthMinutes) * 100))}%" title="${formatMinutesAsDuration(bucket.minutes)}"></div>
+      <div class="column-chart-bar-track">
+        <div class="column-chart-bar monthly-chart-bar" style="height:${Math.max(bucket.minutes ? 8 : 2, Math.round((bucket.minutes / maxMonthMinutes) * 100))}%" title="${formatMinutesAsDuration(bucket.minutes)}"></div>
+      </div>
       <span class="column-chart-label">Week ${bucket.week}</span>
     </div>
   `).join("");
