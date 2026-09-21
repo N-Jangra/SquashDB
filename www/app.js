@@ -2729,11 +2729,21 @@ function calculateTimeToComplete(item) {
   const { category } = item;
 
   if (category === "series" || category === "kdrama" || category === "cdrama" || category === "anime") {
-    const runtime = parseInt(item.episodeRuntime) || 0;
+    const cachedRuntimes = Array.isArray(item.episodesCache)
+      ? item.episodesCache.map(episode => Number(episode.runtime)).filter(runtime => runtime > 0)
+      : [];
+    const averageRuntime = cachedRuntimes.length
+      ? Math.round(cachedRuntimes.reduce((sum, runtime) => sum + runtime, 0) / cachedRuntimes.length)
+      : 0;
+    const runtime = parseInt(item.episodeRuntime) || averageRuntime;
     if (runtime <= 0) return null;
     const totalEp = parseInt(item.totalEpisodes) || getSeasonTotalEpisodes(item) || 0;
     if (totalEp <= 0) return null;
-    const doneEp = Math.min(totalEp, parseInt(item.episodesDone) || 0);
+    const doneEp = Math.min(totalEp, Math.max(
+      parseInt(item.episodesDone) || 0,
+      getSeasonWatchedEpisodes(item),
+      Array.isArray(item.watchedEpisodeIds) ? item.watchedEpisodeIds.length : 0
+    ));
     return {
       total: runtime * totalEp,
       remaining: item.status === "Completed" ? 0 : runtime * (totalEp - doneEp)
@@ -3769,6 +3779,8 @@ function renderStats() {
   const inProgressItems = activeItems.filter(item => item.status === "Playing" || item.status === "In Progress" || item.status === "Reading");
   const queuedStatuses = new Set(["Watchlist", "Playlist", "Backlog", "Plan to Read", "Plan to Watch", "Want to Play"]);
   const queuedItems = activeItems.filter(item => queuedStatuses.has(item.status));
+  const onHoldItems = activeItems.filter(item => item.status === "On Hold");
+  const droppedItems = activeItems.filter(item => item.status === "Dropped");
 
   const totalCount = activeItems.length;
   const completedCount = completedItems.length;
@@ -3780,6 +3792,10 @@ function renderStats() {
   completedEl.textContent = completedCount;
   activeEl.textContent = activeCount;
   if (queuedEl) queuedEl.textContent = queuedCount;
+  const onHoldEl = document.getElementById("stats-on-hold");
+  const droppedEl = document.getElementById("stats-dropped");
+  if (onHoldEl) onHoldEl.textContent = onHoldItems.length;
+  if (droppedEl) droppedEl.textContent = droppedItems.length;
   rateEl.textContent = `${rate}%`;
 
   // Time-to-complete aggregates: only shown when at least one item in the
@@ -3808,7 +3824,7 @@ function renderStats() {
   renderStatsGenres(activeItems);
   renderStatsNetworks(activeItems);
   renderStatsRatings(activeItems);
-  renderStatsWatchCharts(activeItemIds);
+  renderStatsWatchCharts(activeItemIds, activeItems);
 }
 
 // Top genres leaderboard, scoped to whatever category chip is active. Genres
@@ -3900,7 +3916,7 @@ function renderStatsRatings(activeItems) {
 // Weekly time-series (hours + episode count) built from state.watchLog, plus
 // a "biggest marathons" leaderboard (most episodes of one show in a single
 // day). Only reflects episodes ticked after watch-logging shipped.
-function renderStatsWatchCharts(activeItemIds) {
+function renderStatsWatchCharts(activeItemIds, activeItems = []) {
   const timeCard = document.getElementById("stats-weekly-time-card");
   const timeChart = document.getElementById("stats-weekly-time-chart");
   const epCard = document.getElementById("stats-weekly-episodes-card");
@@ -3909,8 +3925,19 @@ function renderStatsWatchCharts(activeItemIds) {
   const marathonsList = document.getElementById("stats-marathons-list");
   if (!timeCard || !timeChart || !epCard || !epChart || !marathonsCard || !marathonsList) return;
 
-  const log = (state.watchLog || []).filter(entry => activeItemIds.has(entry.itemId));
-  const hasWatchHistory = log.length > 0;
+  const watchLog = (state.watchLog || []).filter(entry => activeItemIds.has(entry.itemId));
+  // Imported and older items may not have watch-log rows. Use their last
+  // update as a lightweight activity event until real watch events exist.
+  const log = watchLog.length ? watchLog : activeItems
+    .filter(item => activeItemIds.has(item.id) && Number(item.updated || item.created) > 0)
+    .map(item => ({
+      itemId: item.id,
+      title: item.title,
+      watchedAt: item.updated || item.created,
+      runtime: Number(item.episodeRuntime || item.playtime) || 1,
+      derived: true
+    }));
+  const hasActivity = log.length > 0;
 
   const dayTotals = {}; // "itemId|YYYY-MM-DD" -> { title, count }
   const now = new Date();
@@ -3923,6 +3950,13 @@ function renderStatsWatchCharts(activeItemIds) {
 
   timeCard.style.display = "flex";
   epCard.style.display = "flex";
+  if (!hasActivity) {
+    const emptyMessage = '<div class="stats-chart-empty">No activity recorded for this category yet.</div>';
+    timeChart.innerHTML = emptyMessage;
+    epChart.innerHTML = emptyMessage;
+    marathonsCard.style.display = "none";
+    return;
+  }
   // Weekly graph: one bar per day for the current Monday-Sunday week.
   const dayOfWeek = (now.getDay() + 6) % 7;
   const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
@@ -3938,6 +3972,9 @@ function renderStatsWatchCharts(activeItemIds) {
       weekBuckets[day].episodes += 1;
     }
   });
+  // The 100 below is only the CSS chart height. The data scale must always
+  // follow the largest value in the current result set so one quiet day does
+  // not make every bar look equally tall.
   const maxMinutes = Math.max(...weekBuckets.map(day => day.minutes), 1);
   timeChart.innerHTML = weekBuckets.map(day => `
     <div class="column-chart-col">
@@ -3983,19 +4020,22 @@ function renderStatsWatchCharts(activeItemIds) {
     bucket.minutes += Number(entry.runtime) || 0;
     bucket.episodes += 1;
   });
-  const maxMonthMinutes = Math.max(...monthBuckets.map(bucket => bucket.minutes), 1);
+  // This chart displays episode counts, so scale it by the largest episode
+  // count rather than by runtime minutes. Otherwise a long episode can make
+  // a week with fewer episodes appear larger than it should.
+  const maxMonthEpisodes = Math.max(...monthBuckets.map(bucket => bucket.episodes), 1);
   epChart.innerHTML = monthBuckets.map(bucket => `
     <div class="column-chart-col">
       <span class="column-chart-value">${bucket.episodes ? `${bucket.episodes} ep` : ""}</span>
       <div class="column-chart-bar-track">
-        <div class="column-chart-bar monthly-chart-bar" style="height:${Math.max(bucket.minutes ? 8 : 2, Math.round((bucket.minutes / maxMonthMinutes) * 100))}%" title="${formatMinutesAsDuration(bucket.minutes)}"></div>
+        <div class="column-chart-bar monthly-chart-bar" style="height:${Math.max(bucket.episodes ? 8 : 2, Math.round((bucket.episodes / maxMonthEpisodes) * 100))}%" title="${formatMinutesAsDuration(bucket.minutes)}"></div>
       </div>
       <span class="column-chart-label">Week ${bucket.week}</span>
     </div>
   `).join("");
 
   const marathons = Object.values(dayTotals).sort((a, b) => b.count - a.count).slice(0, 5);
-  if (!hasWatchHistory || marathons.length === 0) {
+  if (!watchLog.length || marathons.length === 0) {
     marathonsCard.style.display = "none";
   } else {
     marathonsCard.style.display = "flex";
