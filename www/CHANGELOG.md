@@ -17,9 +17,12 @@ All notable changes to SquashDB are documented in this file.
 
 ### Dashboard and progress
 - Added complete Dashboard sections for On hold, Dropped, and other statuses without limiting each section to four items.
+- Added Statistics totals for all tracked status groups, including On Hold and Dropped.
 - Movies and games now show ratings and status pills instead of misleading percentage progress indicators.
 - Fixed completion handling so episodes, seasons, chapters, and volumes are marked complete when an item is completed.
 - Improved manga and novel progress calculation using chapter or volume totals.
+- Improved Statistics time-left estimates using cached episode runtimes and watched episode data.
+- Fixed Statistics activity charts to use real watch history and provide useful fallback activity for imported items.
 - Updated show-detail completion handling to keep completed item progress consistent.
 
 ### Settings and detail presentation
