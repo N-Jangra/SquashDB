@@ -2241,6 +2241,7 @@ body.compact-mode .dashboard-insights { margin-bottom: 8px; }
 }
 
 .notification-time-input { margin: 8px 0 12px; }
+.notification-time-save { width: 100%; margin-top: 4px; }
 .notification-time-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: 13px; padding: 4px 0 12px; }
 .notification-time-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
 .notification-time-pair label { display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary); font-size: 12px; }
@@ -3523,6 +3524,111 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.45;
+}
+
+/* App-lock setup wizard: step indicator + step panels + action row */
+.wizard-steps {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 20px;
+  padding: 0;
+  list-style: none;
+  counter-reset: wizard-step;
+}
+
+.wizard-steps li {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wizard-steps li::before {
+  counter-increment: wizard-step;
+  content: counter(wizard-step);
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wizard-steps li.active {
+  color: var(--primary);
+}
+
+.wizard-steps li.active::before {
+  background: var(--primary);
+  color: #fff;
+}
+
+.wizard-steps li.done {
+  color: var(--text-secondary);
+}
+
+.wizard-steps li.done::before {
+  content: "✓";
+  background: var(--primary-glow);
+  color: var(--primary);
+}
+
+.wizard-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.wizard-actions .btn {
+  flex: 1;
+}
+
+/* Segmented control (e.g. Backups sub-tabs) */
+.segmented-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 4px 0 20px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+
+.segmented-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 9px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color calc(0.18s * var(--anim-speed)) ease,
+    color calc(0.18s * var(--anim-speed)) ease;
+}
+
+.segmented-tab.active {
+  background: var(--primary);
+  color: #fff;
 }
 
 .manage-screen .settings-section .settings-row-note {

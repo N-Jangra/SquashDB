@@ -1,6 +1,7 @@
-// SquashDB - App Password setup page (manage-app-lock.html)
+// SquashDB - App Password setup wizard (manage-app-lock.html)
 // Depends on globals from app.js/applock.js: state, saveData(), normalizeAppLock(),
-// setAppLockSecret(), setSecurityQuestions(), renderPatternGrid(), serializePattern().
+// setAppLockSecret(), setSecurityQuestions(), setBiometricAppLock(),
+// renderPatternGrid(), serializePattern(), updateAppLockSettingsSummary().
 
 const APP_LOCK_METHOD_CHOICES = [
   { value: "none", label: "None", desc: "No password — the app opens directly." },
@@ -10,8 +11,33 @@ const APP_LOCK_METHOD_CHOICES = [
   { value: "biometric", label: "Biometric", desc: "Use fingerprint, face, or your Android device screen lock." }
 ];
 
+const SETTINGS_URL = "static/pages/settings/settings.html";
+
 let appLockDraftMethod = null;
-let appLockPendingSecret = null; // set once the PIN/pattern/password step is completed
+let appLockPendingSecret = null;  // set once the setup step's secret is confirmed
+let appLockFirstSecret = null;    // first entry, awaiting re-verify match
+
+// ---- Step navigation -------------------------------------------------------
+
+const APP_LOCK_STEPS = ["method", "setup", "questions"];
+
+function showAppLockStep(step) {
+  APP_LOCK_STEPS.forEach(name => {
+    const panel = document.getElementById(`app-lock-step-${name}`);
+    if (panel) panel.style.display = name === step ? "block" : "none";
+  });
+  const stepper = document.getElementById("app-lock-stepper");
+  if (stepper) {
+    const order = APP_LOCK_STEPS.indexOf(step);
+    stepper.querySelectorAll("li").forEach(li => {
+      const idx = APP_LOCK_STEPS.indexOf(li.dataset.step);
+      li.classList.toggle("active", idx === order);
+      li.classList.toggle("done", idx < order);
+    });
+  }
+}
+
+// ---- Step 1: method picker -------------------------------------------------
 
 function renderAppLockMethodPicker() {
   const container = document.getElementById("app-lock-method-picker");
@@ -38,86 +64,220 @@ function renderAppLockMethodPicker() {
     radio.addEventListener("change", (e) => {
       appLockDraftMethod = e.target.value;
       appLockPendingSecret = null;
-      renderAppLockSetupArea();
+      appLockFirstSecret = null;
     });
   });
 
-  renderAppLockSetupArea();
+  showAppLockStep("method");
 }
 
-function renderAppLockSetupArea() {
-  const setupSection = document.getElementById("app-lock-setup-section");
-  const questionsSection = document.getElementById("app-lock-questions-section");
-  const setupArea = document.getElementById("app-lock-setup-area");
-  const setupTitle = document.getElementById("app-lock-setup-title");
-  if (!setupSection || !setupArea) return;
-
-  if (appLockDraftMethod === "none") {
-    setupSection.style.display = "none";
-    questionsSection.style.display = "none";
-    // Selecting "None" takes effect immediately — no secret to set, nothing to confirm.
-    state.preferences.appLock.method = "none";
-    state.preferences.appLock.passwordHash = "";
-    state.preferences.appLock.passwordSalt = "";
-    saveData();
-    updateAppLockSettingsSummary();
+function handleMethodContinue() {
+  if (!appLockDraftMethod) {
+    alert("Pick a lock method to continue.");
     return;
   }
 
+  // "None" applies immediately — no secret, no questions.
+  if (appLockDraftMethod === "none") {
+    normalizeAppLock();
+    state.preferences.appLock.method = "none";
+    state.preferences.appLock.passwordHash = "";
+    state.preferences.appLock.passwordSalt = "";
+    state.preferences.appLock.securityQuestions = [];
+    saveData();
+    updateAppLockSettingsSummary();
+    window.location.href = SETTINGS_URL;
+    return;
+  }
+
+  renderAppLockSetupArea();
+  showAppLockStep("setup");
+}
+
+// ---- Step 2: set up secret (enter + re-verify) -----------------------------
+
+function renderAppLockSetupArea() {
+  const setupArea = document.getElementById("app-lock-setup-area");
+  const setupTitle = document.getElementById("app-lock-setup-title");
+  const continueBtn = document.getElementById("app-lock-setup-continue");
+  if (!setupArea) return;
+
+  appLockPendingSecret = null;
+  appLockFirstSecret = null;
+  if (continueBtn) continueBtn.style.display = "";
+
   if (appLockDraftMethod === "biometric") {
-    setupSection.style.display = "block";
-    questionsSection.style.display = "none";
     setupTitle.textContent = "Biometric Unlock";
     setupArea.innerHTML = `
       <p class="setting-desc">Android will verify your enrolled fingerprint, face, or device credential when the app opens.</p>
       <button type="button" class="btn btn-primary" id="app-lock-enable-biometric" style="width:100%;margin-top:12px;">Enable Biometric Unlock</button>
       <p class="app-lock-error" id="app-lock-biometric-error" style="display:none;"></p>
     `;
-    appLockPendingSecret = "__biometric__";
+    // Biometric enables and exits directly; no re-verify / questions steps.
+    if (continueBtn) continueBtn.style.display = "none";
     document.getElementById("app-lock-enable-biometric").addEventListener("click", enableBiometricAppLock);
     return;
   }
 
-  setupSection.style.display = "block";
-  setupTitle.textContent = appLockDraftMethod === "pin" ? "Set Your PIN"
-    : appLockDraftMethod === "pattern" ? "Draw Your Pattern"
-    : "Set Your Password";
-
   if (appLockDraftMethod === "pattern") {
-    setupArea.innerHTML = `<p class="setting-desc" id="app-lock-pattern-status">Draw a pattern (2+ dots).</p>`;
-    const gridWrap = document.createElement("div");
-    setupArea.appendChild(gridWrap);
-    renderPatternGrid(gridWrap, (cells) => {
-      appLockPendingSecret = serializePattern(cells);
-      document.getElementById("app-lock-pattern-status").textContent = `Pattern captured (${cells.length} dots). You can redraw it or continue to security questions below.`;
-      renderAppLockQuestionsArea();
-    });
-  } else {
-    setupArea.innerHTML = `
-      <div class="form-group">
-        <input type="${appLockDraftMethod === "pin" ? "password" : "text"}" ${appLockDraftMethod === "pin" ? 'inputmode="numeric" pattern="[0-9]*"' : ""} id="app-lock-secret-input" class="form-control" placeholder="${appLockDraftMethod === "pin" ? "New PIN (4+ digits)" : "New password"}">
-      </div>
-      <p class="app-lock-error" id="app-lock-setup-error" style="display:none;"></p>
-    `;
-    const input = document.getElementById("app-lock-secret-input");
-    input.addEventListener("input", () => {
-      const value = input.value;
-      const errorEl = document.getElementById("app-lock-setup-error");
-      const valid = appLockDraftMethod === "pin" ? /^\d{4,}$/.test(value) : value.length >= 4;
-      if (valid) {
-        appLockPendingSecret = value;
-        errorEl.style.display = "none";
-      } else {
-        appLockPendingSecret = null;
-        errorEl.textContent = appLockDraftMethod === "pin" ? "PIN must be at least 4 digits." : "Password must be at least 4 characters.";
-        errorEl.style.display = value ? "block" : "none";
-      }
-      renderAppLockQuestionsArea();
-    });
+    setupTitle.textContent = "Draw Your Pattern";
+    renderPatternSetup(setupArea);
+    return;
   }
 
-  renderAppLockQuestionsArea();
+  // PIN / alphanumeric: enter, then re-enter to confirm.
+  setupTitle.textContent = appLockDraftMethod === "pin" ? "Set Your PIN" : "Set Your Password";
+  const isPin = appLockDraftMethod === "pin";
+  const type = isPin ? "password" : "text";
+  const extra = isPin ? 'inputmode="numeric" pattern="[0-9]*"' : "";
+  setupArea.innerHTML = `
+    <div class="form-group">
+      <label>${isPin ? "New PIN" : "New password"}</label>
+      <input type="${type}" ${extra} id="app-lock-secret-input" class="form-control" placeholder="${isPin ? "New PIN (4+ digits)" : "New password"}">
+    </div>
+    <div class="form-group">
+      <label>${isPin ? "Confirm PIN" : "Confirm password"}</label>
+      <input type="${type}" ${extra} id="app-lock-secret-confirm" class="form-control" placeholder="Re-enter to confirm">
+    </div>
+    <p class="app-lock-error" id="app-lock-setup-error" style="display:none;"></p>
+  `;
+
+  const input = document.getElementById("app-lock-secret-input");
+  const confirm = document.getElementById("app-lock-secret-confirm");
+  const errorEl = document.getElementById("app-lock-setup-error");
+
+  const validate = () => {
+    const value = input.value;
+    const confirmValue = confirm.value;
+    const baseValid = isPin ? /^\d{4,}$/.test(value) : value.length >= 4;
+    appLockPendingSecret = null;
+
+    if (!baseValid) {
+      errorEl.textContent = isPin ? "PIN must be at least 4 digits." : "Password must be at least 4 characters.";
+      errorEl.style.display = value ? "block" : "none";
+      return;
+    }
+    if (!confirmValue) {
+      errorEl.style.display = "none";
+      return;
+    }
+    if (value !== confirmValue) {
+      errorEl.textContent = isPin ? "PINs don't match." : "Passwords don't match.";
+      errorEl.style.display = "block";
+      return;
+    }
+    appLockPendingSecret = value;
+    errorEl.style.display = "none";
+  };
+
+  input.addEventListener("input", validate);
+  confirm.addEventListener("input", validate);
 }
+
+function renderPatternSetup(setupArea) {
+  // Two-phase pattern: draw once, then redraw to confirm it matches.
+  setupArea.innerHTML = `<p class="setting-desc" id="app-lock-pattern-status">Draw a pattern (2+ dots).</p>`;
+  const gridWrap = document.createElement("div");
+  setupArea.appendChild(gridWrap);
+
+  const statusEl = () => document.getElementById("app-lock-pattern-status");
+
+  const startConfirmPhase = () => {
+    statusEl().textContent = "Great — now draw the same pattern again to confirm.";
+    gridWrap.innerHTML = "";
+    renderPatternGrid(gridWrap, (cells) => {
+      const candidate = serializePattern(cells);
+      if (candidate === appLockFirstSecret) {
+        appLockPendingSecret = candidate;
+        statusEl().textContent = `Pattern confirmed (${cells.length} dots). Tap Continue.`;
+      } else {
+        appLockPendingSecret = null;
+        appLockFirstSecret = null;
+        statusEl().textContent = "Patterns didn't match. Start over — draw your pattern.";
+        startDrawPhase();
+      }
+    });
+  };
+
+  const startDrawPhase = () => {
+    appLockFirstSecret = null;
+    appLockPendingSecret = null;
+    gridWrap.innerHTML = "";
+    renderPatternGrid(gridWrap, (cells) => {
+      appLockFirstSecret = serializePattern(cells);
+      startConfirmPhase();
+    });
+  };
+
+  startDrawPhase();
+}
+
+function handleSetupContinue() {
+  if (appLockDraftMethod === "biometric") return; // handled by its own button
+  if (!appLockPendingSecret) {
+    alert(appLockDraftMethod === "pattern"
+      ? "Draw and confirm your pattern first."
+      : "Enter and confirm your PIN/password first.");
+    return;
+  }
+  renderAppLockQuestionsArea();
+  showAppLockStep("questions");
+}
+
+// ---- Step 3: security questions (skippable) --------------------------------
+
+function renderAppLockQuestionsArea() {
+  const questionsArea = document.getElementById("app-lock-questions-area");
+  if (!questionsArea) return;
+  if (questionsArea.childElementCount > 0) return; // keep answers already typed
+
+  const existing = state.preferences.appLock.securityQuestions || [];
+  questionsArea.innerHTML = "";
+  for (let i = 0; i < 3; i++) {
+    const group = document.createElement("div");
+    group.className = "form-group";
+    group.innerHTML = `
+      <label>Question ${i + 1}</label>
+      <input type="text" class="form-control app-lock-question-input" data-index="${i}" placeholder="e.g. What was your first pet's name?" value="${existing[i]?.question || ""}">
+      <input type="text" class="form-control app-lock-answer-input" data-index="${i}" placeholder="Answer" style="margin-top:6px;">
+    `;
+    questionsArea.appendChild(group);
+  }
+}
+
+async function commitAppLock(includeQuestions) {
+  if (!appLockPendingSecret) {
+    alert("Please finish setting your PIN, pattern, or password first.");
+    showAppLockStep("setup");
+    return;
+  }
+
+  let qaPairs = [];
+  if (includeQuestions) {
+    const questions = Array.from(document.querySelectorAll(".app-lock-question-input"))
+      .sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index))
+      .map(el => el.value.trim());
+    const answers = Array.from(document.querySelectorAll(".app-lock-answer-input"))
+      .sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index))
+      .map(el => el.value);
+
+    if (questions.some(q => !q) || answers.some(a => !a.trim())) {
+      alert("Please fill in all 3 security questions and answers, or use Skip.");
+      return;
+    }
+    qaPairs = questions.map((question, i) => ({ question, answer: answers[i] }));
+  }
+
+  await setAppLockSecret(appLockDraftMethod, appLockPendingSecret);
+  await setSecurityQuestions(qaPairs); // empty array clears questions on skip
+
+  alert(includeQuestions ? "App password set successfully." : "App password set. No recovery questions — keep it safe.");
+  appLockPendingSecret = null;
+  updateAppLockSettingsSummary();
+  window.location.href = SETTINGS_URL;
+}
+
+// ---- Biometric -------------------------------------------------------------
 
 async function enableBiometricAppLock() {
   const biometric = window.Capacitor?.Plugins?.Biometric;
@@ -148,73 +308,28 @@ async function enableBiometricAppLock() {
   }
 
   setBiometricAppLock();
+  updateAppLockSettingsSummary();
   alert("Biometric unlock enabled.");
-  window.location.href = "settings.html";
+  window.location.href = SETTINGS_URL;
 }
 
-function renderAppLockQuestionsArea() {
-  const questionsSection = document.getElementById("app-lock-questions-section");
-  const questionsArea = document.getElementById("app-lock-questions-area");
-  if (!questionsSection || !questionsArea) return;
+// ---- Wiring ----------------------------------------------------------------
 
-  if (!appLockPendingSecret) {
-    questionsSection.style.display = "none";
-    return;
-  }
+function setupAppLockWizard() {
+  const wired = document.getElementById("app-lock-stepper");
+  if (wired && wired.dataset.bound) return;
+  if (wired) wired.dataset.bound = "true";
 
-  questionsSection.style.display = "block";
-  if (questionsArea.childElementCount > 0) return; // don't wipe answers already typed
-
-  const existing = state.preferences.appLock.securityQuestions;
-  questionsArea.innerHTML = "";
-  for (let i = 0; i < 3; i++) {
-    const group = document.createElement("div");
-    group.className = "form-group";
-    group.innerHTML = `
-      <label>Question ${i + 1}</label>
-      <input type="text" class="form-control app-lock-question-input" data-index="${i}" placeholder="e.g. What was your first pet's name?" value="${existing[i]?.question || ""}">
-      <input type="text" class="form-control app-lock-answer-input" data-index="${i}" placeholder="Answer" style="margin-top:6px;">
-    `;
-    questionsArea.appendChild(group);
-  }
-}
-
-function setupAppLockSaveButton() {
-  const saveBtn = document.getElementById("app-lock-save-btn");
-  if (!saveBtn || saveBtn.dataset.bound) return;
-  saveBtn.dataset.bound = "true";
-
-  saveBtn.addEventListener("click", async () => {
-    if (!appLockPendingSecret) {
-      alert("Please finish setting your PIN, pattern, or password first.");
-      return;
+  document.getElementById("app-lock-method-continue")?.addEventListener("click", handleMethodContinue);
+  document.getElementById("app-lock-setup-back")?.addEventListener("click", () => showAppLockStep("method"));
+  document.getElementById("app-lock-setup-continue")?.addEventListener("click", handleSetupContinue);
+  document.getElementById("app-lock-questions-back")?.addEventListener("click", () => showAppLockStep("setup"));
+  document.getElementById("app-lock-skip-btn")?.addEventListener("click", () => {
+    if (window.confirm("Skip security questions? You won't be able to recover a forgotten password.")) {
+      commitAppLock(false);
     }
-
-    if (appLockDraftMethod === "biometric") {
-      await enableBiometricAppLock();
-      return;
-    }
-
-    const questions = Array.from(document.querySelectorAll(".app-lock-question-input"))
-      .sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index))
-      .map(el => el.value.trim());
-    const answers = Array.from(document.querySelectorAll(".app-lock-answer-input"))
-      .sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index))
-      .map(el => el.value);
-
-    if (questions.some(q => !q) || answers.some(a => !a.trim())) {
-      alert("Please fill in all 3 security questions and answers.");
-      return;
-    }
-
-    await setAppLockSecret(appLockDraftMethod, appLockPendingSecret);
-    await setSecurityQuestions(questions.map((question, i) => ({ question, answer: answers[i] })));
-
-    alert("App password set successfully.");
-    appLockPendingSecret = null;
-    updateAppLockSettingsSummary();
-    window.location.href = "settings.html";
   });
+  document.getElementById("app-lock-save-btn")?.addEventListener("click", () => commitAppLock(true));
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -223,7 +338,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const tryInit = () => {
     if (!document.getElementById("app-lock-method-picker")) return;
     renderAppLockMethodPicker();
-    setupAppLockSaveButton();
+    setupAppLockWizard();
+    showAppLockStep("method");
   };
   // app.js may still be mid-unlock-gate on this page; wait for app-unlocked if so.
   if (typeof appLockShouldBlockPage === "function" && appLockShouldBlockPage()) {

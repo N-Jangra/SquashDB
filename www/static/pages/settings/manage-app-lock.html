@@ -19,19 +19,42 @@
     <main>
       <section class="tab-content active">
         <p class="manage-intro">Locks the app behind a PIN, pattern, or password when it's opened. This deters casual snooping only — it does not encrypt your data.</p>
-        <div class="settings-section">
+
+        <ol class="wizard-steps" id="app-lock-stepper" aria-hidden="true">
+          <li data-step="method" class="active">Method</li>
+          <li data-step="setup">Set up</li>
+          <li data-step="questions">Security</li>
+        </ol>
+
+        <!-- Step 1: Lock method -->
+        <div class="wizard-step active" id="app-lock-step-method" data-step="method">
           <h4 class="settings-section-title">Lock method</h4>
           <div id="app-lock-method-picker" class="settings-section-inner"></div>
+          <div class="wizard-actions">
+            <button type="button" class="btn btn-primary" id="app-lock-method-continue">Continue</button>
+          </div>
         </div>
-        <div class="settings-section" id="app-lock-setup-section" style="display:none;">
+
+        <!-- Step 2: Set up (enter + re-verify) -->
+        <div class="wizard-step" id="app-lock-step-setup" data-step="setup" style="display:none;">
           <h4 class="settings-section-title" id="app-lock-setup-title">Set Your Secret</h4>
           <div id="app-lock-setup-area"></div>
+          <div class="wizard-actions">
+            <button type="button" class="btn btn-secondary" id="app-lock-setup-back">Back</button>
+            <button type="button" class="btn btn-primary" id="app-lock-setup-continue">Continue</button>
+          </div>
         </div>
-        <div class="settings-section" id="app-lock-questions-section" style="display:none;">
+
+        <!-- Step 3: Security questions (skippable, recommended) -->
+        <div class="wizard-step" id="app-lock-step-questions" data-step="questions" style="display:none;">
           <h4 class="settings-section-title">Security Questions</h4>
-          <p class="setting-desc">Required so you can reset your password if you forget it. All 3 must be answered.</p>
+          <p class="setting-desc">Recommended so you can reset your password if you forget it. You can skip this, but then a forgotten password can't be recovered.</p>
           <div id="app-lock-questions-area"></div>
-          <button type="button" class="btn btn-primary" id="app-lock-save-btn" style="width:100%;margin-top:12px;">Save</button>
+          <div class="wizard-actions">
+            <button type="button" class="btn btn-secondary" id="app-lock-questions-back">Back</button>
+            <button type="button" class="btn btn-secondary" id="app-lock-skip-btn">Skip</button>
+            <button type="button" class="btn btn-primary" id="app-lock-save-btn">Save</button>
+          </div>
         </div>
       </section>
     </main>
