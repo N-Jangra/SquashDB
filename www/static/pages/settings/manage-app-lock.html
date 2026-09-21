@@ -9,16 +9,18 @@
   <link rel="stylesheet" href="static/index.css">
   <script src="core/logcat.js"></script><script src="lucide.min.js"></script>
 </head>
-<body>
+<body class="manage-screen">
   <div id="app-container">
+    <header class="settings-ios-header">
+      <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+      <h1>App Password</h1>
+      <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+    </header>
     <main>
       <section class="tab-content active">
-        <div class="show-detail-topbar">
-  <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
-</div>
-<div class="settings-section">
-          <h4 class="settings-section-title">App Password</h4>
-          <p class="setting-desc">Locks the app behind a PIN, pattern, or password when it's opened. This deters casual snooping only — it does not encrypt your data.</p>
+        <p class="manage-intro">Locks the app behind a PIN, pattern, or password when it's opened. This deters casual snooping only — it does not encrypt your data.</p>
+        <div class="settings-section">
+          <h4 class="settings-section-title">Lock method</h4>
           <div id="app-lock-method-picker" class="settings-section-inner"></div>
         </div>
         <div class="settings-section" id="app-lock-setup-section" style="display:none;">
@@ -30,9 +32,6 @@
           <p class="setting-desc">Required so you can reset your password if you forget it. All 3 must be answered.</p>
           <div id="app-lock-questions-area"></div>
           <button type="button" class="btn btn-primary" id="app-lock-save-btn" style="width:100%;margin-top:12px;">Save</button>
-        </div>
-        <div class="page-back-actions">
-          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
         </div>
       </section>
     </main>

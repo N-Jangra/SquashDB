@@ -10,27 +10,21 @@
   <script src="core/logcat.js"></script>
   <script src="lucide.min.js"></script>
 </head>
-<body>
+<body class="info-screen">
   <div id="app-container">
+    <header class="settings-ios-header">
+      <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+      <h1>Changelog</h1>
+      <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+    </header>
     <main>
       <section class="tab-content active">
-        <div class="show-detail-topbar">
-          <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
-        </div>
-
-        <div class="settings-page-header">
-          <h2>Changelog</h2>
-          <p>What's new in each version of SquashDB.</p>
-        </div>
+        <p class="info-intro">What's new in each version of SquashDB.</p>
 
         <div class="settings-section">
           <div id="changelog-content" class="changelog-content">
             <p class="settings-row-note">Loading changelog…</p>
           </div>
-        </div>
-
-        <div class="page-back-actions">
-          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
         </div>
       </section>
     </main>
@@ -39,8 +33,9 @@
   <script>
     // Minimal Markdown → HTML for CHANGELOG.md's own simple structure only:
     // "# " / "## " / "### " headers, "- " bullet lists, blank-line-separated
-    // paragraphs. Not a general Markdown parser — deliberately narrow so it
-    // has no injection surface beyond escaping raw text.
+    // paragraphs. Version headings become an accordion. Not a general
+    // Markdown parser — deliberately narrow so it has no injection surface
+    // beyond escaping raw text.
     function escapeHtml(str) {
       const div = document.createElement("div");
       div.textContent = str;
@@ -51,11 +46,21 @@
       const lines = markdown.split("\n");
       let html = "";
       let inList = false;
+      let versionOpen = false;
+      let versionCount = 0;
 
       const closeList = () => {
         if (inList) {
           html += "</ul>";
           inList = false;
+        }
+      };
+
+      const closeVersion = () => {
+        closeList();
+        if (versionOpen) {
+          html += "</div></details>";
+          versionOpen = false;
         }
       };
 
@@ -65,8 +70,17 @@
           closeList();
           html += `<h3>${escapeHtml(line.replace(/^###\s+/, ""))}</h3>`;
         } else if (/^##\s+/.test(line)) {
-          closeList();
-          html += `<h2>${escapeHtml(line.replace(/^##\s+/, ""))}</h2>`;
+          const heading = line.replace(/^##\s+/, "");
+          if (/^\[?\d+\.\d+/.test(heading)) {
+            closeVersion();
+            const label = heading.replace(/^\[|\]$/g, "");
+            html += `<details class="changelog-version"${versionCount === 0 ? " open" : ""}><summary><span>${escapeHtml(label)}</span><span class="changelog-version-chevron" aria-hidden="true">⌄</span></summary><div class="changelog-version-body">`;
+            versionOpen = true;
+            versionCount += 1;
+          } else {
+            closeList();
+            html += `<h2>${escapeHtml(heading)}</h2>`;
+          }
         } else if (/^#\s+/.test(line)) {
           closeList();
           html += `<h2>${escapeHtml(line.replace(/^#\s+/, ""))}</h2>`;
@@ -83,7 +97,7 @@
           html += `<p>${escapeHtml(line)}</p>`;
         }
       });
-      closeList();
+      closeVersion();
       return html;
     }
 
@@ -95,6 +109,14 @@
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const text = await res.text();
         contentEl.innerHTML = renderChangelogMarkdown(text);
+        contentEl.querySelectorAll(".changelog-version").forEach(selected => {
+          selected.addEventListener("toggle", () => {
+            if (!selected.open) return;
+            contentEl.querySelectorAll(".changelog-version").forEach(other => {
+              if (other !== selected) other.open = false;
+            });
+          });
+        });
       } catch (err) {
         console.warn("Could not load changelog", err);
         contentEl.innerHTML = `<p class="settings-row-note">Couldn't load the changelog file.</p>`;

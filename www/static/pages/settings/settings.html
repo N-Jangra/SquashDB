@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
 <base href="../../../"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Settings</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="static/index.css"><script src="core/logcat.js"></script><script src="lucide.min.js"></script></head>
-<body><div id="app-container">
+<body class="settings-screen"><div id="app-container">
+<header class="settings-ios-header">
+  <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/main/dashboard.html">‹ Back</button>
+  <h1>Settings</h1>
+  <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+</header>
 <main><section id="tab-settings" class="tab-content active">
-<div class="settings-page-header">
+<div class="settings-page-header settings-main-title">
   <h2>Settings</h2>
 </div>
 <div class="settings-section">
@@ -22,7 +27,7 @@
       <div class="settings-row-icon"><i data-lucide="type"></i></div>
       <div class="settings-row-body">
         <label>Font</label>
-        <span>Change the font used throughout the app. Some options need a connection the first time.</span>
+        <span>Change the font used throughout the app.</span>
       </div>
       <div class="settings-row-value"><span id="ui-font-picker-value">Inter (default)</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
@@ -36,24 +41,23 @@
     </button>
     <button type="button" class="settings-row settings-row-picker" id="category-colors-picker">
       <div class="settings-row-icon"><i data-lucide="swatch-book"></i></div>
-      <div class="settings-row-body"><label>Category Colors</label><span>Customize the accent color used by each tracking category.</span></div>
+      <div class="settings-row-body"><label>Category Colors</label><span>Customize accent color for categories.</span></div>
       <div class="settings-row-value"><span>Customize</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" data-pref="highContrast">
+    <button type="button" class="settings-row settings-row-picker" data-pref="highContrast" data-direct-toggle="true">
       <div class="settings-row-icon"><i data-lucide="contrast"></i></div>
-      <div class="settings-row-body"><label>Accessible Contrast</label><span>Increase text, border, and focus contrast for easier reading.</span></div>
-      <div class="settings-row-value"><span>Standard contrast</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+      <div class="settings-row-body"><label>Accessible Contrast</label><span>Increase contrast for easier reading.</span></div>
+      <div class="settings-row-value"><span>Standard</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" data-pref="reducedMotion">
+    <button type="button" class="settings-row settings-row-picker" data-pref="reducedMotion" data-direct-toggle="true">
       <div class="settings-row-icon"><i data-lucide="accessibility"></i></div>
-      <div class="settings-row-body"><label>Reduced Motion</label><span>Minimize transitions, shimmer, and animated movement.</span></div>
-      <div class="settings-row-value"><span>Allow motion</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+      <div class="settings-row-body"><label>Reduced Motion</label><span>Minimize transitions and animated movement.</span></div>
+      <div class="settings-row-value"><span>Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
     <button type="button" class="settings-row settings-row-picker" id="animation-speed-picker" data-pref="animationSpeed">
       <div class="settings-row-icon"><i data-lucide="zap"></i></div>
       <div class="settings-row-body">
         <label>Animation Speed</label>
-        <span>Controls the speed of transitions and animations throughout the app.</span>
       </div>
       <div class="settings-row-value"><span id="animation-speed-picker-value">Normal</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
@@ -68,7 +72,7 @@
       <div class="settings-row-icon"><i data-lucide="app-window"></i></div>
       <div class="settings-row-body">
         <label>App Icons and Names</label>
-        <span>Change the app icon and name shown on your home screen.</span>
+        <span>Change icon and name on home screen.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -76,7 +80,6 @@
       <div class="settings-row-icon"><i data-lucide="layout-panel-top"></i></div>
       <div class="settings-row-body">
         <label>Bottom Menu Icons</label>
-        <span>Customize the navigation bar icons.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -84,7 +87,6 @@
       <div class="settings-row-icon"><i data-lucide="layout-panel-left"></i></div>
       <div class="settings-row-body">
         <label>Bottom Bar Layout</label>
-        <span>Reorder tabs and choose which ones appear.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -100,34 +102,29 @@
       <div class="settings-row-body"><label>Dashboard View</label><span>Show items as a list or a poster grid.</span></div>
       <div class="settings-row-value"><span id="dashboard-view-picker-value">List</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" data-pref="navigationSheet">
-      <div class="settings-row-icon"><i data-lucide="panel-bottom"></i></div>
-      <div class="settings-row-body"><label>Navigation Style</label><span>Open navigation in a mobile bottom sheet or navigate directly.</span></div>
-      <div class="settings-row-value"><span>Direct navigation</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
-    </button>
     <button type="button" class="settings-row settings-row-picker" data-pref="oneHandedMode">
       <div class="settings-row-icon"><i data-lucide="hand"></i></div>
-      <div class="settings-row-body"><label>One-handed Layout</label><span>Move the app shell toward the hand you use most.</span></div>
+      <div class="settings-row-body"><label>One-handed Layout</label></div>
       <div class="settings-row-value"><span>Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" data-pref="tabletTwoColumn">
+    <button type="button" class="settings-row settings-row-picker" data-pref="tabletTwoColumn" data-direct-toggle="true">
       <div class="settings-row-icon"><i data-lucide="columns-2"></i></div>
-      <div class="settings-row-body"><label>Tablet Layout</label><span>Use two columns on wider screens for faster browsing.</span></div>
+      <div class="settings-row-body"><label>Tablet Layout</label></div>
       <div class="settings-row-value"><span>Two columns</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" data-pref="compactMode">
+    <button type="button" class="settings-row settings-row-picker" data-pref="compactMode" data-direct-toggle="true">
       <div class="settings-row-icon"><i data-lucide="list-collapse"></i></div>
-      <div class="settings-row-body"><label>Compact Mode</label><span>Fit more tracked items on screen in large watchlists.</span></div>
+      <div class="settings-row-body"><label>Compact Mode</label></div>
       <div class="settings-row-value"><span>Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
     <button type="button" class="settings-row settings-row-picker" id="dashboard-row-actions-picker" data-pref="dashboardRowActions">
       <div class="settings-row-icon"><i data-lucide="mouse-pointer-click"></i></div>
-      <div class="settings-row-body"><label>Dashboard Row Actions</label><span>Choose how to edit or delete items.</span></div>
+      <div class="settings-row-body"><label>Row Actions</label></div>
       <div class="settings-row-value"><span id="dashboard-row-actions-picker-value">3-dot menu</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
     <button type="button" class="settings-row settings-row-picker" id="rating-format-picker" data-pref="ratingFormat">
       <div class="settings-row-icon"><i data-lucide="star"></i></div>
-      <div class="settings-row-body"><label>Rating Format</label><span>Choose how ratings are displayed.</span></div>
+      <div class="settings-row-body"><label>Rating Format</label></div>
       <div class="settings-row-value"><span id="rating-format-picker-value">5 stars</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
   </div>
@@ -141,7 +138,6 @@
       <div class="settings-row-icon"><i data-lucide="list-checks"></i></div>
       <div class="settings-row-body">
         <label>Tracking Choices</label>
-        <span>Choose which lists show up and create new ones.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -149,7 +145,6 @@
       <div class="settings-row-icon"><i data-lucide="arrow-down-up"></i></div>
       <div class="settings-row-body">
         <label>Category Order</label>
-        <span>Drag to reorder your enabled lists.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -168,11 +163,10 @@
       </div>
       <div class="settings-row-value"><span id="metadata-mode-picker-value">Online</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" id="metadata-thumbnails-picker" data-pref="metadataThumbnails">
+    <button type="button" class="settings-row settings-row-picker" id="metadata-thumbnails-picker" data-pref="metadataThumbnails" data-direct-toggle="true">
       <div class="settings-row-icon"><i data-lucide="image"></i></div>
       <div class="settings-row-body">
         <label>Metadata Thumbnails</label>
-        <span>Turn thumbnail fetching and display on or off.</span>
       </div>
       <div class="settings-row-value"><span id="metadata-thumbnails-picker-value">On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
@@ -180,7 +174,6 @@
       <div class="settings-row-icon"><i data-lucide="server"></i></div>
       <div class="settings-row-body">
         <label>Metadata Sources</label>
-        <span>Enable, reorder, or add custom lookup sources.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -195,7 +188,6 @@
       <div class="settings-row-icon"><i data-lucide="folder-sync"></i></div>
       <div class="settings-row-body">
         <label>Folder Sync Delay</label>
-        <span>How long to wait after a change before syncing to the backup folder.</span>
       </div>
       <div class="settings-row-value"><span id="folder-sync-delay-picker-value">30 seconds</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
@@ -203,7 +195,6 @@
       <div class="settings-row-icon"><i data-lucide="database-backup"></i></div>
       <div class="settings-row-body">
         <label>Backups &amp; Restore</label>
-        <span>Export your data or restore from a backup file.</span>
       </div>
       <i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
@@ -229,32 +220,32 @@
 </div>
 <div class="settings-section">
   <div class="settings-list">
-    <button type="button" class="settings-row settings-row-picker" id="notification-permission">
+    <button type="button" class="settings-row settings-row-picker" id="notification-permission" data-inline-toggle="true">
       <div class="settings-row-icon"><i data-lucide="bell"></i></div><div class="settings-row-body"><label>Notifications</label><span>Turn SquashDB reminders on or off.</span></div><div class="settings-row-value"><span id="notification-permission-status">Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
     <button type="button" class="settings-row settings-row-picker" id="notification-test">
-      <div class="settings-row-icon"><i data-lucide="bell-ring"></i></div><div class="settings-row-body"><label>Test Notification</label><span>Send a test notification to confirm Android permission is working.</span></div><div class="settings-row-value"><span>Test</span><i data-lucide="send" class="settings-row-chevron"></i></div>
+      <div class="settings-row-icon"><i data-lucide="bell-ring"></i></div><div class="settings-row-body"><label>Test Notification</label></div><div class="settings-row-value"><span>Test</span><i data-lucide="send" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" id="notification-episode-reminders">
-      <div class="settings-row-icon"><i data-lucide="tv-2"></i></div><div class="settings-row-body"><label>Episode Reminders</label><span>Remind you about upcoming episodes.</span></div><div class="settings-row-value"><span id="notification-episode-reminders-status">On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    <button type="button" class="settings-row settings-row-picker" id="notification-episode-reminders" data-inline-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="tv-2"></i></div><div class="settings-row-body"><label>Episode Reminders</label></div><div class="settings-row-value"><span id="notification-episode-reminders-status">On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" id="notification-backup-reminders">
-      <div class="settings-row-icon"><i data-lucide="database-backup"></i></div><div class="settings-row-body"><label>Backup Reminders</label><span>Notify when a scheduled encrypted backup needs attention.</span></div><div class="settings-row-value"><span id="notification-backup-reminders-status">Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    <button type="button" class="settings-row settings-row-picker" id="notification-backup-reminders" data-inline-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="database-backup"></i></div><div class="settings-row-body"><label>Backup Reminders</label></div><div class="settings-row-value"><span id="notification-backup-reminders-status">Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" id="notification-cloud-failures">
-      <div class="settings-row-icon"><i data-lucide="cloud-alert"></i></div><div class="settings-row-body"><label>Cloud Sync Failures</label><span>Notify when optional cloud backup sync fails.</span></div><div class="settings-row-value"><span id="notification-cloud-failures-status">On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    <button type="button" class="settings-row settings-row-picker" id="notification-cloud-failures" data-inline-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="cloud-alert"></i></div><div class="settings-row-body"><label>Cloud Sync Failures</label></div><div class="settings-row-value"><span id="notification-cloud-failures-status">On</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" id="notification-unfinished-items">
-      <div class="settings-row-icon"><i data-lucide="list-todo"></i></div><div class="settings-row-body"><label>Unfinished Items</label><span>Periodic reminders for items still in progress.</span></div><div class="settings-row-value"><span id="notification-unfinished-items-status">Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    <button type="button" class="settings-row settings-row-picker" id="notification-unfinished-items" data-inline-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="list-todo"></i></div><div class="settings-row-body"><label>Unfinished Items</label></div><div class="settings-row-value"><span id="notification-unfinished-items-status">Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
     <button type="button" class="settings-row settings-row-picker" id="notification-reminder-time">
-      <div class="settings-row-icon"><i data-lucide="alarm-clock"></i></div><div class="settings-row-body"><label>Custom Reminder Time</label><span>Preferred time for daily unfinished-item reminders.</span></div><div class="settings-row-value"><span id="notification-reminder-time-status">09:00</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+      <div class="settings-row-icon"><i data-lucide="alarm-clock"></i></div><div class="settings-row-body"><label>Custom Reminder Time</label></div><div class="settings-row-value"><span id="notification-reminder-time-status">09:00</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" id="notification-quiet-hours">
-      <div class="settings-row-icon"><i data-lucide="moon-star"></i></div><div class="settings-row-body"><label>Quiet Hours</label><span>Do not send reminders between your selected hours.</span></div><div class="settings-row-value"><span id="notification-quiet-hours-status">Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+    <button type="button" class="settings-row settings-row-picker" id="notification-quiet-hours" data-inline-toggle="true">
+      <div class="settings-row-icon"><i data-lucide="moon-star"></i></div><div class="settings-row-body"><label>Quiet Hours</label></div><div class="settings-row-value"><span id="notification-quiet-hours-status">Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
     <button type="button" class="settings-row settings-row-picker" id="notification-snooze">
-      <div class="settings-row-icon"><i data-lucide="alarm-clock-plus"></i></div><div class="settings-row-body"><label>Remind Me Later</label><span>Default delay used by notification snooze actions.</span></div><div class="settings-row-value"><span id="notification-snooze-status">1 hour</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
+      <div class="settings-row-icon"><i data-lucide="alarm-clock-plus"></i></div><div class="settings-row-body"><label>Remind Me Later</label></div><div class="settings-row-value"><span id="notification-snooze-status">1 hour</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
   </div>
 </div>
@@ -275,7 +266,7 @@
       <div class="settings-row-icon"><i data-lucide="image"></i></div>
       <div class="settings-row-body">
         <label>Clear Image Cache</label>
-        <span>Remove cached thumbnails and fonts. Images may load again from the network.</span>
+        <span>Remove cached thumbnails.</span>
       </div>
       <div class="settings-row-value"><span>Temporary</span><i data-lucide="trash-2" class="settings-row-chevron"></i></div>
     </button>
@@ -283,15 +274,13 @@
       <div class="settings-row-icon"><i data-lucide="gauge"></i></div>
       <div class="settings-row-body">
         <label>Limit Image Cache</label>
-        <span>Choose how many cached images to keep on the device.</span>
       </div>
       <div class="settings-row-value"><span id="image-cache-limit-status">250 images</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
-    <button type="button" class="settings-row settings-row-picker" id="background-backups-toggle">
+    <button type="button" class="settings-row settings-row-picker" id="background-backups-toggle" data-inline-toggle="true">
       <div class="settings-row-icon"><i data-lucide="clock"></i></div>
       <div class="settings-row-body">
         <label>Background Encrypted Backups</label>
-        <span>Use Android WorkManager to create an encrypted snapshot about once per day.</span>
       </div>
       <div class="settings-row-value"><span id="background-backups-status">Off</span><i data-lucide="chevron-right" class="settings-row-chevron"></i></div>
     </button>
@@ -299,9 +288,8 @@
       <div class="settings-row-icon"><i data-lucide="trash-2"></i></div>
       <div class="settings-row-body">
         <label>Clear All Temporary Cache</label>
-        <span>Clear metadata, thumbnails, fonts, and WebView HTTP cache. User data and backups stay safe.</span>
       </div>
-      <div class="settings-row-value"><span>Temporary</span><i data-lucide="trash-2" class="settings-row-chevron"></i></div>
+      <div class="settings-row-value"><span>Clear</span><i data-lucide="trash-2" class="settings-row-chevron"></i></div>
     </button>
   </div>
 </div>
@@ -311,19 +299,19 @@
 <div class="settings-section">
   <div class="settings-list">
     <a class="settings-row settings-row-link" href="static/pages/info/app-info.html">
-      <div class="settings-row-icon"><i data-lucide="info"></i></div><div class="settings-row-body"><label>App Info</label><span>What SquashDB is and how it works.</span></div><i data-lucide="chevron-right" class="settings-row-chevron"></i>
+      <div class="settings-row-icon"><i data-lucide="info"></i></div><div class="settings-row-body"><label>App Info</label></div><i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
     <a class="settings-row settings-row-link" href="static/pages/info/usage-guide.html">
-      <div class="settings-row-icon"><i data-lucide="book-open-check"></i></div><div class="settings-row-body"><label>Usage Guide</label><span>How to use each tab and setting.</span></div><i data-lucide="chevron-right" class="settings-row-chevron"></i>
+      <div class="settings-row-icon"><i data-lucide="book-open-check"></i></div><div class="settings-row-body"><label>Usage Guide</label></div><i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
     <a class="settings-row settings-row-link" href="static/pages/info/logcat.html">
-      <div class="settings-row-icon"><i data-lucide="terminal"></i></div><div class="settings-row-body"><label>Logcat</label><span>View app logs, filter by level.</span></div><i data-lucide="chevron-right" class="settings-row-chevron"></i>
+      <div class="settings-row-icon"><i data-lucide="terminal"></i></div><div class="settings-row-body"><label>Logcat</label></div><i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
     <a class="settings-row settings-row-link" href="static/pages/info/changelog.html">
-      <div class="settings-row-icon"><i data-lucide="history"></i></div><div class="settings-row-body"><label>Changelog</label><span>What's new in each version.</span></div><i data-lucide="chevron-right" class="settings-row-chevron"></i>
+      <div class="settings-row-icon"><i data-lucide="history"></i></div><div class="settings-row-body"><label>Changelog</label></div><i data-lucide="chevron-right" class="settings-row-chevron"></i>
     </a>
     <a class="settings-row settings-row-link" href="https://github.com/N-Jangra/SquashDB" target="_blank" rel="noopener">
-      <div class="settings-row-icon"><i data-lucide="code-2"></i></div><div class="settings-row-body"><label>GitHub</label><span>View the source code and report issues.</span></div><i data-lucide="external-link" class="settings-row-chevron"></i>
+      <div class="settings-row-icon"><i data-lucide="code-2"></i></div><div class="settings-row-body"><label>GitHub</label></div><i data-lucide="external-link" class="settings-row-chevron"></i>
     </a>
   </div>
 </div>

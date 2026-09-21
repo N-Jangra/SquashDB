@@ -9,15 +9,17 @@
   <link rel="stylesheet" href="static/index.css">
   <script src="core/logcat.js"></script><script src="lucide.min.js"></script>
 </head>
-<body>
+<body class="manage-screen">
   <div id="app-container">
+    <header class="settings-ios-header">
+      <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+      <h1>Backups</h1>
+      <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+    </header>
     <main>
       <section class="tab-content active">
-        <div class="show-detail-topbar">
-  <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
-</div>
+        <h4 class="settings-section-title">Manage backups and restore</h4>
         <div class="settings-section">
-          <h4 class="settings-section-title">Manage backups and restore</h4>
           <p class="settings-row-note" id="backup-folder-path-display">No backup folder selected yet.</p>
           <p class="settings-row-note" id="backup-folder-status-notice" style="display:none; color: var(--danger);">
             Android storage permission for this folder is missing or revoked. Your local database is safe, but backups cannot run until you select the folder again.
@@ -34,8 +36,8 @@
           </div>
           <div class="backup-progress" id="backup-progress" style="display:none;" aria-live="polite"><div class="backup-progress-header"><span id="backup-progress-label">Preparing backup…</span><span id="backup-progress-value">0%</span></div><div class="backup-progress-track"><span id="backup-progress-bar"></span></div></div>
         </div>
+        <h4 class="settings-section-title">Backup Status</h4>
         <div class="settings-section backup-status-card" id="backup-status-card">
-          <h4 class="settings-section-title">Backup Status</h4>
           <div class="backup-status-grid">
             <div><span>Last backup</span><strong id="backup-last-date">Never</strong></div>
             <div><span>Backup size</span><strong id="backup-total-size">—</strong></div>
@@ -44,18 +46,18 @@
           </div>
           <div class="backup-health-row"><span id="backup-health-status">Health check not run.</span><button class="btn btn-secondary" id="backup-health-check"><i data-lucide="heart-pulse"></i> Check health</button></div>
         </div>
+        <h4 class="settings-section-title">Storage Usage</h4>
         <div class="settings-section">
-          <h4 class="settings-section-title">Storage Usage</h4>
           <div class="backup-storage-usage"><div><span>Database</span><strong id="storage-database-size">Calculating…</strong></div><div><span>Image cache</span><strong id="storage-image-cache-size">Calculating…</strong></div><div><span>Metadata cache</span><strong id="storage-metadata-cache-size">Calculating…</strong></div></div>
         </div>
+        <h4 class="settings-section-title">Backup Recovery Center</h4>
         <div class="settings-section">
-          <h4 class="settings-section-title">Backup Recovery Center</h4>
           <p class="settings-row-note" id="backup-recovery-status">Checking available backups...</p>
           <button class="btn btn-secondary" id="backup-recovery-refresh"><i data-lucide="refresh-cw"></i> Refresh Backup List</button>
           <div id="backup-recovery-list" class="settings-list"></div>
         </div>
+        <h4 class="settings-section-title">Optional Cloud Sync</h4>
         <div class="settings-section">
-          <h4 class="settings-section-title">Optional Cloud Sync</h4>
           <p class="settings-row-note">Uploads only encrypted <code>.sqdbe</code> backups to a WebDAV-compatible HTTPS URL. Your cloud provider must allow WebDAV requests from the app.</p>
           <div class="form-group"><label for="cloud-endpoint">WebDAV file URL</label><input id="cloud-endpoint" class="form-control" type="url" placeholder="https://cloud.example.com/remote.php/dav/files/you/squashdb.sqdbe"></div>
           <div class="form-group"><label for="cloud-username">Username</label><input id="cloud-username" class="form-control" type="text" autocomplete="username"></div>
@@ -65,9 +67,6 @@
             <button class="btn btn-secondary" id="cloud-sync-download"><i data-lucide="cloud-download"></i> Download and Restore</button>
           </div>
           <p class="settings-row-note">Cloud credentials are used only for the current action; the password is not saved. Use an app password when your provider supports it.</p>
-        </div>
-        <div class="page-back-actions">
-          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
         </div>
       </section>
     </main>

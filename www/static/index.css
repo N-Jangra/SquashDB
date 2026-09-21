@@ -513,20 +513,24 @@ a.chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 1px solid var(--card-border);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    var(--card-bg);
-  color: var(--text-primary);
+  border: 0;
+  background: var(--primary-glow);
+  color: var(--primary);
   text-decoration: none;
-  transition: border-color calc(0.14s * var(--anim-speed)) ease;
+  transition: background-color calc(0.14s * var(--anim-speed)) ease,
+    transform calc(0.14s * var(--anim-speed)) ease;
 }
 
 .explore-icon-btn:hover {
-  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.explore-icon-btn:active {
+  transform: scale(0.94);
 }
 
 .explore-icon-btn i {
@@ -572,6 +576,156 @@ a.chip {
 .explore-quick-link i {
   width: 18px;
   height: 18px;
+}
+
+/* Explore page iOS-style list groups (Insights & Activity, Metadata Sources) */
+.explore-group-title {
+  margin: 24px 0 8px;
+}
+
+.explore-topbar + .explore-group-title {
+  margin-top: 4px;
+}
+
+.explore-list-group {
+  background: var(--card-bg);
+  border-radius: var(--border-radius-md, 12px);
+  overflow: hidden;
+}
+
+.explore-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--card-border);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: background-color calc(0.18s * var(--anim-speed)) ease;
+}
+
+.explore-list-group .explore-list-row:last-child {
+  border-bottom: 0;
+}
+
+.explore-list-row:hover,
+.explore-list-row:active {
+  background: var(--primary-glow);
+  border-color: var(--card-border);
+}
+
+.explore-list-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.explore-list-icon i {
+  width: 16px;
+  height: 16px;
+}
+
+.explore-list-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.explore-list-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.explore-list-chevron {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+/* Metadata Sources rendered as a vertical list on the Explore page.
+   Overrides the grid tile layout used on sources.html. */
+.explore-source-list {
+  display: block;
+  gap: 0;
+  background: var(--card-bg);
+  border-radius: var(--border-radius-md, 12px);
+  overflow: hidden;
+}
+
+.explore-source-list .source-tile {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+  min-height: 56px;
+  padding: 12px 16px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--card-border);
+  border-radius: 0;
+}
+
+.explore-source-list .source-tile:last-child {
+  border-bottom: 0;
+}
+
+.explore-source-list .source-tile:hover {
+  background: var(--primary-glow);
+}
+
+.explore-source-list .source-tile-icon {
+  display: none;
+}
+
+.explore-source-list .source-tile-name {
+  flex: 0 0 auto;
+  order: 1;
+  font-size: 16px;
+  font-weight: 500;
+  white-space: normal;
+}
+
+.explore-source-list .source-tile-desc {
+  order: 2;
+  flex: 1 1 auto;
+  margin-left: 0;
+  font-size: 13px;
+  white-space: normal;
+}
+
+/* Move the description onto its own line under the name */
+.explore-source-list .source-tile {
+  flex-wrap: wrap;
+}
+
+.explore-source-list .source-tile-name {
+  flex-basis: 100%;
+  margin-bottom: 2px;
+}
+
+.explore-source-list .source-tile::after {
+  content: "›";
+  position: absolute;
+  right: 16px;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.explore-source-list .source-tile {
+  position: relative;
+  padding-right: 40px;
 }
 
 .chip.active {
@@ -989,6 +1143,86 @@ main {
   color: var(--text-primary);
   font-size: 10px;
   font-weight: 700;
+}
+
+/* Compact list cards used by the dashboard insight sections. */
+.dashboard-screen {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.dashboard-insights[data-view="list"] .dashboard-insight-section h3 {
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.dashboard-insights[data-view="list"] .dashboard-insight-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-rows: auto 12px;
+  column-gap: 10px;
+  row-gap: 5px;
+  min-height: 84px;
+  padding: 8px 10px;
+  border-radius: 18px;
+  background: rgba(8, 8, 8, 0.86);
+}
+
+.dashboard-insights[data-view="list"] .dashboard-insight-thumb {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 48px;
+  height: 64px;
+  flex-basis: 48px;
+  border-radius: 8px;
+}
+
+.dashboard-insights[data-view="list"] .dashboard-insight-body {
+  grid-column: 2;
+  grid-row: 1;
+  gap: 3px;
+}
+
+.dashboard-insights[data-view="list"] .dashboard-insight-body strong {
+  font-size: 16px;
+}
+
+.dashboard-insights[data-view="list"] .dashboard-insight-body small {
+  font-size: 14px;
+}
+
+.dashboard-insights[data-view="list"] .dashboard-progress-ring {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+  width: calc(100% - 42px);
+  height: 4px;
+  min-height: 4px;
+  margin: 4px 42px 0 0;
+  flex-basis: auto;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary) 0 var(--progress), rgba(148, 163, 184, 0.18) var(--progress) 100%);
+}
+
+.dashboard-insights[data-view="list"] .dashboard-progress-ring::before {
+  display: none;
+}
+
+.dashboard-insights[data-view="list"] .dashboard-progress-ring span {
+  position: absolute;
+  right: -42px;
+  top: 50%;
+  z-index: 1;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.dashboard-insights[data-view="list"] .dashboard-insight-section.completed .dashboard-progress-ring {
+  background: linear-gradient(90deg, #34c759 0 var(--progress), rgba(148, 163, 184, 0.18) var(--progress) 100%);
 }
 
 /* Insight cards follow the selected Dashboard View instead of keeping a
@@ -1563,54 +1797,6 @@ main {
   }
 }
 
-.app-navigation-sheet-overlay {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh;
-  max-width: 100vw;
-  max-height: 100dvh;
-  z-index: 90;
-  display: flex;
-  align-items: flex-end;
-  background: rgba(0, 0, 0, .48);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .18s ease;
-  overflow: hidden;
-}
-
-.app-navigation-sheet-overlay.active {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.app-navigation-sheet {
-  width: min(100%, 560px);
-  max-width: 100%;
-  max-height: 85dvh;
-  margin: 0 auto;
-  box-sizing: border-box;
-  overflow-y: auto;
-  padding: 10px 16px calc(18px + env(safe-area-inset-bottom));
-  border: 1px solid var(--card-border);
-  border-bottom: 0;
-  border-radius: 22px 22px 0 0;
-  background: var(--card-bg);
-  backdrop-filter: blur(18px);
-  transform: translateY(100%);
-  transition: transform .2s ease;
-}
-
-.app-navigation-sheet-overlay.active .app-navigation-sheet { transform: translateY(0); }
-.app-navigation-sheet-handle { width: 36px; height: 4px; margin: 0 auto 12px; border-radius: 99px; background: var(--text-muted); }
-.app-navigation-sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.app-navigation-sheet-header button { border: 0; background: none; color: var(--text-muted); font-size: 26px; cursor: pointer; }
-.app-navigation-sheet-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.app-navigation-sheet-item { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 5px; border: 1px solid var(--card-border); border-radius: 12px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 11px; cursor: pointer; }
-.app-navigation-sheet-item i { width: 20px; height: 20px; }
-.app-navigation-sheet-item.active { border-color: var(--primary); color: var(--primary); background: var(--primary-glow); }
-
 body.compact-mode .note-row-content { gap: 8px; padding-top: 7px; padding-bottom: 7px; }
 body.compact-mode .note-thumb { width: 28px; height: 38px; }
 body.compact-mode .note-subtitle { font-size: 11px; }
@@ -2101,6 +2287,113 @@ body.compact-mode .dashboard-insights { margin-bottom: 8px; }
   }
 }
 
+/* ===== Apple-style Add/Edit tracking form (dashboard #item-modal) ===== */
+#item-modal .form-group label,
+#item-modal .season-episodes-title {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+#item-modal .form-control {
+  padding: 13px 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+/* Category shown as a dropdown-style field with a chevron */
+#item-modal .category-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 13px 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#item-modal .category-pill::after {
+  content: "⌄";
+  margin-left: 12px;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* Status as a horizontal pill row (visible layer over a hidden <select>) */
+.status-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all calc(0.2s * var(--anim-speed)) ease;
+}
+
+.status-pill.active {
+  background: var(--primary-glow);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Fetch metadata rendered as a labelled iOS toggle card */
+.metadata-fetch-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+}
+
+.metadata-fetch-toggle .metadata-fetch-toggle-body {
+  min-width: 0;
+}
+
+.metadata-fetch-toggle .metadata-fetch-toggle-body label {
+  display: block;
+  margin: 0 0 2px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.metadata-fetch-toggle .metadata-fetch-toggle-body p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* Keep the toggle switch at its intrinsic size inside the flex row so the
+   knob stays inside the track. */
+.metadata-fetch-toggle .switch {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 24px;
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -2142,12 +2435,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   left: 50%;
   bottom: calc(76px + env(safe-area-inset-bottom));
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
-  max-width: min(92vw, 520px);
+  width: min(calc(100vw - 24px), 520px);
+  max-width: none;
+  box-sizing: border-box;
   padding: 12px 16px;
   border: 1px solid var(--card-border);
-  border-radius: var(--border-radius-full);
+  border-radius: 14px;
   background: color-mix(in srgb, var(--card-bg) 92%, #000 8%);
   color: var(--text-primary);
   box-shadow: var(--shadow-lg);
@@ -2157,7 +2452,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   transition: opacity calc(.2s * var(--anim-speed)) ease, transform calc(.2s * var(--anim-speed)) ease;
 }
 .squashdb-toast.active { opacity: 1; transform: translate(-50%, 0) scale(1); }
-.squashdb-toast i { width: 17px; height: 17px; color: var(--primary); flex: 0 0 auto; }
+.squashdb-toast i { width: 17px; height: 17px; margin-top: 2px; color: var(--primary); flex: 0 0 auto; }
+.squashdb-toast span { min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
 .squashdb-toast.success { border-color: color-mix(in srgb, #22c55e 55%, var(--card-border)); }
 .squashdb-toast.success i { color: #22c55e; }
 .squashdb-toast.error { border-color: color-mix(in srgb, var(--danger) 55%, var(--card-border)); }
@@ -2198,12 +2494,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .date-filter-btn {
-  padding: 6px 12px;
+  padding: 8px 16px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   color: var(--text-secondary);
-  border-radius: var(--border-radius-sm);
-  font-size: 12px;
+  border-radius: var(--border-radius-full, 999px);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all calc(0.2s * var(--anim-speed)) ease;
 }
@@ -2216,15 +2513,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .timeline-filter-icon-btn {
   margin-left: auto;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: var(--border-radius-sm);
+  border-radius: 50%;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all calc(0.2s * var(--anim-speed)) ease;
@@ -2476,6 +2773,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 8px;
+}
+
+/* Detail-page status/source/cache badges use compact square pills. */
+.show-detail-badge-row .show-detail-production-badge,
+.show-detail-badge-row .discover-result-source,
+.show-detail-badge-row .show-detail-cache-badge {
+  border-radius: 6px;
 }
 
 .show-detail-production-badge {
@@ -3019,28 +3323,48 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .stats-card {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
-    var(--card-bg);
+  background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--border-radius-md);
-  min-height: 112px;
-  padding: 14px 12px;
+  min-height: 78px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  text-align: center;
-  gap: 4px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  text-align: left;
+  gap: 6px;
 }
 
 .stats-card-rate {
   grid-column: 1 / -1;
 }
 
+/* Completion Rate as a full-width accent hero card (label left, value right),
+   matching the Statistics design. */
 .stats-card-rate {
-  border-color: var(--card-border);
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  min-height: 76px;
+  padding: 18px 20px;
+  border-color: rgba(99, 102, 241, 0.35);
+  background:
+    linear-gradient(135deg, var(--primary-glow) 0%, var(--card-bg) 100%);
+}
+
+.stats-card-rate .stats-label {
+  order: 1;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stats-card-rate .stats-value {
+  order: 2;
+  font-size: 32px;
+  color: var(--primary) !important;
 }
 
 .stats-card-active {
@@ -3061,7 +3385,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .stats-value {
   font-family: var(--font-heading);
-  font-size: 30px;
+  font-size: 26px;
   line-height: 1;
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -3077,14 +3401,327 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .stats-label {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Space out the stat blocks — the section itself has no flex gap */
 #tab-stats .stats-grid,
 #tab-stats .stats-chart-card {
   margin-bottom: 14px;
+}
+
+/* Standalone section heading that sits outside the cards (e.g. "Activity"). */
+.stats-group-title {
+  margin: 0 0 12px;
+  padding: 0 2px;
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 700;
+  -webkit-text-fill-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+#tab-stats .stats-group-title {
+  margin-top: 4px;
+}
+
+/* Top Genres / Top Networks: the heading sits OUTSIDE the card as a plain
+   section title, and the ranking rows live in their own edge-to-edge card. */
+#stats-genres-card,
+#stats-networks-card {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  gap: 10px;
+}
+
+#stats-genres-card .chart-title,
+#stats-networks-card .chart-title {
+  font-size: 20px;
+  font-weight: 700;
+  padding: 0 2px;
+}
+
+#stats-genres-card .bar-chart,
+#stats-networks-card .bar-chart {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-md, 12px);
+  overflow: hidden;
+}
+
+/* Statistics screen: give the sticky iOS header room and pad the content */
+.stats-screen .chips-container {
+  padding-top: 12px;
+}
+
+.stats-screen main {
+  padding-bottom: 92px;
+}
+
+/* Timeline screen: same iOS header treatment as Statistics */
+.timeline-screen .chips-container {
+  padding-top: 12px;
+}
+
+.timeline-screen main {
+  padding-bottom: 92px;
+}
+
+/* Apple-style management pages (Backups, Metadata Sources, App Password) */
+.manage-screen main {
+  padding: 8px 18px 92px;
+}
+
+.manage-screen .manage-intro {
+  margin: 8px 2px 18px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.manage-screen .settings-section-title {
+  margin: 22px 2px 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.manage-screen section > .settings-section-title:first-child,
+.manage-screen .manage-intro + .settings-section-title {
+  margin-top: 4px;
+}
+
+/* Each section becomes a grouped iOS card — except sections that hold a
+   JS-rendered row list (metadata sources, app-lock methods), whose rows are
+   already individual cards and would otherwise double up. */
+.manage-screen .settings-section {
+  margin: 0 0 6px;
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius-md, 12px);
+}
+
+.manage-screen .settings-section:has(.settings-section-inner),
+.manage-screen .settings-section:has(.sortable-list),
+.manage-screen .settings-section:has(.icon-picker-carousel-wrap),
+.manage-screen .settings-section:has(.app-icon-picker-grid) {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.manage-screen .manage-note {
+  margin: -8px 2px 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.manage-screen .settings-section .settings-row-note {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.manage-screen .settings-section .settings-row-note:last-child {
+  margin-bottom: 0;
+}
+
+/* Label/value rows (Backup Status, Storage Usage) laid out flush left/right */
+.manage-screen .backup-status-grid,
+.manage-screen .backup-storage-usage {
+  display: flex;
+  flex-direction: column;
+}
+
+.manage-screen .backup-status-grid > div,
+.manage-screen .backup-storage-usage > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.manage-screen .backup-status-grid > div:first-child,
+.manage-screen .backup-storage-usage > div:first-child {
+  padding-top: 0;
+}
+
+.manage-screen .backup-status-grid > div:last-child,
+.manage-screen .backup-storage-usage > div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.manage-screen .backup-status-grid span,
+.manage-screen .backup-storage-usage span {
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+.manage-screen .backup-status-grid strong,
+.manage-screen .backup-storage-usage strong {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.manage-screen .backup-health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--card-border);
+}
+
+.manage-screen .backup-health-row span {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.manage-screen .backup-health-row .btn {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+/* Apple-style info pages (App Info, Usage Guide, Changelog) */
+.info-screen main {
+  padding: 8px 18px 92px;
+}
+
+.info-screen .info-intro {
+  margin: 8px 2px 20px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.info-screen .info-group-title,
+.info-screen .settings-section-title {
+  margin: 22px 2px 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-screen .settings-section {
+  margin: 0 0 4px;
+}
+
+/* Prose sections sit in a grouped iOS card */
+.info-screen .info-card {
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius-md, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-indent: 0;
+}
+
+.info-screen .info-card > * {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.info-screen .info-card .settings-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Standalone prose paragraphs (Usage Guide sections) get their own card. */
+.info-screen .settings-section > .settings-note {
+  margin: 0;
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius-md, 12px);
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.info-screen .settings-section > .settings-note + .settings-note {
+  margin-top: 8px;
+}
+
+.info-screen .settings-section > .settings-note strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.info-screen .info-card code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+}
+
+/* Link groups reuse the settings list card */
+.info-screen .settings-list {
+  background: var(--card-bg);
+  border-radius: var(--border-radius-md, 12px);
+  overflow: hidden;
+}
+
+.info-screen .settings-row-icon {
+  display: flex;
+}
+
+/* Guide definition lists become their own iOS card of stacked rows */
+.info-screen .guide-def-list {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--card-bg);
+  border-radius: var(--border-radius-md, 12px);
+  overflow: hidden;
+}
+
+.info-screen .guide-def-list li {
+  margin: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--card-border);
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.info-screen .guide-def-list li:last-child {
+  border-bottom: 0;
+}
+
+.info-screen .guide-def-list strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Changelog: the markdown's own top "# Changelog" heading duplicates the
+   iOS header title, so hide the first content heading. */
+.info-screen .changelog-content > h2:first-child {
+  display: none;
+}
+
+.info-screen .changelog-content li,
+.info-screen .changelog-content p {
+  font-size: 14px;
 }
 
 .stats-chart-card {
@@ -3138,47 +3775,78 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border: 0;
 }
 
+/* Top Genres / Top Networks: each row is a full-height bar whose colored fill
+   is the row background, with the name (left) and count (right) overlaid. */
 .bar-chart {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
+  border-radius: var(--border-radius-md, 12px);
+  overflow: hidden;
 }
 
 .bar-item {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  min-height: 52px;
+  padding: 0;
+  border-bottom: 1px solid var(--card-border);
 }
 
-.bar-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 500;
+.bar-item:last-child {
+  border-bottom: 0;
 }
 
 .bar-bg {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: var(--border-radius-full);
+  height: 100%;
+  background: transparent;
+  border-radius: 0;
   overflow: hidden;
+  z-index: 0;
 }
 
 .bar-fill {
   height: 100%;
-  background: var(--theme-color);
-  border-radius: var(--border-radius-full);
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 0;
   transition: width calc(0.5s * var(--anim-speed)) ease-out;
   width: 0%;
+}
+
+/* Highlight the top-ranked row's fill with a subtle navy-blue accent tint,
+   matching the Statistics design. */
+.bar-item:first-child .bar-fill {
+  background: rgba(10, 132, 255, 0.15) !important;
+}
+
+.bar-labels {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.bar-labels span:last-child {
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .column-chart {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  height: 120px;
+  gap: 8px;
+  height: 150px;
   padding-top: 20px;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .column-chart-col {
@@ -3189,27 +3857,44 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   align-items: center;
   justify-content: flex-end;
   height: 100%;
-  gap: 4px;
+  gap: 6px;
 }
 
+/* The value/label rows sit outside the bar's growth area so the bar height
+   percentage maps to the full column. */
 .column-chart-value {
   font-size: 10px;
   color: var(--text-muted);
   min-height: 12px;
+  flex: none;
+}
+
+.column-chart-bar-track {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .column-chart-bar {
+  flex: none;
   width: 100%;
-  max-width: 22px;
-  background: var(--primary);
-  border-radius: 3px 3px 0 0;
-  min-height: 2px;
+  max-width: 26px;
+  min-height: 6px;
+  background: #3a82f7;
+  border-radius: 4px 4px 0 0;
+}
+
+.column-chart-bar.monthly-chart-bar {
+  background: var(--success, #34c759);
 }
 
 .column-chart-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
+  flex: none;
 }
 
 .leaderboard-list {
@@ -3379,6 +4064,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--text-muted);
   font-weight: 700;
   letter-spacing: 1px;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.sortable-item.dragging .drag-handle {
+  cursor: grabbing;
 }
 
 .sortable-label {
@@ -3820,6 +4512,325 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 13px;
 }
 
+/* iOS-style settings screen */
+.settings-screen {
+  background: var(--bg-color);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.settings-screen #app-container {
+  width: 100%;
+  max-width: 540px;
+  min-height: 100vh;
+  background: var(--bg-color);
+}
+
+.settings-screen,
+.settings-screen * {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.settings-ios-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 72px 1fr 72px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px 16px;
+  background: var(--bg-color);
+  border-bottom: 1px solid var(--card-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.settings-ios-header h1 {
+  margin: 0;
+  display: block;
+  background: none;
+  -webkit-text-fill-color: var(--text-primary);
+  color: var(--text-primary) !important;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.settings-ios-back {
+  min-width: 0;
+  justify-content: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+.settings-ios-back:hover,
+.settings-ios-back:active {
+  transform: none;
+  border: 0;
+  background: transparent;
+  color: var(--primary-hover);
+}
+
+.settings-screen main {
+  padding-bottom: 76px;
+}
+
+.settings-screen .settings-main-title {
+  display: none;
+}
+
+.settings-screen .settings-page-header:not(.settings-main-title) {
+  margin: 0;
+  padding: 24px 36px 8px;
+}
+
+.settings-screen .settings-section-title {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.settings-screen .settings-section {
+  gap: 0;
+  margin: 0 18px 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--card-bg);
+}
+
+.settings-screen .settings-list {
+  gap: 0;
+}
+
+.settings-screen .settings-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 52px;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--card-border);
+  background: transparent;
+}
+
+.settings-screen .settings-list .settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-screen .settings-row-icon {
+  display: none;
+}
+
+.settings-screen .settings-row-body {
+  min-width: 0;
+  gap: 2px;
+}
+
+.settings-screen .settings-row-body label {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.settings-screen .settings-row-body span {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+
+.settings-screen .settings-row-value {
+  max-width: 48%;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.settings-screen .settings-row-chevron {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+.settings-screen .settings-row:hover,
+.settings-screen .settings-row:active {
+  background: var(--primary-glow);
+}
+
+/* Keep these rows connected to the existing option picker while presenting
+   boolean values like native iOS switches. */
+.settings-screen .settings-row[data-direct-toggle="true"] .settings-row-value span,
+.settings-screen .settings-row[data-inline-toggle="true"] .settings-row-value span {
+  display: none;
+}
+
+.settings-screen .settings-row[data-direct-toggle="true"] .settings-row-chevron,
+.settings-screen .settings-row[data-inline-toggle="true"] .settings-row-chevron {
+  display: none;
+}
+
+.settings-screen .settings-row[data-direct-toggle="true"] .settings-row-value,
+.settings-screen .settings-row[data-inline-toggle="true"] .settings-row-value {
+  flex: 0 0 50px;
+  display: block;
+  box-sizing: border-box;
+  min-width: 50px;
+  max-width: 50px;
+  width: 50px;
+  height: 30px;
+  padding: 0;
+  gap: 0;
+  border-radius: 30px;
+  background: #39393d;
+  transition: background-color calc(0.3s * var(--anim-speed)) ease;
+}
+
+.settings-screen .settings-row[data-toggle-on="true"] .settings-row-value {
+  background: #34c759;
+}
+
+.settings-screen .settings-row[data-direct-toggle="true"] .settings-row-value::before,
+.settings-screen .settings-row[data-inline-toggle="true"] .settings-row-value::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin: 2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform calc(0.3s * var(--anim-speed)) ease;
+}
+
+body.compact-mode .settings-screen .settings-row[data-pref="compactMode"] .settings-row-value::before,
+body.reduced-motion .settings-screen .settings-row[data-pref="reducedMotion"] .settings-row-value::before,
+.settings-screen .settings-row[data-toggle-on="true"] .settings-row-value::before {
+  transform: translateX(20px);
+}
+
+/* Action rows show a colored word instead of a value + navigation chevron.
+   Hide the trailing icon and color the label so the action reads clearly. */
+.settings-screen #notification-test .settings-row-chevron,
+.settings-screen #clear-metadata-cache .settings-row-chevron,
+.settings-screen #clear-image-cache .settings-row-chevron,
+.settings-screen #clear-all-cache .settings-row-chevron {
+  display: none;
+}
+
+.settings-screen #notification-test .settings-row-value span {
+  color: var(--primary);
+}
+
+.settings-screen #clear-metadata-cache .settings-row-value span,
+.settings-screen #clear-image-cache .settings-row-value span,
+.settings-screen #clear-all-cache .settings-row-value span {
+  color: var(--danger);
+}
+
+.settings-screen .settings-section + .settings-page-header {
+  margin-top: 0;
+}
+
+@media (max-width: 560px) {
+  .settings-screen {
+    justify-content: stretch;
+  }
+
+  .settings-screen #app-container {
+    width: 100%;
+    max-width: none;
+    border-left: 0;
+    border-right: 0;
+    box-shadow: none;
+  }
+
+  .settings-screen main {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .settings-screen .settings-page-header:not(.settings-main-title) {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .settings-screen .settings-section {
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+}
+
+@media (min-width: 561px) and (max-width: 1100px) {
+  body.settings-screen[data-tablet-layout="two-column"] #app-container,
+  .settings-screen #app-container {
+    width: 100%;
+    max-width: none;
+  }
+
+  .settings-screen main {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .settings-screen .settings-section {
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+
+  .settings-screen .settings-page-header:not(.settings-main-title) {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}
+
+/* Keep the main mobile screens edge-to-edge like Settings. Their content
+   retains a small, consistent inset instead of inheriting the wide shell
+   padding intended for desktop. */
+@media (max-width: 560px) {
+  .explore-screen #app-container,
+  .stats-screen #app-container,
+  .dashboard-screen #app-container,
+  .info-screen #app-container,
+  .manage-screen #app-container {
+    width: 100%;
+    max-width: none;
+    border-left: 0;
+    border-right: 0;
+    box-shadow: none;
+  }
+
+  .explore-screen main,
+  .stats-screen main,
+  .dashboard-screen main,
+  .info-screen main,
+  .manage-screen main {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .explore-screen main > .tab-content,
+  .stats-screen main > .tab-content,
+  .dashboard-screen main > .tab-content,
+  .info-screen main > .tab-content,
+  .manage-screen main > .tab-content {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
 /* Toggle Switch */
 .switch {
   position: relative;
@@ -4188,6 +5199,45 @@ input:checked + .slider:before {
 }
 
 /* Changelog page */
+.changelog-version {
+  margin: 0 0 10px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--border-radius-md);
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.changelog-version summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.changelog-version summary::-webkit-details-marker { display: none; }
+
+.changelog-version-chevron {
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform calc(0.18s * var(--anim-speed)) ease;
+}
+
+.changelog-version[open] .changelog-version-chevron { transform: rotate(180deg); }
+
+.changelog-version-body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--card-border);
+}
+
 .changelog-content h2 {
   font-family: var(--font-heading);
   font-size: 18px;
@@ -4197,6 +5247,8 @@ input:checked + .slider:before {
 .changelog-content h2:first-child {
   margin-top: 0;
 }
+
+.changelog-version-body h2 { display: none; }
 
 .changelog-content h3 {
   font-size: 14px;

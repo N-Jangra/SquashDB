@@ -9,26 +9,25 @@
   <link rel="stylesheet" href="static/index.css">
   <script src="core/logcat.js"></script><script src="lucide.min.js"></script>
 </head>
-<body>
+<body class="manage-screen">
   <div id="app-container">
+    <header class="settings-ios-header">
+      <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+      <h1>Metadata Sources</h1>
+      <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+    </header>
     <main>
       <section class="tab-content active">
-        <div class="show-detail-topbar">
-  <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
-</div>
-<div class="settings-section">
-          <h4 class="settings-section-title">Built-in sources</h4>
+        <h4 class="settings-section-title">Built-in sources</h4>
+        <div class="settings-section">
           <div id="builtin-metadata-sources-list" class="settings-section-inner"></div>
         </div>
+        <h4 class="settings-section-title">Custom sources</h4>
         <div class="settings-section">
-          <h4 class="settings-section-title">Custom sources</h4>
           <div id="custom-metadata-sources-list" class="settings-section-inner"></div>
           <button type="button" id="create-metadata-source-btn" class="btn btn-secondary" style="width:100%;margin-top:8px;">
             <i data-lucide="plus"></i> Add custom source
           </button>
-        </div>
-        <div class="page-back-actions">
-          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
         </div>
       </section>
     </main>

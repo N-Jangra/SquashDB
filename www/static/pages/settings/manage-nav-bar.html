@@ -2,23 +2,18 @@
 <html lang="en">
 <head>
 <base href="../../../"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Bottom Bar Layout</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="static/index.css"><script src="core/logcat.js"></script><script src="lucide.min.js"></script></head>
-<body><div id="app-container">
+<body class="manage-screen"><div id="app-container">
+<header class="settings-ios-header">
+  <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+  <h1>Bottom Bar Layout</h1>
+  <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+</header>
 <main><section class="tab-content active">
-<div class="show-detail-topbar">
-  <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
-</div>
-<div class="settings-page-header">
-  <h2>Bottom Bar Layout</h2>
-  <p>Drag to reorder the tabs in the bottom navigation bar, and toggle which ones show.</p>
-  <p class="settings-row-note">Turning Explore on switches Timeline, Sources, and Statistics off — the Explore page links to all three. Outside of Explore, only one of Timeline and Statistics can be on at a time. Settings always stays visible.</p>
-</div>
+<p class="manage-intro">Drag to reorder the tabs in the bottom navigation bar, and toggle which ones show.</p>
+<p class="manage-note">Turning Explore on switches Timeline, Sources, and Statistics off — the Explore page links to all three. Outside of Explore, only one of Timeline and Statistics can be on at a time. Settings always stays visible.</p>
 
 <div class="settings-section">
   <div id="nav-bar-arrangement-list" class="sortable-list"></div>
-</div>
-
-<div class="page-back-actions">
-  <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
 </div>
 
 </section></main>

@@ -2,15 +2,14 @@
 <html lang="en">
 <head>
 <base href="../../../"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Bottom Menu Icons</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="static/index.css"><script src="core/logcat.js"></script><script src="lucide.min.js"></script></head>
-<body><div id="app-container">
+<body class="manage-screen"><div id="app-container">
+<header class="settings-ios-header">
+  <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+  <h1>Bottom Menu Icons</h1>
+  <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+</header>
 <main><section class="tab-content active">
-<div class="show-detail-topbar">
-  <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
-</div>
-<div class="settings-page-header">
-  <h2>Bottom Menu Icons</h2>
-  <p>Pick an icon for each tab in the bottom navigation bar.</p>
-</div>
+<p class="manage-intro">Pick an icon for each tab in the bottom navigation bar.</p>
 
 <div class="settings-section">
   <h4 class="settings-section-title">Dashboard</h4>
@@ -47,9 +46,6 @@
   <div class="icon-picker-carousel-wrap"><div id="nav-icon-picker-settings" class="icon-picker-carousel" data-nav-key="settings"></div></div>
 </div>
 
-<div class="page-back-actions">
-  <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
-</div>
 
 </section></main>
 </div><script src="core/applock.js"></script><script src="features/metadata.js"></script><script src="core/app-navigation.js"></script><script src="core/app-backups.js"></script><script src="core/app-search.js"></script><script src="app.js"></script><script src="core/fonts.js"></script></body></html>

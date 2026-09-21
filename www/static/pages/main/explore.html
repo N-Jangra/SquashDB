@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <base href="../../../"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Explore</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="static/index.css"><script src="core/logcat.js"></script><script src="lucide.min.js"></script></head>
-<body><div id="app-container">
+<body class="explore-screen"><div id="app-container">
 <main><section id="tab-explore" class="tab-content active">
 
 <div class="explore-topbar">
@@ -10,15 +10,22 @@
   <a class="explore-icon-btn" href="static/pages/settings/manage-metadata-sources.html" title="Manage metadata sources"><i data-lucide="wrench"></i></a>
 </div>
 
-<h4 class="settings-section-title">Metadata Sources</h4>
-<div class="sources-grid" id="sources-list"></div>
-
-<hr class="explore-section-divider">
-
-<div class="explore-quick-links">
-  <a class="explore-quick-link" href="static/pages/main/timeline.html"><i data-lucide="calendar"></i> Timeline</a>
-  <a class="explore-quick-link" href="static/pages/main/statistics.html"><i data-lucide="pie-chart"></i> Statistics</a>
+<h4 class="settings-section-title explore-group-title">Insights &amp; Activity</h4>
+<div class="explore-list-group">
+  <a class="explore-list-row explore-quick-link" href="static/pages/main/timeline.html">
+    <span class="explore-list-icon" style="background:#34c759;"><i data-lucide="clock"></i></span>
+    <span class="explore-list-body"><span class="explore-list-name">Timeline</span></span>
+    <i data-lucide="chevron-right" class="explore-list-chevron"></i>
+  </a>
+  <a class="explore-list-row explore-quick-link" href="static/pages/main/statistics.html">
+    <span class="explore-list-icon" style="background:#ff9500;"><i data-lucide="bar-chart-3"></i></span>
+    <span class="explore-list-body"><span class="explore-list-name">Statistics</span></span>
+    <i data-lucide="chevron-right" class="explore-list-chevron"></i>
+  </a>
 </div>
+
+<h4 class="settings-section-title explore-group-title">Metadata Sources</h4>
+<div class="sources-grid explore-source-list" id="sources-list"></div>
 
 </section></main>
 <nav class="bottom-nav">

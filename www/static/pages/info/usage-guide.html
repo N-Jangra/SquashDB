@@ -10,21 +10,19 @@
   <script src="core/logcat.js"></script>
   <script src="lucide.min.js"></script>
 </head>
-<body>
+<body class="info-screen">
   <div id="app-container">
+    <header class="settings-ios-header">
+      <button class="settings-ios-back page-back-btn" type="button" data-back-fallback="static/pages/settings/settings.html">‹ Back</button>
+      <h1>Usage Guide</h1>
+      <span class="settings-ios-header-spacer" aria-hidden="true"></span>
+    </header>
     <main>
       <section class="tab-content active">
-        <div class="show-detail-topbar">
-          <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" data-back-fallback="settings.html"><i data-lucide="chevron-left"></i>Back</button>
-        </div>
+        <p class="info-intro">How to use each tab and setting.</p>
 
-        <div class="settings-page-header">
-          <h2>Usage Guide</h2>
-          <p>How to use each tab and setting.</p>
-        </div>
-
+        <h4 class="settings-section-title info-group-title">Jump to a section</h4>
         <div class="settings-section">
-          <h4 class="settings-section-title">Jump to a section</h4>
           <div class="settings-list">
             <a class="settings-row settings-row-link" href="javascript:void(0)" data-jump="guide-dashboard">
               <div class="settings-row-icon"><i data-lucide="layout-grid"></i></div>
@@ -178,9 +176,6 @@
           </ul>
         </div>
 
-        <div class="page-back-actions">
-          <button class="page-back-btn" type="button" data-back-fallback="settings.html"><i data-lucide="arrow-left"></i> Back to Settings</button>
-        </div>
       </section>
     </main>
   </div>
