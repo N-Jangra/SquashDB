@@ -118,7 +118,7 @@ All notable changes to SquashDB are documented in this file.
 
 ### File-based backups (Android)
 - New native plugin (`BackupFolderPlugin`) for Storage Access Framework (SAF) folder picking, plain/nested/binary file I/O, and a from-scratch POSIX (ustar) tar writer/reader — no third-party library.
-- **Folder-tree mirror**: enabling a backup folder mirrors every tracked item into `squash-db/<category>/<item-slug>/index.json` + `thumbnail.webp` (thumbnail fetched and re-encoded to WebP), additive-only — items removed in-app are never deleted from the mirror.
+- **Folder-tree mirror**: enabling a backup folder mirrors every tracked item into `squash-db/<category>/<item-slug>/index.json` + `.thumbnail` (thumbnail resized to max 500px and re-encoded to WebP), additive-only — items removed in-app are never deleted from the mirror.
 - **Full tar backups**: Export now writes a single `squashdb_backup_<date>.tar` containing the entire `squash-db/` tree plus the state JSON, as a sibling of `squash-db/` in the chosen folder. Falls back to a plain `.json` download on non-native/desktop.
 - **Import** accepts both `.json` and `.tar` (previously JSON-only); always merges by item ID, never overwrites existing items.
 - **Daily auto-backup**: on app launch, if 24+ hours have passed since the last auto-backup and there are tracked items, writes a new tar snapshot automatically and prunes old ones, keeping only the newest 3 backup dates.
