@@ -8,6 +8,7 @@ All notable changes to SquashDB are documented in this file.
 - Improved startup performance with immediate loading guards, cached progress values, dashboard result caching, batched dashboard rendering, and consistent search debouncing.
 - Scoped icon rendering and reduced unnecessary work during page updates.
 - Replaced list-view insight progress rings with compact horizontal progress bars, including green completed-state bars.
+- Fixed TV-series progress percentages to count watched and total episodes across all seasons instead of using only completed-season ratios.
 - Android encrypted persistence now stores individual encrypted item records plus separate encrypted metadata instead of rewriting one complete encrypted state blob.
 - Added automatic migration from legacy encrypted state and removal of the old snapshot after successful migration.
 
@@ -26,6 +27,10 @@ All notable changes to SquashDB are documented in this file.
 - Added dedicated headers and simplified the Timeline and Statistics page actions.
 - Added touch-friendly drag handles for reordering metadata sources and bottom navigation items in Android WebView.
 - Shortened Dashboard Row Actions labels and changed boolean settings to compact inline controls where appropriate.
+- Added a guided multi-step App Lock setup flow with secret confirmation, optional recovery questions, and a direct biometric path.
+- Refreshed Backup management with separate Backup, Status, and Cloud & Recovery tabs while keeping all backup controls available.
+- Improved notification time and quiet-hours dialogs with clear full-width Save buttons.
+- Refined Settings subpage headers, descriptions, and mobile spacing for Category Order and Tracking Choices.
 
 ### Explore and changelog
 - Redesigned Explore insights and metadata-source sections as grouped list rows with clearer icons and navigation chevrons.
