@@ -167,7 +167,7 @@ async function initShowDetail() {
     const itemId = params.get("itemId");
     const item = state.items.find(i => i.id === itemId);
     if (!item) {
-      window.location.href = "dashboard.html";
+      window.location.href = "static/pages/main/dashboard.html";
       return;
     }
     showDetailState.mode = "local";
@@ -245,7 +245,7 @@ async function initShowDetail() {
     return i.metadataSource === provider && i.providerId != null && String(i.providerId) === String(providerId);
   });
   if (existingItem) {
-    window.location.href = `show-detail.html?source=local&itemId=${encodeURIComponent(existingItem.id)}`;
+    window.location.href = `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(existingItem.id)}`;
     return;
   }
 
@@ -764,7 +764,7 @@ function confirmDeleteShowDetailItem() {
   if (!modal || !list || !titleEl) {
     deleteEntry(item.id);
     flushPendingSave();
-    window.location.href = "dashboard.html";
+    window.location.href = "static/pages/main/dashboard.html";
     return;
   }
 
@@ -779,7 +779,7 @@ function confirmDeleteShowDetailItem() {
     closeSettingsPicker();
     deleteEntry(item.id);
     flushPendingSave();
-    window.location.href = "dashboard.html";
+    window.location.href = "static/pages/main/dashboard.html";
   });
   list.appendChild(confirmBtn);
 
@@ -829,9 +829,31 @@ function renderSteamExtra(game, steamUrl, steamDbUrl) {
     <div class="steam-link-row">
       <a class="btn btn-secondary" href="${steamDbUrl}" target="_blank" rel="noopener">View in SteamDB</a>
     </div>
-    ${screenshots.length ? `<div class="show-detail-section-title">Screenshots</div><div class="steam-screenshots">${screenshots.map(image => `<a href="${image.path_full}" target="_blank" rel="noopener"><img src="${image.path_thumbnail || image.path_full}" loading="lazy" alt="Game screenshot"></a>`).join("")}</div>` : ""}
+    ${screenshots.length ? `<div class="show-detail-section-title">Screenshots</div><div class="steam-screenshots">${screenshots.map((image, index) => `<button type="button" class="steam-screenshot-thumb" data-steam-screenshot-index="${index}"><img src="${image.path_thumbnail || image.path_full}" loading="lazy" alt="Game screenshot"></button>`).join("")}</div>` : ""}
   `;
+  section.querySelectorAll("[data-steam-screenshot-index]").forEach(button => button.addEventListener("click", () => openSteamScreenshotGallery(screenshots, Number(button.dataset.steamScreenshotIndex))));
 }
+
+let steamScreenshotGallery = [];
+let steamScreenshotIndex = 0;
+function openSteamScreenshotGallery(images, index) {
+  steamScreenshotGallery = images || [];
+  steamScreenshotIndex = Math.max(0, Math.min(index, steamScreenshotGallery.length - 1));
+  document.getElementById("steam-screenshot-modal")?.classList.add("active");
+  renderSteamScreenshotGallery();
+}
+function renderSteamScreenshotGallery() {
+  const image = steamScreenshotGallery[steamScreenshotIndex];
+  const img = document.getElementById("steam-screenshot-modal-img");
+  if (img && image) img.src = image.path_full || image.path_thumbnail || "";
+}
+function closeSteamScreenshotGallery() { document.getElementById("steam-screenshot-modal")?.classList.remove("active"); }
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("steam-screenshot-close")?.addEventListener("click", closeSteamScreenshotGallery);
+  document.getElementById("steam-screenshot-modal")?.addEventListener("click", e => { if (e.target.id === "steam-screenshot-modal") closeSteamScreenshotGallery(); });
+  document.getElementById("steam-screenshot-prev")?.addEventListener("click", () => { if (steamScreenshotGallery.length) { steamScreenshotIndex = (steamScreenshotIndex - 1 + steamScreenshotGallery.length) % steamScreenshotGallery.length; renderSteamScreenshotGallery(); } });
+  document.getElementById("steam-screenshot-next")?.addEventListener("click", () => { if (steamScreenshotGallery.length) { steamScreenshotIndex = (steamScreenshotIndex + 1) % steamScreenshotGallery.length; renderSteamScreenshotGallery(); } });
+});
 
 function stripHtml(html) {
   const div = document.createElement("div");
@@ -1078,7 +1100,7 @@ async function loadProviderRecommendations(current) {
           title: show.name || "Untitled",
           thumbnail: show.image?.medium || show.image?.original || "",
           meta: [show.type, show.premiered?.slice(0, 4)].filter(Boolean).join(" · "),
-          url: `show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=tvmaze&providerId=${encodeURIComponent(show.id)}&title=${encodeURIComponent(show.name || "")}`
+          url: `static/pages/main/show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=tvmaze&providerId=${encodeURIComponent(show.id)}&title=${encodeURIComponent(show.name || "")}`
         }));
     } else if (provider === "jikan") {
       const response = await fetchJsonPortable(`https://api.jikan.moe/v4/anime/${encodeURIComponent(providerId)}/recommendations`);
@@ -1086,7 +1108,7 @@ async function loadProviderRecommendations(current) {
         title: show.title || "Untitled",
         thumbnail: show.images?.jpg?.image_url || "",
         meta: "MyAnimeList recommendation",
-        url: `show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=jikan&providerId=${encodeURIComponent(show.mal_id)}&title=${encodeURIComponent(show.title || "")}`
+        url: `static/pages/main/show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=jikan&providerId=${encodeURIComponent(show.mal_id)}&title=${encodeURIComponent(show.title || "")}`
       }));
     } else if (provider === "anilist") {
       const response = await fetchJsonPortable("https://graphql.anilist.co", {
@@ -1098,7 +1120,7 @@ async function loadProviderRecommendations(current) {
         title: show.title?.english || show.title?.romaji || "Untitled",
         thumbnail: show.coverImage?.medium || "",
         meta: "AniList recommendation",
-        url: `show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=anilist&providerId=${encodeURIComponent(show.id)}&title=${encodeURIComponent(show.title?.english || show.title?.romaji || "")}`
+        url: `static/pages/main/show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=anilist&providerId=${encodeURIComponent(show.id)}&title=${encodeURIComponent(show.title?.english || show.title?.romaji || "")}`
       }));
     }
 
@@ -1396,7 +1418,7 @@ async function scheduleNextEpisodeReminder() {
       title: `${title}: new episode`,
       body: `Episode ${next.number || "next"} is scheduled for ${next.airdate}.`,
       itemId: showDetailState.itemId || "",
-      actionUrl: showDetailState.itemId ? `show-detail.html?source=local&itemId=${encodeURIComponent(showDetailState.itemId)}` : "",
+      actionUrl: showDetailState.itemId ? `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(showDetailState.itemId)}` : "",
       snoozeMinutes: state.preferences.notificationSnoozeMinutes || 60
     });
   } catch (err) {
