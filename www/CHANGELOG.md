@@ -2,6 +2,31 @@
 
 All notable changes to SquashDB are documented in this file.
 
+## [0.0.7]
+
+### Import and export
+- Added dedicated Settings pages for importing and exporting lists instead of using a popup workflow.
+- Added CSV, TSV, and TXT import support with category-aware status handling, duplicate policies, previews, and configurable metadata sources.
+- Added background metadata syncing with a persistent queue, retry and pause/resume controls, import status tracking, and a beta worker-count setting.
+- Added category-specific export with CSV, TSV, and TXT output and timestamped filenames such as `squashdb-anime-YYYYMMDD-HHmmss.csv`.
+
+### Storage and data management
+- Added a Settings → Storage page with total usage, library category usage, metadata cache, thumbnail cache, preferences, watch history, and backup size breakdowns.
+- Added controls to clear metadata cache, thumbnail cache, all temporary caches, tracked data, and perform a factory reset with in-app confirmation.
+- Added local example and planning-note patterns to `.gitignore`.
+
+### Dashboard and progress
+- Added complete Dashboard sections for On hold, Dropped, and other statuses without limiting each section to four items.
+- Movies and games now show ratings and status pills instead of misleading percentage progress indicators.
+- Fixed completion handling so episodes, seasons, chapters, and volumes are marked complete when an item is completed.
+- Improved manga and novel progress calculation using chapter or volume totals.
+- Updated show-detail completion handling to keep completed item progress consistent.
+
+### Settings and detail presentation
+- Reordered Settings sections and options alphabetically, moved Information to the bottom, and grouped Metadata & Storage together.
+- Added clearer spacing between Settings groups and the new Storage entry.
+- Improved show-detail navigation and completion behavior.
+
 ## [0.0.6]
 
 ### Performance and persistence
