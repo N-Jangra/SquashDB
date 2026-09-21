@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SquashDB - Dashboard</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="squashdb-logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="index.css">
   <script src="logcat.js"></script><script src="lucide.min.js"></script>
 </head>
@@ -13,20 +14,34 @@
     <div class="chips-container" id="category-chips"></div>
     <div id="search-container" class="search-container">
       <i data-lucide="search"></i>
-      <input type="text" id="global-search" class="search-input" placeholder="Search Downloads...">
-      <button type="button" id="dashboard-filter-btn" class="timeline-filter-icon-btn" title="Filter by status"><i data-lucide="sliders-horizontal"></i></button>
+      <input type="text" id="global-search" class="search-input" placeholder="Search title, notes, genres, tags..." autocomplete="off">
+      <button type="button" id="dashboard-sort-btn" class="timeline-filter-icon-btn" title="Sort list"><i data-lucide="arrow-down-up"></i></button>
+      <button type="button" id="dashboard-filter-btn" class="timeline-filter-icon-btn" title="Filter list"><i data-lucide="sliders-horizontal"></i></button>
     </div>
+    <div id="dashboard-search-history" class="dashboard-search-history" style="display:none;"></div>
+    <div id="dashboard-filter-chips" class="dashboard-filter-chips" aria-label="Dashboard filters"></div>
 
     <main>
       <section id="tab-dashboard" class="tab-content active">
+        <div id="dashboard-refresh-status" class="dashboard-refresh-status" aria-live="polite"></div>
+        <div id="dashboard-insights" class="dashboard-insights"></div>
         <div id="notes-container" class="notes-container"></div>
         <div id="dashboard-empty" class="empty-state" style="display:none;">
           <i data-lucide="bookmark-x"></i>
-          <h3>No Items Found</h3>
-          <p>Tap the floating "+" button to add games, movies, series, or books to your list.</p>
+          <h3 id="dashboard-empty-title">No Items Found</h3>
+          <p id="dashboard-empty-message">Tap the floating "+" button to add games, movies, series, or books to your list.</p>
+          <div id="dashboard-empty-suggestions" class="dashboard-empty-suggestions"></div>
         </div>
       </section>
     </main>
+
+    <div id="grid-selection-bar" class="grid-selection-bar" style="display:none;">
+      <span id="grid-selection-count" class="grid-selection-count">0 selected</span>
+      <div class="grid-selection-actions">
+        <button type="button" class="btn btn-secondary" id="grid-selection-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="grid-selection-delete">Delete</button>
+      </div>
+    </div>
 
     <button id="add-fab" class="fab" title="Add Tracking Entry"><i data-lucide="plus"></i></button>
 
@@ -48,7 +63,10 @@
           <input type="hidden" id="entry-id">
           <div class="form-group">
             <label for="entry-title">Title / Name</label>
-            <input type="text" id="entry-title" class="form-control" placeholder="e.g., Elden Ring, Naruto, Dune" required>
+            <div class="entry-title-input-row">
+              <input type="text" id="entry-title" class="form-control" placeholder="e.g., Elden Ring, Naruto, Dune" required>
+              <button type="button" class="icon-btn" id="scan-code-btn" title="Scan barcode or QR code"><i data-lucide="scan-line"></i></button>
+            </div>
           </div>
           <div class="form-group">
             <label>Category</label>
@@ -78,6 +96,6 @@
       </div>
     </div>
   </div>
-  <script src="applock.js"></script><script src="metadata.js"></script><script src="app.js"></script><script src="fonts.js"></script>
+  <script src="applock.js"></script><script src="metadata.js"></script><script src="cache-manager.js"></script><script src="app-navigation.js"></script><script src="app-backups.js"></script><script src="app-search.js"></script><script src="app.js"></script><script src="fonts.js"></script>
 </body>
 </html>

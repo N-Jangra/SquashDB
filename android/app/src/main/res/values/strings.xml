@@ -27,4 +27,6 @@
     <string name="look_name_calculator">Calculator</string>
     <string name="look_name_freeotp">FreeOTP</string>
     <string name="look_name_termux">Termux</string>
+    <string name="look_name_controller">Controller</string>
+    <string name="look_name_gear">Gear</string>
 </resources>

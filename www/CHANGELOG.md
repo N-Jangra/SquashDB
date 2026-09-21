@@ -2,6 +2,45 @@
 
 All notable changes to SquashDB are documented in this file.
 
+## [0.0.5]
+
+### Android and security
+- Added encrypted Android local state storage backed by an Android Keystore AES-GCM key, with browser `localStorage` retained as the web fallback.
+- Added encrypted `.sqdbe` backups using PBKDF2-SHA256 and AES-256-GCM.
+- Added optional cloud sync for encrypted backups through a user-supplied HTTPS/WebDAV endpoint.
+- Added Android biometric unlock support.
+- Added Android WorkManager background snapshots and cleanup of older snapshots.
+- Added Android notification support, notification receivers, share intents, and a progress widget.
+
+### Backups and cache management
+- Added backup recovery/status handling, storage-location checks, recovery previews, backup health information, and progress feedback for large backups.
+- Added metadata-cache, image-cache, font-cache, WebView-cache, and cache-limit controls.
+- Added automatic image-cache limiting and safer temporary-cache cleanup without removing tracked data or backups.
+- Moved backup, cache, navigation, and search behavior into separate JavaScript feature modules.
+
+### Dashboard and navigation
+- Added Continue Watching, Recently Added, and Completed dashboard sections without repeating the same item across sections.
+- Added a Not started yet section for saved items with no progress, marked as Ready to start without duplicating them in the main list.
+- Added list and poster-grid dashboard layouts with progress rings, progress strips, quick actions, and improved empty/loading states.
+- Added improved Android back-button handling, swipe-back behavior, direct bottom-bar navigation, and persistent navigation settings.
+- Added responsive mobile and tablet layout improvements, floating add actions, and cleaner bottom-sheet interactions.
+
+### Search and item details
+- Added search across titles, notes, genres, statuses, tags, and providers with filters, sorting, and search history.
+- Added improved item-detail headers, progress display, episode filters, next-episode actions, notes, related provider results, and offline metadata indicators.
+- Added faster item entry with remembered choices, duplicate warnings, drafts, undo-after-delete, share-intent support, and barcode/QR scanning hooks.
+- Fixed related-title suggestions using provider results instead of unrelated saved database items.
+- Fixed Shikimori and MangaDex manga/manhwa/manhua searches: manga mode is selected correctly, API responses are parsed robustly, requests retry, and real API errors are shown instead of being reported as empty results.
+
+### Notifications and visual polish
+- Added separate notification controls for episode reminders, backups, sync failures, and unfinished items, including quiet hours and snooze options.
+- Added toast feedback, animated success/error states, skeleton loading, pressed states, haptic-action hooks, reduced-motion support, and accessible contrast improvements.
+- Added configurable weekly/monthly statistics graphs and improved chart rendering.
+
+### App identity
+- Added Controller and Gear app icon/name choices in App Icons and Names.
+- Added Android launcher aliases and native icon resources so both choices can be applied from the installed app.
+
 ## [0.0.4]
 
 ### Show detail page (redesign)

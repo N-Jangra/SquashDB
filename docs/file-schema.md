@@ -73,7 +73,7 @@ Squash/
 └── README.md
 ```
 
-Every `.html` page is a standalone document (no client-side router/SPA framework) that loads `applock.js`, then `metadata.js`, then `app.js`, in that order — the lock-gate code must be available before `app.js`'s own init runs. Each page calls `initializePage()` on `DOMContentLoaded`, which detects the current page by checking for known container IDs (`getCurrentPageTab()`) and re-renders only what that page needs; shared state is reloaded from `localStorage` fresh on every navigation. If an app-lock method is set and the current session hasn't been unlocked, `guardAppLock()` intercepts before any of that runs and shows the lock overlay instead — see [app-lock.md](app-lock.md).
+Every `.html` page is a standalone document (no client-side router/SPA framework) that loads `applock.js`, then `metadata.js`, then `app.js`, in that order — the lock-gate code must be available before `app.js`'s own init runs. Each page calls `initializePage()` on `DOMContentLoaded`, which detects the current page by checking for known container IDs (`getCurrentPageTab()`) and re-renders only what that page needs; shared state is reloaded from the encrypted Android store or browser `localStorage` fresh on every navigation. If an app-lock method is set and the current session hasn't been unlocked, `guardAppLock()` intercepts before any of that runs and shows the lock overlay instead — see [app-lock.md](app-lock.md).
 
 ## Launcher icon variants
 
@@ -121,16 +121,19 @@ These only exist once a backup folder has been picked (via Backups & Restore →
 │   └── settings/
 │       └── metadata-sources.json       state.preferences.metadataSources, with every
 │                                       custom source's apiKey replaced by "***REDACTED***"
-└── squashdb_backup_<YYYY-MM-DD>.tar    full snapshot: squash-db/ tree + one extra root-level
+├── squashdb_backup_<YYYY-MM-DD>.tar    full snapshot: squash-db/ tree + one extra root-level
                                         entry squashdb_backup_<YYYY-MM-DD>.json (the same
                                         payload buildBackupPayload() produces for a plain
                                         JSON export)
+└── squashdb_backup_<YYYY-MM-DD>.sqdbe  passphrase-protected AES-256-GCM backup envelope
 ```
 
 Notes:
 - The mirror under `squash-db/` is **additive-only** — items deleted or recategorized in-app leave their old folder behind; nothing here is ever auto-deleted.
 - `.tar` uses no compression (plain POSIX ustar) — written and read by hand-rolled code in `BackupFolderPlugin.java`/`app.js` (`parseTarArchive()`), not a library.
+- `.sqdbe` contains encrypted JSON metadata plus ciphertext; it does not contain the passphrase, and it can also be uploaded by the optional Cloud Sync controls.
+- `.sqdb` is an Android-only, device-bound encrypted snapshot produced by WorkManager; it uses the same Keystore key and is available in the Backup Recovery Center.
 - On non-native platforms (plain desktop browser), Export instead uses `showSaveFilePicker()` if available, or falls back to a plain `<a download>` link — no `squash-db/` tree is ever created outside the native Android path.
-- On a **fresh install** with an empty item list, picking a backup folder that already has a `squash-db/` tree or a `squashdb_backup_*.tar`/`.json` file in it triggers an offer to auto-restore from the newest one found — see [storage.md](storage.md).
+- On a **fresh install** with an empty item list, picking a backup folder that already has a `squash-db/` tree or a `squashdb_backup_*.tar`/`.json`/`.sqdbe` file in it triggers an offer to auto-restore from the newest one found — see [storage.md](storage.md). `.sqdb` snapshots are restored explicitly from the Recovery Center on the same device.
 
-See [storage.md](storage.md) for how/when these files actually get written (sync triggers, delay setting, what's cache vs. persistent), and [metadata.md](metadata.md) for what populates `thumbnail`/the metadata-sources file. Note that `appLock` (PIN/pattern/password hashes, security questions) is **not** included in this mirror — only `metadataSources` is currently written to `squash-db/settings/`; app-lock data only ever lives in `localStorage` and in a full `.tar`/`.json` backup export (see [app-lock.md](app-lock.md)).
+See [storage.md](storage.md) for how/when these files actually get written (sync triggers, delay setting, what's cache vs. persistent), and [metadata.md](metadata.md) for what populates `thumbnail`/the metadata-sources file. Note that `appLock` is included in the encrypted Android state and full `.tar`/`.json` backup export, but is not included in the additive `squash-db/` mirror.

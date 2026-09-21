@@ -4,7 +4,7 @@ Settings → Security → **App Password** (`manage-app-lock.html`, logic in `ww
 
 ## Threat model — read this before relying on it
 
-This deters **casual snooping** (someone picking up your unlocked phone), not a determined attacker. The underlying `state.items`/`state.preferences` data is **not encrypted** — it's still plain JSON in `localStorage`, exactly as described in [storage.md](storage.md). Anyone with `adb`/root filesystem access, or anyone who restores a `.tar`/`.json` backup with preferences included, can read everything regardless of whether a lock is set. The lock only gates the **UI**.
+This deters **casual snooping** (someone picking up your unlocked phone), not a determined attacker. The lock gates the **UI**. On Android, the main `state.items`/`state.preferences`/watch-history state is separately encrypted with an Android Keystore key; browser-only auxiliary keys remain in `localStorage`, and portable `.tar`/`.json` exports remain readable unless the encrypted backup option is used.
 
 ## Methods
 

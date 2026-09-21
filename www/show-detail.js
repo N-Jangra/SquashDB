@@ -16,7 +16,8 @@ let showDetailState = {
   episodes: [],     // flat list across all seasons
   seasons: [],      // sorted season numbers
   activeSeason: null,
-  watchedEpisodeIds: []
+  watchedEpisodeIds: [],
+  episodeFilter: "all"
 };
 
 function buildSyntheticAnimeEpisodes(totalEpisodes, meta = {}) {
@@ -82,7 +83,7 @@ function formatRuntimeHM(minutes) {
 }
 
 function showDetailIsOnline() {
-  return typeof navigator === "undefined" || navigator.onLine !== false;
+  return typeof squashDbIsOffline !== "function" || !squashDbIsOffline();
 }
 
 function getNativeHttpPlugin() {
@@ -93,36 +94,41 @@ function getNativeHttpPlugin() {
 }
 
 async function fetchJsonPortable(url, init = {}) {
-  const plugin = getNativeHttpPlugin();
-  if (plugin?.get) {
-    const response = await plugin.get({ url, headers: init.headers || {} });
-    return response?.data ?? null;
-  }
-  if (plugin?.request) {
-    const response = await plugin.request({
-      url,
-      method: init.method || "GET",
-      headers: init.headers || {},
-      data: init.body || null,
-      responseType: "json"
-    });
-    return response?.data ?? null;
-  }
-
-  if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
-    const proxyUrl = new URL("/proxy", window.location.origin);
-    proxyUrl.searchParams.set("url", url);
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(proxyUrl.toString(), init);
-      if (res.ok) return res.json();
+      const plugin = getNativeHttpPlugin();
+      if (plugin?.get && (init.method || "GET").toUpperCase() === "GET") {
+        const response = await plugin.get({ url, headers: init.headers || {} });
+        return response?.data ?? null;
+      }
+      if (plugin?.request) {
+        const response = await plugin.request({
+          url,
+          method: init.method || "GET",
+          headers: init.headers || {},
+          data: init.body || null,
+          responseType: "json"
+        });
+        return response?.data ?? null;
+      }
+
+      if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+        const proxyUrl = new URL("/proxy", window.location.origin);
+        proxyUrl.searchParams.set("url", url);
+        const proxyResponse = await fetch(proxyUrl.toString(), init);
+        if (proxyResponse.ok) return proxyResponse.json();
+      }
+
+      const response = await fetch(url, init);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
     } catch (err) {
-      // fall through to direct fetch
+      lastError = err;
+      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
     }
   }
-
-  const res = await fetch(url, init);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  throw lastError || new Error("Network request failed");
 }
 
 function getUrlParams() {
@@ -145,6 +151,10 @@ async function initShowDetail() {
     showDetailState.category = item.category;
     showDetailState.itemId = item.id;
     showDetailState.provider = item.metadataSource || (item.tvmazeShowId ? "tvmaze" : "");
+    // Keep the local record as the active detail object. The offline action
+    // must merge with it instead of treating a local page as an empty online
+    // result and wiping saved metadata.
+    showDetailState.show = { ...item };
     showDetailState.watchedEpisodeIds = item.watchedEpisodeIds || [];
 
     if (EPISODE_TRACKED_CATEGORIES.includes(item.category) && (item.tvmazeShowId || item.metadataSource === "anilist" || item.metadataSource === "jikan" || item.metadataSource === "kitsu")) {
@@ -168,8 +178,11 @@ async function initShowDetail() {
             });
             if (episodes.length) applyEpisodesToState(episodes, item);
           }
+          removeQueuedMetadataUpdate(item.category, item.title, item.id);
         } catch (err) {
           console.warn("Could not refresh episode list", err);
+          queueMetadataUpdate(item.category, item.title, item.id);
+          if (notice) notice.style.display = "block";
         }
       } else if (notice) {
         notice.style.display = "block";
@@ -190,6 +203,7 @@ async function initShowDetail() {
     renderBookProgressSection(item);
     renderRatingWidget(item);
     renderNotesField(item);
+    renderRelatedTitles(item);
     updateShowDetailMenu();
     return;
   }
@@ -629,6 +643,7 @@ async function refreshTvmazeItemMetadata(item) {
     saveData();
   } catch (err) {
     console.warn("Could not refresh show metadata", err);
+    queueMetadataUpdate(item.category, item.title, item.id);
   }
 }
 
@@ -654,6 +669,7 @@ async function fetchAndCacheEpisodes(tvmazeShowId, existingItem) {
     }
   } catch (err) {
     console.warn("Error fetching episodes:", err);
+    if (existingItem) queueMetadataUpdate(existingItem.category, existingItem.title, existingItem.id);
   }
 }
 
@@ -674,20 +690,15 @@ function applyEpisodesToState(episodes, existingItem) {
     );
     showDetailState.activeSeason = firstUnfinished ?? showDetailState.seasons[showDetailState.seasons.length - 1] ?? null;
   }
+  scheduleNextEpisodeReminder();
 }
-
-// Topbar delete button: only shown for tracked entries still in Watchlist or
-// In Progress — once a title is On Hold/Dropped/Completed the delete action
-// moves elsewhere (this page keeps it out of the way to avoid accidental
-// removal of finished progress).
-const DELETABLE_STATUSES = ["Watchlist", "In Progress", "Reading", "On Hold", "Dropped", "Completed", "Plan to Read", "Playing", "Backlog"];
 
 function updateShowDetailMenu() {
   const btn = document.getElementById("show-detail-delete-btn-top");
   if (!btn) return;
 
   const item = state.items.find(i => i.id === showDetailState.itemId);
-  const canDelete = !!item && DELETABLE_STATUSES.includes(item.status);
+  const canDelete = !!item;
   btn.style.display = canDelete ? "flex" : "none";
 
   if (!btn.dataset.bound) {
@@ -700,11 +711,40 @@ function updateShowDetailMenu() {
 function confirmDeleteShowDetailItem() {
   const item = state.items.find(i => i.id === showDetailState.itemId);
   if (!item) return;
-  if (!confirm(`Delete "${item.title}" from your list? This cannot be undone.`)) return;
-  state.items = state.items.filter(i => i.id !== showDetailState.itemId);
-  saveData();
-  flushPendingSave();
-  navigateBackWithinApp("dashboard.html");
+  const modal = document.getElementById("picker-modal");
+  const list = document.getElementById("picker-options-list");
+  const titleEl = document.getElementById("picker-modal-title");
+  if (!modal || !list || !titleEl) {
+    deleteEntry(item.id);
+    flushPendingSave();
+    window.location.href = "dashboard.html";
+    return;
+  }
+
+  titleEl.textContent = "Delete this tracker?";
+  list.innerHTML = "";
+
+  const confirmBtn = document.createElement("button");
+  confirmBtn.type = "button";
+  confirmBtn.className = "picker-option";
+  confirmBtn.innerHTML = `<i data-lucide="trash-2" class="picker-option-check" style="visibility:visible; color: var(--danger);"></i><span style="color: var(--danger);">Delete</span>`;
+  confirmBtn.addEventListener("click", () => {
+    closeSettingsPicker();
+    deleteEntry(item.id);
+    flushPendingSave();
+    window.location.href = "dashboard.html";
+  });
+  list.appendChild(confirmBtn);
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "picker-option";
+  cancelBtn.innerHTML = `<i data-lucide="x" class="picker-option-check" style="visibility:visible;"></i><span>Cancel</span>`;
+  cancelBtn.addEventListener("click", closeSettingsPicker);
+  list.appendChild(cancelBtn);
+
+  modal.classList.add("active");
+  if (window.lucide) lucide.createIcons();
 }
 
 // Shared render for providers with no episode/season feed — just header +
@@ -719,6 +759,7 @@ function renderSimpleShowDetail() {
   }
   renderRatingWidget(null);
   renderNotesField(null);
+  renderRelatedTitles(showDetailState.show);
 }
 
 function stripHtml(html) {
@@ -728,8 +769,15 @@ function stripHtml(html) {
 }
 
 function renderShowDetailHeader(show) {
+  const localItem = state.items.find(item => item.id === showDetailState.itemId) || {};
+  const runtimeMinutes = show.episodeRuntime || show.playtime || localItem.episodeRuntime || localItem.playtime || 0;
+  const fallbackMeta = [
+    CATEGORIES[show.category || showDetailState.category]?.label || "",
+    runtimeMinutes ? `~${formatRuntimeHM(runtimeMinutes)}${EPISODE_TRACKED_CATEGORIES.includes(show.category || showDetailState.category) ? "/ep" : ""}` : "",
+    show.network || localItem.network || ""
+  ].filter(Boolean).join(" · ");
   document.getElementById("show-detail-topbar-title").textContent = show.title || "";
-  document.getElementById("show-detail-meta").textContent = show.meta || "";
+  document.getElementById("show-detail-meta").textContent = show.meta || fallbackMeta;
 
   const categoryEl = document.getElementById("show-detail-topbar-category");
   if (categoryEl) categoryEl.textContent = CATEGORIES[showDetailState.category]?.label || "";
@@ -780,11 +828,231 @@ function renderShowDetailHeader(show) {
     }
   }
 
+  const cacheBadge = document.getElementById("show-detail-cache-badge");
+  const hasCachedMetadata = Boolean(localItem && (localItem.summary || localItem.thumbnail || localItem.metadataSource || localItem.episodesCache?.length));
+  if (cacheBadge) {
+    cacheBadge.style.display = hasCachedMetadata ? "inline-flex" : "none";
+    const offline = typeof squashDbIsOffline === "function" ? squashDbIsOffline() : navigator.onLine === false;
+    cacheBadge.title = offline ? "Showing saved metadata while offline" : "Metadata saved on this device";
+    cacheBadge.innerHTML = `<i data-lucide="${offline ? "wifi-off" : "database"}"></i> ${offline ? "Offline cache" : "Cached metadata"}`;
+  }
+
+  renderShowDetailProgress(show, localItem);
+  renderPrimaryDetailActions();
+  renderRelatedTitles(localItem || show);
+
   if (window.lucide) lucide.createIcons();
 }
 
+function showDetailProgress(item) {
+  if (!item || typeof calculateProgress !== "function") return 0;
+  return Math.max(0, Math.min(100, Number(calculateProgress(item)) || 0));
+}
+
+function renderShowDetailProgress(show, localItem) {
+  const bar = document.getElementById("show-detail-progress-bar");
+  const label = document.getElementById("show-detail-progress-label");
+  const progress = showDetailProgress(localItem || show);
+  if (bar) bar.style.width = `${progress}%`;
+  if (label) label.textContent = localItem ? `${progress}% complete` : "Not tracked yet";
+}
+
+function nextDetailEpisode() {
+  const watched = new Set(showDetailState.watchedEpisodeIds || []);
+  return [...showDetailState.episodes]
+    .filter(episode => !watched.has(episode.id))
+    .sort((a, b) => {
+      const season = (parseInt(a.season) || 0) - (parseInt(b.season) || 0);
+      return season || ((parseInt(a.number) || 0) - (parseInt(b.number) || 0));
+    })[0] || null;
+}
+
+function renderPrimaryDetailActions() {
+  const root = document.getElementById("show-detail-primary-actions");
+  const nextButton = document.getElementById("show-detail-next-episode-btn");
+  const previousButton = document.getElementById("show-detail-mark-previous-btn");
+  const offlineButton = document.getElementById("show-detail-offline-download-btn");
+  const visible = showDetailState.episodes.length > 0 || Boolean(showDetailState.show);
+  if (root) root.style.display = visible ? "flex" : "none";
+  if (!visible || !nextButton || !previousButton || !offlineButton) return;
+  const next = nextDetailEpisode();
+  const hasEpisodes = showDetailState.episodes.length > 0;
+  nextButton.style.display = hasEpisodes ? "inline-flex" : "none";
+  previousButton.style.display = hasEpisodes ? "inline-flex" : "none";
+  nextButton.disabled = !next;
+  nextButton.querySelector("span").textContent = next ? `Next: Episode ${next.number || "next"}` : "All episodes watched";
+  previousButton.disabled = !next;
+  nextButton.onclick = () => {
+    if (!next) return;
+    showDetailState.activeSeason = parseInt(next.season) || showDetailState.activeSeason;
+    const seasonLabel = document.getElementById("show-detail-season-btn-label");
+    if (seasonLabel) seasonLabel.textContent = `Season ${showDetailState.activeSeason}`;
+    showDetailState.episodeFilter = "all";
+    renderEpisodeList();
+    const nextRow = Array.from(document.querySelectorAll("[data-episode-id]")).find(row => String(row.dataset.episodeId) === String(next.id));
+    nextRow?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  previousButton.onclick = () => {
+    if (!next) return;
+    const sorted = [...showDetailState.episodes].sort((a, b) => {
+      const season = (parseInt(a.season) || 0) - (parseInt(b.season) || 0);
+      return season || ((parseInt(a.number) || 0) - (parseInt(b.number) || 0));
+    });
+    const nextIndex = sorted.findIndex(episode => episode.id === next.id);
+    const watched = new Set(showDetailState.watchedEpisodeIds || []);
+    sorted.slice(0, Math.max(0, nextIndex)).forEach(episode => watched.add(episode.id));
+    showDetailState.watchedEpisodeIds = Array.from(watched);
+    ensureLocalItem({ watchedEpisodeIds: showDetailState.watchedEpisodeIds, episodesDone: showDetailState.watchedEpisodeIds.length, totalEpisodes: showDetailState.episodes.length });
+    renderEpisodeList();
+    renderPrimaryDetailActions();
+    renderShowDetailProgress(showDetailState.show, state.items.find(item => item.id === showDetailState.itemId));
+  };
+  const currentItem = state.items.find(item => item.id === showDetailState.itemId);
+  const isCached = Boolean(currentItem?.metadataCached || currentItem?.offlineAvailableAt || currentItem?.episodesCache?.length);
+  offlineButton.querySelector("span").textContent = isCached ? "Refresh offline copy" : "Download for offline";
+  offlineButton.classList.toggle("active", isCached);
+  offlineButton.onclick = downloadCurrentItemForOffline;
+}
+
+async function downloadCurrentItemForOffline() {
+  if (typeof squashDbIsOffline === "function" ? squashDbIsOffline() : navigator.onLine === false) {
+    if (showDetailState.show?.title) queueMetadataUpdate(showDetailState.category, showDetailState.show.title, showDetailState.itemId || "");
+    const notice = document.getElementById("show-detail-offline-notice");
+    if (notice) { notice.textContent = "You are offline. This title will be queued for download when you reconnect."; notice.style.display = "block"; }
+    return;
+  }
+  const currentItem = state.items.find(entry => entry.id === showDetailState.itemId) || {};
+  const show = { ...currentItem, ...(showDetailState.show || {}) };
+  let offlineThumbnail = show.thumbnail || currentItem.thumbnail || "";
+  if (thumbnailsEnabled() && offlineThumbnail && !offlineThumbnail.startsWith("data:")) {
+    try {
+      const response = await fetch(offlineThumbnail);
+      if (response.ok) {
+        const blob = await response.blob();
+        offlineThumbnail = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+    } catch (err) {
+      console.warn("Could not save thumbnail for offline use", err);
+    }
+  }
+  ensureLocalItem({
+    summary: show.summary || currentItem.summary || "",
+    thumbnail: thumbnailsEnabled() ? offlineThumbnail : (currentItem.thumbnail || ""),
+    genres: show.genres || currentItem.genres || [],
+    network: show.network || currentItem.network || "",
+    metadataSource: showDetailState.provider || "",
+    providerId: show.providerId || null,
+    episodesCache: showDetailState.episodes.length ? showDetailState.episodes : (showDetailState.pendingEpisodesCache || []),
+    metadataCached: true,
+    offlineAvailableAt: Date.now()
+  });
+  const item = state.items.find(entry => entry.id === showDetailState.itemId);
+  if (item) {
+    item.metadataCached = true;
+    item.offlineAvailableAt = Date.now();
+    saveData();
+  }
+  showDetailState.show = { ...show, thumbnail: offlineThumbnail || show.thumbnail || "" };
+  renderPrimaryDetailActions();
+  renderShowDetailHeader(show);
+}
+
+function renderProviderRelatedTitles(items) {
+  const root = document.getElementById("show-detail-related-section");
+  const list = document.getElementById("show-detail-related-list");
+  if (!root || !list || !Array.isArray(items) || !items.length) {
+    if (root) root.style.display = "none";
+    return;
+  }
+  root.style.display = "block";
+  list.innerHTML = items.slice(0, 6).map(item => `<button type="button" class="show-detail-related-card" data-related-url="${encodeURIComponent(item.url || "")}">${thumbnailOrPlaceholder(item.thumbnail, "show-detail-related-thumb")}<span>${detailText(item.title)}</span><small>${detailText(item.meta || "Online recommendation")}</small></button>`).join("");
+  list.querySelectorAll("[data-related-url]").forEach(card => card.addEventListener("click", () => {
+    const url = decodeURIComponent(card.dataset.relatedUrl || "");
+    if (url) window.location.href = url;
+  }));
+}
+
+async function loadProviderRecommendations(current) {
+  const root = document.getElementById("show-detail-related-section");
+  if (!root || !current) return;
+  const provider = showDetailState.provider || current.metadataSource || (current.tvmazeShowId ? "tvmaze" : "");
+  const providerId = current.tvmazeShowId || current.providerId;
+  if (!providerId) {
+    root.style.display = "none";
+    return;
+  }
+
+  try {
+    let recommendations = [];
+    if (provider === "tvmaze") {
+      const genres = Array.isArray(current.genres) && current.genres.length ? current.genres.slice(0, 3) : [current.title || ""];
+      const responses = await Promise.all(genres.map(genre => fetchJsonPortable(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(genre)}`)));
+      const shows = responses.flatMap(response => Array.isArray(response) ? response.map(entry => entry.show || entry) : []);
+      recommendations = shows.map(show => ({
+          title: show.name || "Untitled",
+          thumbnail: show.image?.medium || show.image?.original || "",
+          meta: [show.type, show.premiered?.slice(0, 4)].filter(Boolean).join(" · "),
+          url: `show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=tvmaze&providerId=${encodeURIComponent(show.id)}&title=${encodeURIComponent(show.name || "")}`
+        }));
+    } else if (provider === "jikan") {
+      const response = await fetchJsonPortable(`https://api.jikan.moe/v4/anime/${encodeURIComponent(providerId)}/recommendations`);
+      recommendations = (response?.data || []).map(entry => entry.entry || entry).map(show => ({
+        title: show.title || "Untitled",
+        thumbnail: show.images?.jpg?.image_url || "",
+        meta: "MyAnimeList recommendation",
+        url: `show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=jikan&providerId=${encodeURIComponent(show.mal_id)}&title=${encodeURIComponent(show.title || "")}`
+      }));
+    } else if (provider === "anilist") {
+      const response = await fetchJsonPortable("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: `query($id:Int){Media(id:$id){recommendations(sort:RATING_DESC,perPage:6){nodes{mediaRecommendation{id title{romaji english} coverImage{medium} genres}}}}}`, variables: { id: Number(providerId) } })
+      });
+      recommendations = (response?.data?.Media?.recommendations?.nodes || []).map(node => node.mediaRecommendation).filter(Boolean).map(show => ({
+        title: show.title?.english || show.title?.romaji || "Untitled",
+        thumbnail: show.coverImage?.medium || "",
+        meta: "AniList recommendation",
+        url: `show-detail.html?category=${encodeURIComponent(showDetailState.category)}&provider=anilist&providerId=${encodeURIComponent(show.id)}&title=${encodeURIComponent(show.title?.english || show.title?.romaji || "")}`
+      }));
+    }
+
+    const currentTitle = String(current.title || "").toLowerCase();
+    const localTitles = new Set(state.items.map(item => String(item.title || "").toLowerCase()));
+    recommendations = recommendations.filter(item => {
+      const title = String(item.title || "").toLowerCase();
+      return title && title !== currentTitle && !localTitles.has(title);
+    });
+    recommendations = Array.from(new Map(recommendations.map(item => [String(item.title).toLowerCase(), item])).values());
+    renderProviderRelatedTitles(recommendations);
+  } catch (err) {
+    console.warn("Could not load provider recommendations", err);
+    root.style.display = "none";
+  }
+}
+
+function renderRelatedTitles(current) {
+  const root = document.getElementById("show-detail-related-section");
+  if (!root || !current) return;
+  const provider = showDetailState.provider || current.metadataSource || (current.tvmazeShowId ? "tvmaze" : "");
+  const providerId = current.tvmazeShowId || current.providerId || "";
+  const requestKey = `${provider}:${providerId}:${current.title || ""}`;
+  if (showDetailState.relatedRequestKey === requestKey) return;
+  showDetailState.relatedRequestKey = requestKey;
+  root.style.display = "none";
+  loadProviderRecommendations(current);
+}
+
+function detailText(value) {
+  return String(value || "").replace(/[&<>\"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[character]));
+}
+
 function productionStatusSlug(status) {
-  const normalized = status.toLowerCase();
+  const normalized = String(status || "").trim().toLowerCase();
   if (normalized === "running") return "running";
   if (normalized === "ended") return "ended";
   if (normalized === "in development") return "development";
@@ -897,9 +1165,19 @@ function renderNotesField(existingItem) {
   if (title) title.style.display = "block";
   group.style.display = "block";
   textarea.value = existingItem?.notes || "";
+  const toggle = document.getElementById("show-detail-notes-toggle");
+  if (toggle) {
+    group.classList.toggle("collapsed", !existingItem?.notes);
+    toggle.querySelector("span").textContent = existingItem?.notes ? "Collapse notes" : "Expand notes";
+    toggle.onclick = () => {
+      group.classList.toggle("collapsed");
+      toggle.querySelector("span").textContent = group.classList.contains("collapsed") ? "Expand notes" : "Collapse notes";
+    };
+  }
   textarea.onchange = () => {
     ensureLocalItem({ notes: textarea.value });
   };
+  if (window.lucide) lucide.createIcons();
 }
 
 function renderStatusPicker(existingItem) {
@@ -1013,16 +1291,59 @@ function renderSeasonSection() {
   };
 
   renderEpisodeList();
+  scheduleNextEpisodeReminder();
+}
+
+async function scheduleNextEpisodeReminder() {
+  if (!state.preferences.notificationEpisodeReminders || !state.preferences.notificationsEnabled || isNotificationQuietHours()) return;
+  const notifications = window.Capacitor?.Plugins?.Notifications;
+  if (!notifications?.schedule) return;
+  const watched = new Set(showDetailState.watchedEpisodeIds || []);
+  const next = [...showDetailState.episodes]
+    .filter(ep => ep.airdate && !watched.has(ep.id))
+    .sort((a, b) => String(a.airdate).localeCompare(String(b.airdate)))[0];
+  if (!next) return;
+  const date = new Date(`${next.airdate}T09:00:00`);
+  if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now()) return;
+  const item = state.items.find(entry => entry.id === showDetailState.itemId);
+  const title = item?.title || showDetailState.show?.title || "Tracked show";
+  const id = Math.abs([...`${showDetailState.itemId || title}:${next.id}`].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0));
+  try {
+    await notifications.schedule({
+      id: id || 1,
+      at: date.getTime(),
+      title: `${title}: new episode`,
+      body: `Episode ${next.number || "next"} is scheduled for ${next.airdate}.`,
+      itemId: showDetailState.itemId || "",
+      actionUrl: showDetailState.itemId ? `show-detail.html?source=local&itemId=${encodeURIComponent(showDetailState.itemId)}` : "",
+      snoozeMinutes: state.preferences.notificationSnoozeMinutes || 60
+    });
+  } catch (err) {
+    console.warn("Could not schedule episode reminder", err);
+  }
 }
 
 function renderEpisodeList() {
   const list = document.getElementById("show-detail-episode-list");
   if (!list) return;
 
-  const episodes = showDetailState.episodes.filter(ep => (parseInt(ep.season) || 0) === showDetailState.activeSeason);
+  const today = new Date().toISOString().slice(0, 10);
   const watchedSet = new Set(showDetailState.watchedEpisodeIds);
+  const seasonEpisodes = showDetailState.episodes.filter(ep => (parseInt(ep.season) || 0) === showDetailState.activeSeason);
+  const filter = showDetailState.episodeFilter || "all";
+  const episodes = seasonEpisodes.filter(ep => {
+    if (filter === "watched") return watchedSet.has(ep.id);
+    if (filter === "unwatched") return !watchedSet.has(ep.id);
+    if (filter === "upcoming") return Boolean(ep.airdate && ep.airdate > today && !watchedSet.has(ep.id));
+    if (filter === "filler") return Boolean(ep.filler);
+    if (filter === "recap") return Boolean(ep.recap);
+    return true;
+  });
+  document.querySelectorAll("[data-episode-filter]").forEach(button => {
+    button.classList.toggle("active", button.dataset.episodeFilter === filter);
+  });
 
-  list.innerHTML = episodes.map(ep => {
+  list.innerHTML = episodes.length ? episodes.map(ep => {
     const summary = stripHtml(ep.summary || "");
     const thumbUrl = ep.image?.medium || ep.image?.original || "";
     return `
@@ -1045,7 +1366,7 @@ function renderEpisodeList() {
       ${summary ? `<p class="show-detail-episode-summary">${summary}</p>` : ""}
     </div>
   `;
-  }).join("");
+  }).join("") : `<div class="show-detail-episode-empty">No episodes match this filter.</div>`;
 
   list.querySelectorAll(".show-detail-episode-check").forEach(btn => {
     btn.addEventListener("click", (e) => {
@@ -1090,6 +1411,10 @@ function closeEpisodeImageModal() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-episode-filter]").forEach(button => button.addEventListener("click", () => {
+    showDetailState.episodeFilter = button.dataset.episodeFilter || "all";
+    renderEpisodeList();
+  }));
   const modal = document.getElementById("episode-image-modal");
   const closeBtn = document.getElementById("episode-image-modal-close");
   if (closeBtn) closeBtn.addEventListener("click", closeEpisodeImageModal);
@@ -1176,6 +1501,7 @@ function toggleEpisodeWatched(episodeId, watched) {
   if (newlyWatchedIds.length) {
     logEpisodeWatches(newlyWatchedIds);
   }
+  scheduleNextEpisodeReminder();
 
   const updates = {
     watchedEpisodeIds: showDetailState.watchedEpisodeIds,
@@ -1197,6 +1523,8 @@ function toggleEpisodeWatched(episodeId, watched) {
   }
 
   ensureLocalItem(updates);
+  renderPrimaryDetailActions();
+  renderShowDetailProgress(showDetailState.show, state.items.find(item => item.id === showDetailState.itemId));
 
   if (updates.status) {
     renderStatusPicker(state.items.find(i => i.id === showDetailState.itemId));
@@ -1273,7 +1601,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (typeof state === "undefined") {
         setTimeout(waitForState, 10);
       } else {
-        initShowDetail();
+        // app.js declares state before restoring the encrypted/local database.
+        // Wait for that restore to finish or a local item can appear missing
+        // briefly and incorrectly redirect this page to Dashboard.
+        Promise.resolve(window.squashDbAppReady)
+          .then(() => initShowDetail())
+          .catch(err => {
+            console.error("Could not initialize show details", err);
+            initShowDetail();
+          });
       }
     };
     waitForState();

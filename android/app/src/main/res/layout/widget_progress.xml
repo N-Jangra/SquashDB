@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#171827">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SquashDB"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_total"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textColor="#FFFFFF"
+        android:textSize="28sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="tracked items"
+        android:textColor="#B9B8C8"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/widget_completed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 completed"
+        android:textColor="#A7F3D0"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/widget_in_progress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 in progress"
+        android:textColor="#C4B5FD"
+        android:textSize="13sp" />
+</LinearLayout>

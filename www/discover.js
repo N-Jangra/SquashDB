@@ -37,7 +37,7 @@ function loadDiscoverSessionState() {
 }
 
 function discoverIsOnline() {
-  return typeof navigator === "undefined" || navigator.onLine !== false;
+  return typeof squashDbIsOffline !== "function" || !squashDbIsOffline();
 }
 
 function getNativeHttpPlugin() {
@@ -48,36 +48,51 @@ function getNativeHttpPlugin() {
 }
 
 async function fetchJsonPortable(url, init = {}) {
-  const plugin = getNativeHttpPlugin();
-  if (plugin?.get) {
-    const response = await plugin.get({ url, headers: init.headers || {} });
-    return response?.data ?? null;
-  }
-  if (plugin?.request) {
-    const response = await plugin.request({
-      url,
-      method: init.method || "GET",
-      headers: init.headers || {},
-      data: init.body || null,
-      responseType: "json"
-    });
-    return response?.data ?? null;
-  }
-
-  if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
-    const proxyUrl = new URL("/proxy", window.location.origin);
-    proxyUrl.searchParams.set("url", url);
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(proxyUrl.toString(), init);
-      if (res.ok) return res.json();
+      const plugin = getNativeHttpPlugin();
+      if (plugin?.get && (init.method || "GET").toUpperCase() === "GET") {
+        const response = await plugin.get({ url, headers: init.headers || {} });
+        return parsePortableJson(response?.data);
+      }
+      if (plugin?.request) {
+        const response = await plugin.request({
+          url,
+          method: init.method || "GET",
+          headers: init.headers || {},
+          data: init.body || null,
+          responseType: "json"
+        });
+        return parsePortableJson(response?.data);
+      }
+
+      if (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null") {
+        const proxyUrl = new URL("/proxy", window.location.origin);
+        proxyUrl.searchParams.set("url", url);
+        const proxyResponse = await fetch(proxyUrl.toString(), init);
+        if (proxyResponse.ok) return proxyResponse.json();
+        throw new Error(`Proxy HTTP ${proxyResponse.status}`);
+      }
+
+      const response = await fetch(url, init);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
     } catch (err) {
-      // fall through to direct fetch
+      lastError = err;
+      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 300 * (attempt + 1)));
     }
   }
+  throw lastError || new Error("Network request failed");
+}
 
-  const res = await fetch(url, init);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+function parsePortableJson(value) {
+  if (typeof value !== "string") return value ?? null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
 }
 
 // Best-effort category detection from a TVmaze show's language/genres, since
@@ -701,8 +716,15 @@ function mangaDexMangaToResult(entry) {
 }
 
 async function searchMangaDex(query) {
-  const json = await fetchJsonPortable(`https://api.mangadex.org/manga?title=${encodeURIComponent(query)}&includes[]=cover_art&limit=15`);
-  return (Array.isArray(json.data) ? json.data : []).map(mangaDexMangaToResult);
+  const params = new URLSearchParams({
+    title: query.trim(),
+    limit: "15",
+    "order[relevance]": "desc"
+  });
+  params.append("includes[]", "cover_art");
+  const json = await fetchJsonPortable(`https://api.mangadex.org/manga?${params.toString()}`);
+  const entries = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.results) ? json.results : []);
+  return entries.filter(entry => entry?.id).map(mangaDexMangaToResult);
 }
 
 function shikimoriToResult(entry, category) {
@@ -722,8 +744,14 @@ function shikimoriToResult(entry, category) {
 
 async function searchShikimori(query, category) {
   const endpoint = category === "manga" ? "mangas" : "animes";
-  const json = await fetchJsonPortable(`https://shikimori.one/api/${endpoint}?search=${encodeURIComponent(query)}&limit=15`);
-  return (Array.isArray(json) ? json : []).map(entry => shikimoriToResult(entry, category));
+  const params = new URLSearchParams({ search: query.trim(), limit: "15" });
+  const json = await fetchJsonPortable(`https://shikimori.one/api/${endpoint}?${params.toString()}`);
+  const entries = Array.isArray(json) ? json : (
+    Array.isArray(json?.data) ? json.data :
+      (Array.isArray(json?.[endpoint]) ? json[endpoint] : [])
+  );
+  return entries.filter(entry => entry?.id && (entry.russian || entry.name || entry.title))
+    .map(entry => shikimoriToResult(entry, category));
 }
 
 // ---- AniList (anime + manga; also used as a supplemental source for

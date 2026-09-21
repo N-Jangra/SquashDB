@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="190" height="190" viewBox="0 0 190 190">
+  <defs>
+    <linearGradient id="bg" x1="12" y1="10" x2="178" y2="182" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071B22"/>
+      <stop offset="0.55" stop-color="#031116"/>
+      <stop offset="1" stop-color="#02080C"/>
+    </linearGradient>
+
+    <linearGradient id="teal" x1="35" y1="27" x2="150" y2="154" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#66FFF4"/>
+      <stop offset="0.45" stop-color="#28EFD2"/>
+      <stop offset="1" stop-color="#12CC92"/>
+    </linearGradient>
+
+    <filter id="outerGlow" x="-45%" y="-45%" width="190%" height="190%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="0 0 0 0 0.08
+                0 0 0 0 0.95
+                0 0 0 0 0.80
+                0 0 0 0.78 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="softGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="1.4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <radialGradient id="floorGlow" cx="0" cy="0" r="1"
+      gradientTransform="translate(95 165) scale(52 10)">
+      <stop stop-color="#26F4CD" stop-opacity=".85"/>
+      <stop offset=".28" stop-color="#26F4CD" stop-opacity=".28"/>
+      <stop offset=".7" stop-color="#26F4CD" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#26F4CD" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- card -->
+  <rect x="1" y="1" width="188" height="188" rx="22"
+        fill="url(#bg)" stroke="#12333C" stroke-width="2"/>
+
+  <!-- subtle base glow -->
+  <ellipse cx="95" cy="165" rx="52" ry="10" fill="url(#floorGlow)"/>
+  <rect x="72" y="164" width="46" height="2" rx="1" fill="#43FFD7" opacity=".45"/>
+
+  <!-- gear -->
+  <g filter="url(#outerGlow)">
+    <path d="
+      M72 26
+      H91
+      L94 39
+      C100 40 106 42 111 45
+      L121 38
+      L134 51
+      L127 61
+      C130 66 132 72 133 78
+      L146 81
+      V99
+      L133 102
+      C132 108 130 114 127 119
+      L134 129
+      L121 142
+      L111 135
+      C106 138 100 140 94 141
+      L91 154
+      H72
+      L69 141
+      C63 140 57 138 52 135
+      L42 142
+      L29 129
+      L36 119
+      C33 114 31 108 30 102
+      L17 99
+      V81
+      L30 78
+      C31 72 33 66 36 61
+      L29 51
+      L42 38
+      L52 45
+      C57 42 63 40 69 39
+      Z"
+      fill="none"
+      stroke="url(#teal)"
+      stroke-width="6"
+      stroke-linejoin="round"/>
+  </g>
+
+  <!-- correctly centered gear hub -->
+  <circle cx="81.5" cy="90" r="27"
+          fill="none"
+          stroke="url(#teal)"
+          stroke-width="6"
+          filter="url(#softGlow)"/>
+
+  <!-- clipboard overlays the right side of the centered hub -->
+  <g filter="url(#outerGlow)">
+    <rect x="89" y="84" width="63" height="76" rx="8"
+          fill="#061015"
+          stroke="url(#teal)"
+          stroke-width="5.5"/>
+
+    <!-- clip -->
+    <path d="M109 84
+             C109 77 113 73 120 73
+             C127 73 131 77 131 84
+             H139
+             C142 84 144 86 144 89
+             V95
+             H96
+             V89
+             C96 86 98 84 101 84
+             Z"
+          fill="#061015"
+          stroke="url(#teal)"
+          stroke-width="5"
+          stroke-linejoin="round"/>
+  </g>
+
+  <!-- checklist -->
+  <g stroke="url(#teal)"
+     stroke-width="4.2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     filter="url(#softGlow)">
+    <path d="M104 109 L110 115 L119 104"/>
+    <path d="M104 127 L110 133 L119 122"/>
+    <path d="M104 145 L110 151 L119 140"/>
+
+    <path d="M127 110 H141"/>
+    <path d="M127 128 H141"/>
+    <path d="M127 146 H141"/>
+  </g>
+</svg>

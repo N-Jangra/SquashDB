@@ -127,7 +127,11 @@ function initSourceSearchPage() {
   }
 
   sourceSearchState.key = key;
-  sourceSearchState.category = info.categories[0];
+  // MangaDex and Shikimori are being opened from the manga/manhwa/manhua
+  // source flow, so start on manga instead of silently querying anime.
+  sourceSearchState.category = ["mangadex", "shikimori"].includes(key) && info.categories.includes("manga")
+    ? "manga"
+    : info.categories[0];
   titleEl.textContent = info.name;
 
   const notice = document.getElementById("source-search-notice");
@@ -223,12 +227,22 @@ async function runSourceSearch(query) {
     return;
   }
 
+  const notice = document.getElementById("source-search-notice");
+  if (notice) {
+    notice.textContent = "";
+    notice.style.display = "none";
+  }
+
   const requestId = ++sourceSearchState.requestId;
   let results = [];
   try {
     results = await searchSingleSource(sourceSearchState.key, sourceSearchState.category, trimmed);
   } catch (err) {
     console.warn(`${sourceSearchState.key} source search failed`, err);
+    if (notice) {
+      notice.textContent = `${sourceSearchState.key} could not be reached: ${err?.message || "network request failed"}.`;
+      notice.style.display = "block";
+    }
   }
   if (requestId !== sourceSearchState.requestId) return;
 

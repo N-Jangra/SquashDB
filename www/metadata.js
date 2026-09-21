@@ -9,6 +9,54 @@ let metadataSearchState = {
   items: []
 };
 
+const SQUASHDB_METADATA_QUEUE_KEY = "squashdb_metadata_update_queue";
+
+function readMetadataUpdateQueue() {
+  try {
+    const queue = JSON.parse(localStorage.getItem(SQUASHDB_METADATA_QUEUE_KEY) || "[]");
+    return Array.isArray(queue) ? queue : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function queueMetadataUpdate(category, title, itemId = "") {
+  if (!category || !title) return;
+  const queue = readMetadataUpdateQueue().filter(entry => !(entry.category === category && entry.title.toLowerCase() === title.toLowerCase()));
+  queue.push({ category, title, itemId, queuedAt: Date.now() });
+  localStorage.setItem(SQUASHDB_METADATA_QUEUE_KEY, JSON.stringify(queue.slice(-25)));
+  window.dispatchEvent(new CustomEvent("metadata-queue-updated", { detail: { count: queue.length } }));
+}
+
+function removeQueuedMetadataUpdate(category, title, itemId = "") {
+  const normalizedTitle = String(title || "").toLowerCase();
+  const next = readMetadataUpdateQueue().filter(entry => {
+    const sameItem = itemId && entry.itemId && String(entry.itemId) === String(itemId);
+    const sameTitle = entry.category === category && String(entry.title || "").toLowerCase() === normalizedTitle;
+    return !(sameItem || sameTitle);
+  });
+  localStorage.setItem(SQUASHDB_METADATA_QUEUE_KEY, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent("metadata-queue-updated", { detail: { count: next.length } }));
+}
+
+function metadataQueueCount() {
+  return readMetadataUpdateQueue().length;
+}
+
+window.addEventListener("online", () => {
+  window.dispatchEvent(new CustomEvent("metadata-queue-updated", { detail: { count: metadataQueueCount() } }));
+  retryVisibleMetadataUpdate();
+});
+
+async function retryVisibleMetadataUpdate() {
+  if ((typeof squashDbIsOffline === "function" && squashDbIsOffline()) || typeof fetchAndApplyMetadataFromTitle !== "function") return;
+  const category = document.getElementById("entry-category")?.value || state.activeCategoryChip;
+  const title = document.getElementById("entry-title")?.value.trim() || "";
+  const queued = readMetadataUpdateQueue().find(entry => entry.category === category && String(entry.title).toLowerCase() === title.toLowerCase());
+  if (!queued || !title || state.preferences.metadataMode !== "online") return;
+  await fetchAndApplyMetadataFromTitle();
+}
+
 const BUILTIN_METADATA_SOURCES = {
   tvmaze: { name: "TVmaze", icon: "tv", categories: ["series", "kdrama", "cdrama", "anime"] },
   wikidata: { name: "Wikidata", icon: "globe", categories: ["movie", "game"] },
@@ -576,6 +624,10 @@ async function fetchAndApplyMetadataFromTitle() {
   const title = document.getElementById("entry-title")?.value.trim();
   if (!title || !category || state.preferences.metadataMode !== "online") return;
   if (!["series", "kdrama", "cdrama", "anime", "movie", "game", "manga", "novel"].includes(category)) return;
+  if (typeof squashDbIsOffline === "function" ? squashDbIsOffline() : navigator.onLine === false) {
+    queueMetadataUpdate(category, title);
+    return;
+  }
 
   const normalized = encodeURIComponent(title);
 
@@ -733,8 +785,10 @@ async function fetchAndApplyMetadataFromTitle() {
       }
       return;
     }
+    removeQueuedMetadataUpdate(category, title);
   } catch (err) {
     console.warn("Metadata lookup failed", err);
+    queueMetadataUpdate(category, title);
   }
 }
 

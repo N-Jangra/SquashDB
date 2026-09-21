@@ -1,8 +1,8 @@
 # "Database" Schema
 
-There is no SQL database in this app. All data lives in the browser/WebView's `localStorage` — a persistent key→string store, private to the app, that survives restarts and reboots but is not a real file you can browse to (see [storage.md](storage.md) for exactly where it lives and how long it's kept).
+There is no SQL database in this app. On Android, the main state is stored as an encrypted JSON blob using an Android Keystore AES-GCM key; browser builds and auxiliary UI values use the browser/WebView's `localStorage` fallback (see [storage.md](storage.md)).
 
-`state` (defined in `www/app.js`) is the in-memory object that gets serialized into `localStorage` on every save, and reloaded from it on every page load via `loadData()`.
+`state` (defined in `www/app.js`) is the in-memory object serialized into the encrypted Android store on native builds, or `localStorage` on web, and reloaded on every page load via `loadData()`.
 
 ## `squashdb_items` → `state.items: Item[]`
 
@@ -153,7 +153,7 @@ Not nested under items/prefs — small standalone values, mostly UI/session stat
 | `squashdb_last_entry_category` | Category pre-selected next time the Add modal opens |
 | `squashdb_last_tab` | Last visited bottom-nav tab, used to restore on relaunch if `defaultStartPage` is `"remember-last"` |
 | `squashdb_backup_folder_uri` | SAF `content://` tree URI for the chosen backup folder (Android only) |
-| `squashdb_backup_folder_invalid` | `"true"`/`"false"` flag set by a silent startup check; drives the notice on the Backups & Restore page |
+| `squashdb_backup_folder_invalid` | `"true"`/`"false"` flag set by the startup storage check; drives the notice on the Backups & Restore page |
 | `squashdb_synced_item_hashes` | `{ [itemId]: JSON.stringify(item) }` — per-item hash cache so `squash-db/` folder-tree sync only rewrites items that actually changed |
 | `squashdb_lock_failed_attempts` | Count of consecutive wrong app-lock attempts (persists across restarts — this is what makes rate limiting/the "Forgot password" reveal survive an app kill) |
 

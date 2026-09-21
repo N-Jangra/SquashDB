@@ -18,6 +18,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import android.util.Base64;
 
 import com.getcapacitor.JSArray;
@@ -27,6 +29,14 @@ import com.getcapacitor.JSArray;
 // exports/imports never need to re-prompt once a folder has been chosen.
 @CapacitorPlugin(name = "BackupFolder")
 public class BackupFolderPlugin extends Plugin {
+    // SAF providers can be slow (especially cloud-backed folders). Keep all
+    // file work serialized on one background thread so the WebView and Android
+    // main thread remain responsive while preserving operation ordering.
+    private final ExecutorService storageExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "SquashDB-Storage");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     @PluginMethod
     public void pickFolder(PluginCall call) {
@@ -66,6 +76,10 @@ public class BackupFolderPlugin extends Plugin {
 
     @PluginMethod
     public void writeFile(PluginCall call) {
+        storageExecutor.execute(() -> doWriteFile(call));
+    }
+
+    private void doWriteFile(PluginCall call) {
         String treeUriStr = call.getString("uri");
         String fileName = call.getString("fileName");
         String content = call.getString("content");
@@ -112,6 +126,10 @@ public class BackupFolderPlugin extends Plugin {
 
     @PluginMethod
     public void readFile(PluginCall call) {
+        storageExecutor.execute(() -> doReadFile(call));
+    }
+
+    private void doReadFile(PluginCall call) {
         String uriStr = call.getString("uri");
         if (uriStr == null) {
             call.reject("Missing 'uri' parameter");
@@ -146,6 +164,10 @@ public class BackupFolderPlugin extends Plugin {
     // as UTF-8 text), this is safe for binary formats like the .tar backup archive.
     @PluginMethod
     public void readBinaryFile(PluginCall call) {
+        storageExecutor.execute(() -> doReadBinaryFile(call));
+    }
+
+    private void doReadBinaryFile(PluginCall call) {
         String uriStr = call.getString("uri");
         if (uriStr == null) {
             call.reject("Missing 'uri' parameter");
@@ -178,6 +200,10 @@ public class BackupFolderPlugin extends Plugin {
 
     @PluginMethod
     public void listFiles(PluginCall call) {
+        storageExecutor.execute(() -> doListFiles(call));
+    }
+
+    private void doListFiles(PluginCall call) {
         String treeUriStr = call.getString("uri");
         if (treeUriStr == null) {
             call.reject("Missing 'uri' parameter");
@@ -198,21 +224,25 @@ public class BackupFolderPlugin extends Plugin {
                 childrenUri,
                 new String[] {
                     DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    DocumentsContract.Document.COLUMN_DISPLAY_NAME
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_SIZE,
+                    DocumentsContract.Document.COLUMN_LAST_MODIFIED
                 },
                 null, null, null
             );
 
             if (cursor != null) {
                 while (cursor.moveToNext()) {
-                    String docId = cursor.getString(0);
-                    String name = cursor.getString(1);
-                    Uri docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId);
+                String docId = cursor.getString(0);
+                String name = cursor.getString(1);
+                Uri docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId);
 
-                    JSObject file = new JSObject();
-                    file.put("name", name);
-                    file.put("uri", docUri.toString());
-                    files.put(file);
+                JSObject file = new JSObject();
+                file.put("name", name);
+                file.put("uri", docUri.toString());
+                if (!cursor.isNull(2)) file.put("size", cursor.getLong(2));
+                if (!cursor.isNull(3)) file.put("lastModified", cursor.getLong(3));
+                files.put(file);
                 }
                 cursor.close();
             }
@@ -229,6 +259,10 @@ public class BackupFolderPlugin extends Plugin {
     // deleting squash-db/ or any of its contents.
     @PluginMethod
     public void deleteFile(PluginCall call) {
+        storageExecutor.execute(() -> doDeleteFile(call));
+    }
+
+    private void doDeleteFile(PluginCall call) {
         String uriStr = call.getString("uri");
         if (uriStr == null) {
             call.reject("Missing 'uri' parameter");
@@ -248,16 +282,59 @@ public class BackupFolderPlugin extends Plugin {
 
     @PluginMethod
     public void hasPersistedFolder(PluginCall call) {
+        storageExecutor.execute(() -> doHasPersistedFolder(call));
+    }
+
+    @PluginMethod
+    public void rememberFolder(PluginCall call) {
+        String uri = call.getString("uri");
+        if (uri == null || uri.isEmpty()) {
+            call.reject("Missing folder URI");
+            return;
+        }
+        getContext().getSharedPreferences("squashdb_backup_location", android.content.Context.MODE_PRIVATE)
+            .edit().putString("uri", uri).apply();
+        call.resolve(new JSObject().put("success", true));
+    }
+
+    private void doHasPersistedFolder(PluginCall call) {
         String treeUriStr = call.getString("uri");
         boolean valid = false;
 
-        if (treeUriStr != null) {
-            Uri treeUri = Uri.parse(treeUriStr);
-            for (android.content.UriPermission perm : getContext().getContentResolver().getPersistedUriPermissions()) {
-                if (perm.getUri().equals(treeUri) && perm.isWritePermission()) {
-                    valid = true;
-                    break;
+        if (treeUriStr != null && !treeUriStr.isEmpty()) {
+            try {
+                Uri treeUri = Uri.parse(treeUriStr);
+                for (android.content.UriPermission perm : getContext().getContentResolver().getPersistedUriPermissions()) {
+                    if (perm.getUri().equals(treeUri) && perm.isWritePermission()) {
+                        Uri rootUri = DocumentsContract.buildDocumentUriUsingTree(
+                            treeUri,
+                            DocumentsContract.getTreeDocumentId(treeUri)
+                        );
+                        try (Cursor cursor = getContext().getContentResolver().query(
+                            rootUri,
+                            new String[] {
+                                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                                DocumentsContract.Document.COLUMN_MIME_TYPE
+                            },
+                            null, null, null
+                        )) {
+                            if (cursor != null && cursor.moveToFirst()) {
+                                String mimeType = cursor.getString(1);
+                                boolean isDirectory = DocumentsContract.Document.MIME_TYPE_DIR.equals(mimeType);
+                                // Some SAF providers report zero flags for a writable
+                                // tree. The persisted write grant is the authoritative
+                                // permission; querying the directory proves the location
+                                // is still reachable.
+                                valid = isDirectory;
+                            }
+                        }
+                        break;
+                    }
                 }
+            } catch (Exception ignored) {
+                // A revoked grant, removed SD card, or unavailable cloud provider
+                // is reported to JavaScript as an invalid storage location.
+                valid = false;
             }
         }
 
@@ -346,6 +423,10 @@ public class BackupFolderPlugin extends Plugin {
     // Used by the squash-db/ category/item folder-tree mirror.
     @PluginMethod
     public void writeNestedFile(PluginCall call) {
+        storageExecutor.execute(() -> doWriteNestedFile(call));
+    }
+
+    private void doWriteNestedFile(PluginCall call) {
         String treeUriStr = call.getString("uri");
         JSArray dirPathArr = call.getArray("dirPath");
         String fileName = call.getString("fileName");
@@ -384,6 +465,10 @@ public class BackupFolderPlugin extends Plugin {
     // Used for .thumbnail files in the squash-db/ folder-tree mirror.
     @PluginMethod
     public void writeNestedBinaryFile(PluginCall call) {
+        storageExecutor.execute(() -> doWriteNestedBinaryFile(call));
+    }
+
+    private void doWriteNestedBinaryFile(PluginCall call) {
         String treeUriStr = call.getString("uri");
         JSArray dirPathArr = call.getArray("dirPath");
         String fileName = call.getString("fileName");
@@ -435,6 +520,10 @@ public class BackupFolderPlugin extends Plugin {
     // every file's bytes through the JS bridge twice (once to read, once to re-write).
     @PluginMethod
     public void exportTarArchive(PluginCall call) {
+        storageExecutor.execute(() -> doExportTarArchive(call));
+    }
+
+    private void doExportTarArchive(PluginCall call) {
         String treeUriStr = call.getString("uri");
         JSArray sourceDirPathArr = call.getArray("sourceDirPath");
         String tarFileName = call.getString("tarFileName");
