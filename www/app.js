@@ -975,14 +975,14 @@ function setupEventListeners() {
   if (statsFab) {
     statsFab.addEventListener("click", () => {
       recordCurrentPage();
-      window.location.href = "statistics.html";
+      window.location.href = "static/pages/main/statistics.html";
     });
   }
   const timelineFab = document.getElementById("timeline-fab");
   if (timelineFab) {
     timelineFab.addEventListener("click", () => {
       recordCurrentPage();
-      window.location.href = "timeline.html";
+      window.location.href = "static/pages/main/timeline.html";
     });
   }
 
@@ -1429,7 +1429,7 @@ async function sendConfiguredNotification(key, title, body, itemId = "") {
   await notifications.notify({
     id: Math.abs([...`${key}:${itemId}:${title}`].reduce((hash, char) => ((hash << 5) - hash + char.charCodeAt(0)) | 0, 0)) || 1,
     title, body, itemId,
-    actionUrl: itemId ? `show-detail.html?source=local&itemId=${encodeURIComponent(itemId)}` : "",
+    actionUrl: itemId ? `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(itemId)}` : "",
     snoozeMinutes: state.preferences.notificationSnoozeMinutes || 60
   });
   return true;
@@ -1453,7 +1453,7 @@ async function scheduleUnfinishedItemReminder() {
       title: "Continue your list",
       body: `${item.title} is still unfinished.`,
       itemId: item.id,
-      actionUrl: `show-detail.html?source=local&itemId=${encodeURIComponent(item.id)}`,
+      actionUrl: `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(item.id)}`,
       snoozeMinutes: state.preferences.notificationSnoozeMinutes || 60
     });
   } catch (err) {
@@ -4172,7 +4172,7 @@ const SHOW_DETAIL_PAGE_CATEGORIES = [...EPISODE_TRACKED_CATEGORIES, "movie", "ga
 function openItemForCategory(id) {
   const item = state.items.find(i => i.id === id);
   if (item && SHOW_DETAIL_PAGE_CATEGORIES.includes(item.category)) {
-    const detailUrl = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    const detailUrl = `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
     if (typeof navigateToAppPage === "function") navigateToAppPage(detailUrl);
     else window.location.href = detailUrl;
     return;
@@ -4181,7 +4181,7 @@ function openItemForCategory(id) {
   // the tap useful for detail-page categories instead of opening an empty
   // editor modal when the in-memory lookup briefly has no item.
   if (!item && id) {
-    const detailUrl = `show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
+    const detailUrl = `static/pages/main/show-detail.html?source=local&itemId=${encodeURIComponent(id)}`;
     if (typeof navigateToAppPage === "function") navigateToAppPage(detailUrl);
     else window.location.href = detailUrl;
     return;
