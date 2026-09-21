@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base href="../../../static/pages/"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>SquashDB - Show Details</title><link rel="manifest" href="../../../manifest.json"><link rel="icon" href="../../../squashdb-logo.svg" type="image/svg+xml"><link rel="stylesheet" href="../../../static/index.css"><script src="../../../core/logcat.js"></script><script src="../../../lucide.min.js"></script></head>
+<body><div id="app-container">
+<main><section class="tab-content active">
+
+<div class="show-detail-topbar">
+  <button class="page-back-btn show-detail-topbar-link show-detail-topbar-back" type="button" id="show-detail-back-btn-top" data-back-fallback="dashboard.html"><i data-lucide="chevron-left"></i>Back</button>
+  <span class="show-detail-topbar-category" id="show-detail-topbar-category"></span>
+  <button class="show-detail-topbar-delete" type="button" id="show-detail-delete-btn-top" title="Delete from list" style="display:none;"><i data-lucide="trash-2"></i></button>
+</div>
+
+<div class="show-detail-header" id="show-detail-header">
+  <div id="show-detail-thumb-wrap" class="show-detail-poster-wrap"></div>
+  <div class="show-detail-header-body">
+    <h1 id="show-detail-topbar-title" class="show-detail-title"></h1>
+    <div class="show-detail-badge-row">
+      <span id="show-detail-production-badge" class="show-detail-production-badge" style="display:none;"></span>
+      <span id="show-detail-source-badge" class="discover-result-source" style="display:none;"></span>
+      <span id="show-detail-cache-badge" class="show-detail-cache-badge" style="display:none;"><i data-lucide="wifi-off"></i> Offline cache</span>
+    </div>
+    <p id="show-detail-meta" class="show-detail-meta"></p>
+    <div class="show-detail-progress-wrap" aria-label="Progress">
+      <div class="show-detail-progress-track"><span id="show-detail-progress-bar"></span></div>
+      <span id="show-detail-progress-label" class="show-detail-progress-label"></span>
+    </div>
+  </div>
+</div>
+
+<div class="show-detail-primary-actions" id="show-detail-primary-actions" style="display:none;">
+  <button type="button" class="btn btn-primary" id="show-detail-next-episode-btn"><i data-lucide="play"></i><span>Next episode</span></button>
+  <button type="button" class="btn btn-secondary" id="show-detail-mark-previous-btn"><i data-lucide="check-check"></i><span>Mark previous watched</span></button>
+  <button type="button" class="btn btn-secondary" id="show-detail-offline-download-btn"><i data-lucide="list-plus"></i><span>Add to dashboard</span></button>
+</div>
+
+<p class="show-detail-summary" id="show-detail-summary" style="display:none;"></p>
+<div id="steam-extra-section" class="steam-extra-section" style="display:none;"></div>
+
+<p class="settings-row-note" id="show-detail-offline-notice" style="display:none;">You're offline — showing the last saved details for this title. Episode list may be incomplete until you're back online.</p>
+
+<div class="show-detail-section-title" id="show-detail-tracking-title" style="display:none;">Tracking</div>
+<div class="show-detail-menu-group" id="show-detail-tracking-group" style="display:none;">
+  <button type="button" class="show-detail-menu-item" id="show-detail-addlist-row" style="display:none;">
+    <span>Add to list</span>
+    <span class="show-detail-menu-value"><span id="show-detail-addlist-value"></span><span class="show-detail-chevron">❯</span></span>
+  </button>
+  <select id="show-detail-addlist" style="display:none;">
+    <option value="">Select a list…</option>
+  </select>
+
+  <button type="button" class="show-detail-menu-item" id="show-detail-status-row" style="display:none;">
+    <span>Status</span>
+    <span class="show-detail-menu-value"><span id="show-detail-status-value"></span><span class="show-detail-chevron">❯</span></span>
+  </button>
+  <select id="show-detail-status" style="display:none;"></select>
+
+  <div class="show-detail-menu-item" id="show-detail-compdate-row" style="display:none;">
+    <span>Completion Date</span>
+    <input type="date" id="show-detail-compdate" class="show-detail-inline-date">
+  </div>
+</div>
+
+<div class="settings-section" id="show-detail-book-progress-section" style="display:none;">
+  <div class="form-row">
+    <div class="form-group">
+      <label for="show-detail-total-volumes">Total Volumes</label>
+      <input type="number" id="show-detail-total-volumes" class="form-control" min="0" placeholder="e.g. 12">
+    </div>
+    <div class="form-group">
+      <label for="show-detail-volumes-read">Volumes Read</label>
+      <input type="number" id="show-detail-volumes-read" class="form-control" min="0" value="0">
+    </div>
+  </div>
+  <div class="form-row" id="show-detail-chapters-row" style="display:none;">
+    <div class="form-group">
+      <label for="show-detail-total-chapters">Total Chapters</label>
+      <input type="number" id="show-detail-total-chapters" class="form-control" min="0" placeholder="e.g. 150">
+    </div>
+    <div class="form-group">
+      <label for="show-detail-chapters-read">Chapters Read</label>
+      <input type="number" id="show-detail-chapters-read" class="form-control" min="0" value="0">
+    </div>
+  </div>
+  <div class="form-group" id="show-detail-min-per-chapter-group" style="display:none;">
+    <label for="show-detail-min-per-chapter">Avg. Reading Time per Chapter (minutes)</label>
+    <input type="number" id="show-detail-min-per-chapter" class="form-control" min="0" placeholder="e.g. 15" value="15">
+  </div>
+</div>
+
+<div class="show-detail-season-section" id="show-detail-season-section" style="display:none;">
+  <button type="button" class="show-detail-season-btn" id="show-detail-season-select">
+    <span id="show-detail-season-btn-label">Season</span>
+    <span class="show-detail-season-btn-caret">▼</span>
+  </button>
+  <div class="show-detail-episode-filters" id="show-detail-episode-filters" aria-label="Episode filters">
+    <button type="button" class="show-detail-episode-filter active" data-episode-filter="all">All</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="watched">Watched</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="unwatched">Unwatched</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="upcoming">Upcoming</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="filler">Filler</button>
+    <button type="button" class="show-detail-episode-filter" data-episode-filter="recap">Recap</button>
+  </div>
+  <div id="show-detail-episode-list" class="show-detail-episode-list"></div>
+</div>
+
+<div class="show-detail-section-title" id="show-detail-rating-title" style="display:none;">Rating</div>
+<div class="show-detail-menu-group show-detail-inline-group" id="show-detail-rating-group" style="display:none;">
+  <div id="show-detail-rating-widget"></div>
+</div>
+
+<div class="show-detail-section-title" id="show-detail-notes-title" style="display:none;">Notes / Thoughts</div>
+<div class="show-detail-menu-group show-detail-inline-group" id="show-detail-notes-group" style="display:none;">
+  <button type="button" class="show-detail-notes-toggle" id="show-detail-notes-toggle"><span>Expand notes</span><i data-lucide="chevron-down"></i></button>
+  <textarea id="show-detail-notes" class="show-detail-notes-textarea" rows="3" placeholder="Add optional details, links, or comments..."></textarea>
+</div>
+
+<div class="show-detail-related-section" id="show-detail-related-section" style="display:none;">
+  <div class="show-detail-section-title">Related titles &amp; recommendations</div>
+  <div id="show-detail-related-list" class="show-detail-related-list"></div>
+</div>
+
+<div class="page-back-actions">
+  <button class="page-back-btn" type="button" id="show-detail-back-btn" data-back-fallback="dashboard.html"><i data-lucide="arrow-left"></i> Back</button>
+</div>
+
+</section></main>
+<div id="picker-modal" class="modal-overlay">
+  <div class="modal-content picker-sheet">
+    <div class="modal-header">
+      <h3 id="picker-modal-title" class="modal-title">Options</h3>
+      <button class="modal-close" id="picker-modal-close">&times;</button>
+    </div>
+    <div id="picker-options-list" class="picker-options-list"></div>
+  </div>
+</div>
+<div id="episode-image-modal" class="modal-overlay image-modal-overlay">
+  <button class="modal-close image-modal-close" id="episode-image-modal-close">&times;</button>
+  <img id="episode-image-modal-img" class="image-modal-img" src="" alt="Episode still">
+</div>
+</div>
+<script src="../../../core/applock.js"></script><script src="../../../features/metadata.js"></script><script src="../../../core/cache-manager.js"></script><script src="../../../core/app-navigation.js"></script><script src="../../../core/app-backups.js"></script><script src="../../../core/app-search.js"></script><script src="../../../app.js"></script><script src="../../../core/fonts.js"></script><script src="../../../features/show-detail.js"></script>
+</body></html>
