@@ -29,6 +29,18 @@ function corsHeaders() {
   };
 }
 
+function staticHeaders(contentType) {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Cache-Control": process.env.NODE_ENV === "production"
+      ? "public, max-age=31536000, immutable"
+      : "no-cache",
+    "Content-Type": contentType
+  };
+}
+
 function send(res, statusCode, headers, body) {
   res.writeHead(statusCode, headers);
   res.end(body);
@@ -100,10 +112,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   const ext = path.extname(filePath).toLowerCase();
-  const headers = {
-    ...corsHeaders(),
-    "Content-Type": MIME_TYPES[ext] || "application/octet-stream"
-  };
+  const headers = staticHeaders(MIME_TYPES[ext] || "application/octet-stream");
   fs.createReadStream(filePath).pipe(res.writeHead(200, headers));
 });
 

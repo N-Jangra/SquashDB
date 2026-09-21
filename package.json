@@ -5,6 +5,7 @@
   "main": "app.js",
   "scripts": {
     "build": "cp CHANGELOG.md www/CHANGELOG.md && echo \"Building static web assets...\"",
+    "build:production": "cp CHANGELOG.md www/CHANGELOG.md && NODE_ENV=production echo \"Production assets prepared; serve with NODE_ENV=production npm run serve\"",
     "serve": "node dev-server.js",
     "cap:sync": "cap sync",
     "cap:add": "cap add android",
